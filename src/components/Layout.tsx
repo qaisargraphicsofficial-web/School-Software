@@ -46,6 +46,7 @@ export default function Layout({ profile }: LayoutProps) {
   const [profileName, setProfileName] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [schoolName, setSchoolName] = useState('EduManage');
+  const [logoUrl, setLogoUrl] = useState('');
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -65,18 +66,20 @@ export default function Layout({ profile }: LayoutProps) {
   }, [isDarkMode]);
 
   useEffect(() => {
-    const fetchSchoolName = async () => {
+    const fetchSchoolSettings = async () => {
       try {
         const docRef = doc(db, 'settings', 'global');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setSchoolName(docSnap.data().schoolName);
+          const data = docSnap.data();
+          setSchoolName(data.schoolName || 'EduManage');
+          setLogoUrl(data.logoUrl || '');
         }
       } catch (error) {
-        console.error("Error fetching school name:", error);
+        console.error("Error fetching school settings:", error);
       }
     };
-    fetchSchoolName();
+    fetchSchoolSettings();
   }, []);
 
   useEffect(() => {
@@ -169,8 +172,12 @@ export default function Layout({ profile }: LayoutProps) {
       )}>
         <div className="h-full flex flex-col">
           <div className="p-8 flex items-center gap-4 border-b border-slate-100">
-            <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-200">
-              <School className="w-7 h-7 text-white" />
+            <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-200 overflow-hidden flex items-center justify-center w-12 h-12">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <School className="w-7 h-7 text-white" />
+              )}
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold text-slate-900 tracking-tight">{schoolName}</span>

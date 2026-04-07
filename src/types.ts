@@ -212,7 +212,16 @@ export interface SchoolSettings {
   schoolContact: string;
   schoolEmail: string;
   academicYear: string;
+  defaultAdmissionYear: string;
+  academicSession: string;
   currency: string;
+  timezone: string;
+  notificationPreferences: {
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+  };
+  staffPermissions: Record<string, string[]>;
   enableNotifications: boolean;
   allowParentRegistration: boolean;
   maintenanceMode: boolean;

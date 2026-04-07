@@ -20,7 +20,13 @@ import {
   EyeOff,
   AlertTriangle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Briefcase,
+  GraduationCap,
+  HelpCircle,
+  Clock,
+  Smartphone,
+  Layout
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -28,6 +34,16 @@ import { cn } from '../lib/utils';
 interface SettingsProps {
   profile: UserProfile | null;
 }
+
+const Tooltip = ({ text }: { text: string }) => (
+  <div className="group relative inline-block ml-1">
+    <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help hover:text-indigo-600 transition-colors" />
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-48 z-50 shadow-xl">
+      {text}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900" />
+    </div>
+  </div>
+);
 
 export default function Settings({ profile }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'academic' | 'security' | 'system'>('general');
@@ -41,10 +57,25 @@ export default function Settings({ profile }: SettingsProps) {
     schoolContact: '+1 234 567 890',
     schoolEmail: 'admin@edumanage.pro',
     academicYear: '2025-2026',
+    defaultAdmissionYear: '2025',
+    academicSession: '2025-2026',
     currency: 'USD',
+    timezone: 'UTC (GMT+0)',
+    notificationPreferences: {
+      email: true,
+      push: true,
+      sms: false
+    },
+    staffPermissions: {
+      'Teacher': ['Students', 'Academic', 'Attendance', 'Diary'],
+      'Administrator': ['Students', 'Staff', 'Academic', 'Finance', 'Inventory', 'Settings'],
+      'Accountant': ['Finance', 'Inventory'],
+      'Librarian': ['Library']
+    },
     enableNotifications: true,
     allowParentRegistration: true,
     maintenanceMode: false,
+    logoUrl: '',
     updatedAt: new Date().toISOString()
   });
 
@@ -95,7 +126,7 @@ export default function Settings({ profile }: SettingsProps) {
   const tabs = [
     { id: 'general', name: 'General', icon: Building2 },
     { id: 'academic', name: 'Academic', icon: Calendar },
-    { id: 'security', name: 'Security', icon: ShieldCheck },
+    { id: 'security', name: 'Security & Access', icon: ShieldCheck },
     { id: 'system', name: 'System', icon: Database },
   ];
 
@@ -108,11 +139,11 @@ export default function Settings({ profile }: SettingsProps) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-8 pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">System Settings</h1>
-          <p className="text-slate-500 font-medium">Configure global application parameters and school information.</p>
+          <p className="text-slate-500 font-medium">Manage your institution's global configuration and access controls.</p>
         </div>
         
         <AnimatePresence>
@@ -133,7 +164,7 @@ export default function Settings({ profile }: SettingsProps) {
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Sidebar Tabs */}
         <div className="w-full lg:w-64 shrink-0">
-          <div className="bg-white rounded-[32px] border border-slate-200 p-3 space-y-1 shadow-sm">
+          <div className="bg-white rounded-[32px] border border-slate-200 p-3 space-y-1 shadow-sm sticky top-6">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -173,35 +204,116 @@ export default function Settings({ profile }: SettingsProps) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Name</label>
-                      <div className="relative">
-                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                          type="text"
-                          className="input-field pl-11"
-                          value={settings.schoolName}
-                          onChange={e => setSettings({...settings, schoolName: e.target.value})}
-                          placeholder="e.g. Knowledge Academy"
-                        />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Logo Section */}
+                    <div className="space-y-4 md:col-span-2 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Logo</label>
+                        <Tooltip text="The official logo of your school. This will appear in the sidebar and on generated certificates/reports." />
+                      </div>
+                      <div className="flex gap-6 items-center">
+                        <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center border border-slate-200 overflow-hidden shadow-sm shrink-0">
+                          {settings.logoUrl ? (
+                            <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Globe className="w-8 h-8 text-slate-300" />
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <input
+                            type="url"
+                            className="input-field"
+                            value={settings.logoUrl}
+                            onChange={e => setSettings({...settings, logoUrl: e.target.value})}
+                            placeholder="https://example.com/logo.png"
+                          />
+                          <p className="text-[10px] text-slate-400 font-medium italic">Provide a direct image URL (PNG or JPG recommended).</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Email</label>
-                      <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                          type="email"
-                          className="input-field pl-11"
-                          value={settings.schoolEmail}
-                          onChange={e => setSettings({...settings, schoolEmail: e.target.value})}
-                          placeholder="admin@school.com"
-                        />
+
+                    {/* Basic Info Section */}
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Name</label>
+                          <Tooltip text="The full official name of your institution." />
+                        </div>
+                        <div className="relative">
+                          <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            className="input-field pl-11"
+                            value={settings.schoolName}
+                            onChange={e => setSettings({...settings, schoolName: e.target.value})}
+                            placeholder="e.g. Knowledge Academy"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Email</label>
+                          <Tooltip text="Primary contact email for system communications." />
+                        </div>
+                        <div className="relative">
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type="email"
+                            className="input-field pl-11"
+                            value={settings.schoolEmail}
+                            onChange={e => setSettings({...settings, schoolEmail: e.target.value})}
+                            placeholder="admin@school.com"
+                          />
+                        </div>
                       </div>
                     </div>
+
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Contact Number</label>
+                          <Tooltip text="Official phone number for the school office." />
+                        </div>
+                        <div className="relative">
+                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type="tel"
+                            className="input-field pl-11"
+                            value={settings.schoolContact}
+                            onChange={e => setSettings({...settings, schoolContact: e.target.value})}
+                            placeholder="+1 234 567 890"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Default Currency</label>
+                          <Tooltip text="The primary currency used for fee collection and payroll." />
+                        </div>
+                        <div className="relative">
+                          <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select
+                            className="input-field pl-11"
+                            value={settings.currency}
+                            onChange={e => setSettings({...settings, currency: e.target.value})}
+                          >
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                            <option value="GBP">GBP (£)</option>
+                            <option value="PKR">PKR (Rs)</option>
+                            <option value="INR">INR (₹)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Address</label>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Address / Location</label>
+                        <Tooltip text="The physical location of the main campus." />
+                      </div>
                       <div className="relative">
                         <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
                         <textarea
@@ -209,38 +321,8 @@ export default function Settings({ profile }: SettingsProps) {
                           className="input-field pl-11 pt-3"
                           value={settings.schoolAddress}
                           onChange={e => setSettings({...settings, schoolAddress: e.target.value})}
-                          placeholder="Full physical address..."
+                          placeholder="Full physical address or location details..."
                         />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Contact Number</label>
-                      <div className="relative">
-                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                          type="tel"
-                          className="input-field pl-11"
-                          value={settings.schoolContact}
-                          onChange={e => setSettings({...settings, schoolContact: e.target.value})}
-                          placeholder="+1 234 567 890"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Currency</label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select
-                          className="input-field pl-11"
-                          value={settings.currency}
-                          onChange={e => setSettings({...settings, currency: e.target.value})}
-                        >
-                          <option value="USD">USD ($)</option>
-                          <option value="EUR">EUR (€)</option>
-                          <option value="GBP">GBP (£)</option>
-                          <option value="PKR">PKR (Rs)</option>
-                          <option value="INR">INR (₹)</option>
-                        </select>
                       </div>
                     </div>
                   </div>
@@ -254,32 +336,103 @@ export default function Settings({ profile }: SettingsProps) {
                       <Calendar className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900">Academic Configuration</h3>
-                      <p className="text-sm text-slate-500 font-medium">Manage terms, years and sessions.</p>
+                      <h3 className="text-xl font-black text-slate-900">Academic & Student Configuration</h3>
+                      <p className="text-sm text-slate-500 font-medium">Manage terms, sessions and student-specific defaults.</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Current Academic Year</label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        value={settings.academicYear}
-                        onChange={e => setSettings({...settings, academicYear: e.target.value})}
-                        placeholder="2025-2026"
-                      />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Session Section */}
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Current Academic Session</label>
+                          <Tooltip text="The active academic period (e.g. 2025-2026)." />
+                        </div>
+                        <div className="relative">
+                          <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            className="input-field pl-11"
+                            value={settings.academicSession}
+                            onChange={e => setSettings({...settings, academicSession: e.target.value})}
+                            placeholder="2025-2026"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Default Admission Year</label>
+                          <Tooltip text="The default year assigned to new student admissions." />
+                        </div>
+                        <div className="relative">
+                          <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            className="input-field pl-11"
+                            value={settings.defaultAdmissionYear}
+                            onChange={e => setSettings({...settings, defaultAdmissionYear: e.target.value})}
+                            placeholder="2025"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Time Zone</label>
-                      <div className="relative">
-                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select className="input-field pl-11">
-                          <option>UTC (GMT+0)</option>
-                          <option>EST (GMT-5)</option>
-                          <option>PST (GMT-8)</option>
-                          <option>PKT (GMT+5)</option>
-                        </select>
+
+                    {/* System Parameters Section */}
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">System Time Zone</label>
+                          <Tooltip text="The time zone used for all system timestamps and reminders." />
+                        </div>
+                        <div className="relative">
+                          <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select 
+                            className="input-field pl-11"
+                            value={settings.timezone}
+                            onChange={e => setSettings({...settings, timezone: e.target.value})}
+                          >
+                            <option>UTC (GMT+0)</option>
+                            <option>EST (GMT-5)</option>
+                            <option>PST (GMT-8)</option>
+                            <option>PKT (GMT+5)</option>
+                            <option>IST (GMT+5:30)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Notification Channels</label>
+                          <Tooltip text="Choose which channels are active for system-wide notifications." />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['email', 'push', 'sms'] as const).map((channel) => (
+                            <button
+                              key={channel}
+                              type="button"
+                              onClick={() => setSettings({
+                                ...settings,
+                                notificationPreferences: {
+                                  ...settings.notificationPreferences,
+                                  [channel]: !settings.notificationPreferences[channel]
+                                }
+                              })}
+                              className={cn(
+                                "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                                settings.notificationPreferences[channel]
+                                  ? "bg-indigo-50 border-indigo-200 text-indigo-600"
+                                  : "bg-white border-slate-100 text-slate-400"
+                              )}
+                            >
+                              {channel === 'email' && <Mail className="w-4 h-4" />}
+                              {channel === 'push' && <Smartphone className="w-4 h-4" />}
+                              {channel === 'sms' && <Bell className="w-4 h-4" />}
+                              <span className="text-[9px] font-black uppercase tracking-widest">{channel}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -293,84 +446,118 @@ export default function Settings({ profile }: SettingsProps) {
                       <ShieldCheck className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900">Security & Permissions</h3>
-                      <p className="text-sm text-slate-500 font-medium">Control access and user registration.</p>
+                      <h3 className="text-xl font-black text-slate-900">Security & Access Control</h3>
+                      <p className="text-sm text-slate-500 font-medium">Manage user permissions and system access.</p>
                     </div>
                   </div>
 
                   <div className="space-y-6">
-                    <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                      <div>
-                        <h4 className="font-bold text-slate-900">Allow Parent Registration</h4>
-                        <p className="text-xs text-slate-500 font-medium">Enable parents to create their own accounts via the portal.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-900">Allow Parent Registration</h4>
+                            <Tooltip text="Enable parents to create their own accounts via the portal." />
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-medium">Self-service account creation.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSettings({...settings, allowParentRegistration: !settings.allowParentRegistration})}
+                          className={cn(
+                            "w-14 h-8 rounded-full transition-all relative",
+                            settings.allowParentRegistration ? "bg-indigo-600" : "bg-slate-300"
+                          )}
+                        >
+                          <div className={cn(
+                            "absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm",
+                            settings.allowParentRegistration ? "left-7" : "left-1"
+                          )} />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setSettings({...settings, allowParentRegistration: !settings.allowParentRegistration})}
-                        className={cn(
-                          "w-14 h-8 rounded-full transition-all relative",
-                          settings.allowParentRegistration ? "bg-indigo-600" : "bg-slate-300"
-                        )}
-                      >
-                        <div className={cn(
-                          "absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm",
-                          settings.allowParentRegistration ? "left-7" : "left-1"
-                        )} />
-                      </button>
+
+                      <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-900">System Notifications</h4>
+                            <Tooltip text="Send automated alerts for tasks, fees and attendance." />
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-medium">Global notification engine.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSettings({...settings, enableNotifications: !settings.enableNotifications})}
+                          className={cn(
+                            "w-14 h-8 rounded-full transition-all relative",
+                            settings.enableNotifications ? "bg-indigo-600" : "bg-slate-300"
+                          )}
+                        >
+                          <div className={cn(
+                            "absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm",
+                            settings.enableNotifications ? "left-7" : "left-1"
+                          )} />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                      <div>
-                        <h4 className="font-bold text-slate-900">Enable System Notifications</h4>
-                        <p className="text-xs text-slate-500 font-medium">Send automated alerts for tasks, fees and attendance.</p>
+                    <div className="p-8 bg-slate-50 rounded-[32px] border border-slate-100 space-y-8">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-black text-slate-900 flex items-center gap-2 uppercase tracking-widest text-xs">
+                          <Lock className="w-4 h-4 text-indigo-600" />
+                          Granular Role Permissions
+                        </h4>
+                        <Tooltip text="Define which modules each staff role can access. This controls the sidebar visibility and page access." />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setSettings({...settings, enableNotifications: !settings.enableNotifications})}
-                        className={cn(
-                          "w-14 h-8 rounded-full transition-all relative",
-                          settings.enableNotifications ? "bg-indigo-600" : "bg-slate-300"
-                        )}
-                      >
-                        <div className={cn(
-                          "absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm",
-                          settings.enableNotifications ? "left-7" : "left-1"
-                        )} />
-                      </button>
-                    </div>
-
-                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
-                      <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                        <Lock className="w-4 h-4 text-indigo-600" />
-                        Role-Based Access Control
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-white rounded-2xl border border-slate-100">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Staff Permissions</p>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                              <input type="checkbox" defaultChecked className="rounded border-slate-300 text-indigo-600" />
-                              Manage Students
-                            </label>
-                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                              <input type="checkbox" defaultChecked className="rounded border-slate-300 text-indigo-600" />
-                              Mark Attendance
-                            </label>
-                          </div>
-                        </div>
-                        <div className="p-4 bg-white rounded-2xl border border-slate-100">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Student Permissions</p>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                              <input type="checkbox" defaultChecked className="rounded border-slate-300 text-indigo-600" />
-                              View Results
-                            </label>
-                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                              <input type="checkbox" className="rounded border-slate-300 text-indigo-600" />
-                              Edit Profile
-                            </label>
-                          </div>
-                        </div>
+                      
+                      <div className="grid grid-cols-1 gap-8">
+                        {Object.entries(settings.staffPermissions).map(([role, permissions]) => {
+                          const perms = permissions as string[];
+                          return (
+                            <div key={role} className="space-y-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200 shadow-sm">
+                                  <Briefcase className="w-4 h-4 text-indigo-600" />
+                                </div>
+                                <div>
+                                  <h5 className="text-sm font-black text-slate-900">{role}</h5>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Module Access</p>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                {['Students', 'Staff', 'Academic', 'Finance', 'Inventory', 'Library', 'Diary', 'Exams', 'Settings'].map((module) => (
+                                  <label
+                                    key={module}
+                                    className={cn(
+                                      "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                                      perms.includes(module)
+                                        ? "bg-white border-indigo-200 shadow-sm"
+                                        : "bg-slate-100/50 border-transparent opacity-60"
+                                    )}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                      checked={perms.includes(module)}
+                                      onChange={(e) => {
+                                        const newPermissions = e.target.checked
+                                          ? [...perms, module]
+                                          : perms.filter(p => p !== module);
+                                        setSettings({
+                                          ...settings,
+                                          staffPermissions: {
+                                            ...settings.staffPermissions,
+                                            [role]: newPermissions
+                                          }
+                                        });
+                                      }}
+                                    />
+                                    <span className="text-[11px] font-bold text-slate-700">{module}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -394,8 +581,11 @@ export default function Settings({ profile }: SettingsProps) {
                       <div className="flex gap-4">
                         <AlertTriangle className="w-10 h-10 text-rose-600 shrink-0" />
                         <div>
-                          <h4 className="font-bold text-slate-900">Maintenance Mode</h4>
-                          <p className="text-xs text-slate-500 font-medium">Restrict all user access except administrators for system updates.</p>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-900">Maintenance Mode</h4>
+                            <Tooltip text="Restrict all user access except administrators for system updates. Users will see a maintenance screen." />
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-medium">Restrict all user access except administrators for system updates.</p>
                         </div>
                       </div>
                       <button
@@ -413,18 +603,45 @@ export default function Settings({ profile }: SettingsProps) {
                       </button>
                     </div>
 
-                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
-                      <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                        <Database className="w-4 h-4 text-indigo-600" />
-                        Data Backup
-                      </h4>
-                      <p className="text-xs text-slate-500 font-medium">Download a full snapshot of your school database in JSON format.</p>
-                      <button
-                        type="button"
-                        className="px-6 py-3 bg-white border border-slate-200 text-slate-900 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-all shadow-sm"
-                      >
-                        Generate Backup
-                      </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                            <Database className="w-4 h-4 text-indigo-600" />
+                            Data Backup
+                          </h4>
+                          <Tooltip text="Download a full snapshot of your school database in JSON format. Highly recommended before major changes." />
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-medium">Download a full snapshot of your school database in JSON format.</p>
+                        <button
+                          type="button"
+                          className="w-full px-6 py-3 bg-white border border-slate-200 text-slate-900 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+                        >
+                          Generate Backup
+                        </button>
+                      </div>
+
+                      <div className="p-6 bg-rose-50/30 rounded-3xl border border-rose-100 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-rose-600 flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4" />
+                            Factory Reset
+                          </h4>
+                          <Tooltip text="Permanently delete all records and reset the system to defaults. This action CANNOT be undone." />
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-medium">Permanently delete all records and reset the system to defaults.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm("CRITICAL WARNING: This will delete ALL data permanently. Are you absolutely sure?")) {
+                              alert("This feature is restricted for safety. Please contact system support for a full reset.");
+                            }
+                          }}
+                          className="w-full px-6 py-3 bg-rose-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-rose-700 transition-all shadow-sm"
+                        >
+                          Reset System
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

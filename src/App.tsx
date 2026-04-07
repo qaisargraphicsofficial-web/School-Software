@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile, UserRole } from './types';
 import Login from './components/Login';
@@ -35,7 +35,15 @@ export default function App() {
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
-          setProfile(docSnap.data() as UserProfile);
+          const existingProfile = docSnap.data() as UserProfile;
+          // Ensure primary admin always has admin role
+          if (firebaseUser.email === "qaisarabbas6496@gmail.com" && existingProfile.role !== 'admin') {
+            const updatedProfile = { ...existingProfile, role: 'admin' as UserRole };
+            await updateDoc(docRef, { role: 'admin' });
+            setProfile(updatedProfile);
+          } else {
+            setProfile(existingProfile);
+          }
         } else {
           // Default to parent or staff if not set, but admin for the specific email
           const defaultRole: UserRole = firebaseUser.email === "qaisarabbas6496@gmail.com" ? 'admin' : 'parent';
