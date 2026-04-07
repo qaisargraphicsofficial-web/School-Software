@@ -30,6 +30,7 @@ export default function Finance({ profile }: FinanceProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [show1Bill, setShow1Bill] = useState(false);
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null);
+  const [viewingVoucher, setViewingVoucher] = useState<Fee | null>(null);
 
   // Form states
   const [feeForm, setFeeForm] = useState<Partial<Fee>>({
@@ -169,13 +170,42 @@ export default function Finance({ profile }: FinanceProps) {
           </button>
         </div>
         {profile?.role === 'admin' && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-5 h-5" />
-            Add {activeTab === 'fees' ? 'Fee Record' : 'Expense'}
-          </button>
+          <div className="flex gap-3">
+            {activeTab === 'fees' && (
+              <button
+                onClick={() => {
+                  setFeeForm({
+                    ...feeForm,
+                    status: 'pending',
+                    receiptNumber: `VCH-${Date.now().toString().slice(-6)}`
+                  });
+                  setIsModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-200 px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-100 transition-colors shadow-sm"
+              >
+                <Receipt className="w-5 h-5" />
+                Generate Voucher
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (activeTab === 'fees') {
+                  setFeeForm({
+                    studentId: '',
+                    amount: 0,
+                    date: new Date().toISOString().split('T')[0],
+                    status: 'paid',
+                    receiptNumber: `REC-${Date.now().toString().slice(-6)}`
+                  });
+                }
+                setIsModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              Add {activeTab === 'fees' ? 'Fee Record' : 'Expense'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -282,7 +312,10 @@ export default function Finance({ profile }: FinanceProps) {
                               1Bill Pay
                             </button>
                           )}
-                          <button className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+                          <button 
+                            onClick={() => setViewingVoucher(fee)}
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          >
                             <Receipt className="w-5 h-5" />
                           </button>
                         </div>
@@ -502,6 +535,114 @@ export default function Finance({ profile }: FinanceProps) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Printable Voucher Modal */}
+      <AnimatePresence>
+        {viewingVoucher && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 print:p-0 print:bg-white">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/80 backdrop-blur-md print:hidden"
+              onClick={() => setViewingVoucher(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-3xl p-8 w-full max-w-2xl shadow-2xl print:shadow-none print:max-w-none print:rounded-none print:p-0"
+            >
+              <div className="flex justify-between items-center mb-6 print:hidden">
+                <h2 className="text-2xl font-bold text-slate-900">Fee Voucher</h2>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setViewingVoucher(null)}
+                    className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors font-medium"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-medium flex items-center gap-2"
+                  >
+                    <Receipt className="w-4 h-4" />
+                    Print Voucher
+                  </button>
+                </div>
+              </div>
+
+              {/* Printable Area */}
+              <div className="border-2 border-slate-200 rounded-2xl p-8 print:border-none print:p-0">
+                <div className="flex justify-between items-start mb-8 pb-8 border-b-2 border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
+                      <School className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h1 className="text-2xl font-black text-slate-900 tracking-tight">EduManage Pro</h1>
+                      <p className="text-sm text-slate-500 font-medium">Official Fee Voucher</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Voucher No.</p>
+                    <p className="text-lg font-bold text-slate-900">{viewingVoucher.receiptNumber}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8 mb-8">
+                  <div>
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Billed To</p>
+                    <p className="text-lg font-bold text-slate-900">
+                      {students.find(s => s.id === viewingVoucher.studentId)?.name || 'Unknown Student'}
+                    </p>
+                    <p className="text-slate-500">
+                      Class: {students.find(s => s.id === viewingVoucher.studentId)?.class || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Issue Date</p>
+                    <p className="text-lg font-bold text-slate-900">{viewingVoucher.date}</p>
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-4 mb-2">Status</p>
+                    <p className={cn(
+                      "inline-flex px-3 py-1 rounded-full text-sm font-bold",
+                      viewingVoucher.status === 'paid' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                    )}>
+                      {viewingVoucher.status.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+
+                <table className="w-full mb-8">
+                  <thead>
+                    <tr className="border-b-2 border-slate-100">
+                      <th className="text-left py-4 text-sm font-bold text-slate-400 uppercase tracking-widest">Description</th>
+                      <th className="text-right py-4 text-sm font-bold text-slate-400 uppercase tracking-widest">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-slate-100">
+                      <td className="py-4 font-medium text-slate-900">Tuition Fee - {new Date(viewingVoucher.date).toLocaleString('default', { month: 'long', year: 'numeric' })}</td>
+                      <td className="py-4 text-right font-bold text-slate-900">${viewingVoucher.amount.toLocaleString()}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="py-4 text-right font-bold text-slate-900 text-lg">Total Amount:</td>
+                      <td className="py-4 text-right font-black text-indigo-600 text-2xl">${viewingVoucher.amount.toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                <div className="text-center pt-8 border-t-2 border-slate-100 text-slate-500 text-sm">
+                  <p>Please pay the exact amount before the due date to avoid late fees.</p>
+                  <p className="mt-1 font-medium">Thank you for your prompt payment.</p>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

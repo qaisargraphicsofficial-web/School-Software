@@ -23,7 +23,9 @@ import {
   Settings,
   UserCircle,
   Moon,
-  Sun
+  Sun,
+  PieChart,
+  Calendar
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, getDoc } from 'firebase/firestore';
@@ -139,20 +141,19 @@ export default function Layout({ profile }: LayoutProps) {
   };
 
   const navItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
-    { name: 'Students', icon: Users, path: '/students', roles: ['admin', 'staff'] },
-    { name: 'Staff', icon: UserSquare2, path: '/staff', roles: ['admin', 'staff'] },
-    { name: 'Academic', icon: GraduationCap, path: '/academic', roles: ['admin', 'staff', 'student', 'parent'] },
-    { name: 'Curriculum', icon: BookOpen, path: '/curriculum', roles: ['admin', 'staff', 'student', 'parent'] },
-    { name: 'Exams', icon: FileText, path: '/exams', roles: ['admin', 'staff', 'student', 'parent'] },
-    { name: 'Library', icon: Library, path: '/library', roles: ['admin', 'staff', 'student', 'parent'] },
-    { name: 'Daily Diary', icon: BookText, path: '/diary', roles: ['admin', 'staff', 'student', 'parent'] },
-    { name: 'Certificates', icon: Award, path: '/certificates', roles: ['admin', 'staff', 'student', 'parent'] },
-    { name: 'Finance', icon: Wallet, path: '/finance', roles: ['admin', 'staff'] },
-    { name: 'Inventory', icon: Package, path: '/inventory', roles: ['admin', 'staff'] },
-    { name: 'Tasks', icon: CheckSquare, path: '/tasks', roles: ['admin', 'staff', 'student', 'parent'] },
-    { name: 'Communication', icon: Bell, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'] },
-    { name: 'Settings', icon: Settings, path: '/settings', roles: ['admin'] },
+    { name: 'Dashboard', icon: LayoutDashboard, path: '/', category: 'OVERVIEW' },
+    { name: 'Students', icon: Users, path: '/students', roles: ['admin', 'staff'], category: 'ACADEMICS' },
+    { name: 'Classes', icon: BookOpen, path: '/classes', roles: ['admin', 'staff'], category: 'ACADEMICS' },
+    { name: 'Attendance', icon: Calendar, path: '/attendance', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
+    { name: 'Results', icon: FileText, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
+    { name: 'Fees', icon: Wallet, path: '/fees', roles: ['admin', 'staff'], category: 'FINANCE' },
+    { name: 'Payroll', icon: FileText, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
+    { name: 'Expenses', icon: FileText, path: '/expenses', roles: ['admin', 'staff'], category: 'FINANCE' },
+    { name: 'Teachers', icon: UserSquare2, path: '/teachers', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
+    { name: 'Tasks', icon: CheckSquare, path: '/tasks', roles: ['admin', 'staff', 'student', 'parent'], category: 'STAFF & OPS' },
+    { name: 'Communication', icon: Bell, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION' },
+    { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS' },
+    { name: 'Settings', icon: Settings, path: '/settings', roles: ['admin'], category: 'AI & SETTINGS' },
   ];
 
   const filteredNavItems = navItems.filter(item => 
@@ -160,8 +161,24 @@ export default function Layout({ profile }: LayoutProps) {
   );
 
   if (profile?.role === 'admin') {
-    filteredNavItems.splice(filteredNavItems.length - 1, 0, { name: 'Campuses', icon: Building2, path: '/campuses' });
+    const tasksIndex = filteredNavItems.findIndex(i => i.name === 'Tasks');
+    if (tasksIndex !== -1) {
+      filteredNavItems.splice(tasksIndex + 1, 0, { name: 'Campuses', icon: Building2, path: '/campuses', category: 'STAFF & OPS' });
+    } else {
+      filteredNavItems.push({ name: 'Campuses', icon: Building2, path: '/campuses', category: 'STAFF & OPS' });
+    }
   }
+
+  // Group items by category
+  const groupedNavItems = filteredNavItems.reduce((acc, item) => {
+    const cat = item.category || 'OTHER';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {} as Record<string, typeof filteredNavItems>);
+
+  // Define category order
+  const categoryOrder = ['OVERVIEW', 'ACADEMICS', 'FINANCE', 'STAFF & OPS', 'COMMUNICATION', 'AI & SETTINGS', 'OTHER'];
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -185,26 +202,38 @@ export default function Layout({ profile }: LayoutProps) {
             </div>
           </div>
 
-          <nav className="flex-1 p-6 space-y-1.5 overflow-y-auto custom-scrollbar">
-            {filteredNavItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setIsSidebarOpen(false)}
-                className={cn(
-                  "flex items-center gap-3.5 px-4 py-3.5 rounded-2xl transition-all duration-300 group",
-                  location.pathname === item.path
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                )}
-              >
-                <item.icon className={cn(
-                  "w-5 h-5 transition-transform duration-300 group-hover:scale-110",
-                  location.pathname === item.path ? "text-white" : "text-slate-400 group-hover:text-slate-600"
-                )} />
-                <span className="font-bold text-sm tracking-tight">{item.name}</span>
-              </Link>
-            ))}
+          <nav className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar">
+            {categoryOrder.map(category => {
+              const items = groupedNavItems[category];
+              if (!items || items.length === 0) return null;
+              
+              return (
+                <div key={category} className="space-y-2">
+                  <h3 className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{category}</h3>
+                  <div className="space-y-1">
+                    {items.map((item) => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setIsSidebarOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-300 group border-2",
+                          location.pathname === item.path
+                            ? "bg-[#fdf6ea] text-amber-700 border-slate-900 shadow-sm"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent"
+                        )}
+                      >
+                        <item.icon className={cn(
+                          "w-5 h-5 transition-transform duration-300 group-hover:scale-110",
+                          location.pathname === item.path ? "text-amber-600" : "text-slate-400 group-hover:text-slate-600"
+                        )} />
+                        <span className="font-bold text-sm tracking-tight">{item.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </nav>
 
           <div className="p-6 border-t border-slate-100">

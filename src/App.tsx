@@ -10,7 +10,7 @@ import Dashboard from './components/Dashboard';
 import Students from './components/Students';
 import Staff from './components/Staff';
 import Academic from './components/Academic';
-import Finance from './components/Finance';
+import Fees from './components/Fees';
 import Inventory from './components/Inventory';
 import Communication from './components/Communication';
 import Curriculum from './components/Curriculum';
@@ -21,6 +21,8 @@ import Certificates from './components/Certificates';
 import Campuses from './components/Campuses';
 import Tasks from './components/Tasks';
 import Settings from './components/Settings';
+import Reports from './components/Reports';
+import Classes from './components/Classes';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -82,9 +84,13 @@ export default function App() {
           <Route path="/" element={<Layout profile={profile} />}>
             <Route index element={<Dashboard profile={profile} />} />
             <Route path="students" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Students profile={profile} /> : <Navigate to="/" replace />} />
-            <Route path="staff" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Staff profile={profile} /> : <Navigate to="/" replace />} />
-            <Route path="academic" element={<Academic profile={profile} />} />
-            <Route path="finance" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Finance profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="classes" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Classes profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="attendance" element={<Academic profile={profile} />} />
+            <Route path="results" element={<Exams profile={profile} />} />
+            <Route path="teachers" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Staff profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="fees" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Fees profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="payroll" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Fees profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="expenses" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Fees profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="inventory" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Inventory profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="communication" element={<Communication profile={profile} />} />
             <Route path="curriculum" element={<Curriculum profile={profile} />} />
@@ -94,6 +100,7 @@ export default function App() {
             <Route path="certificates" element={<Certificates profile={profile} />} />
             <Route path="campuses" element={profile?.role === 'admin' ? <Campuses profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="tasks" element={<Tasks profile={profile} />} />
+            <Route path="reports" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Reports profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="settings" element={profile?.role === 'admin' ? <Settings profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
