@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, getDocs, limit } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserProfile } from '../types';
+import { UserProfile, Task } from '../types';
 import { 
   Users, 
   GraduationCap, 
@@ -9,7 +9,13 @@ import {
   TrendingUp, 
   Calendar,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Plus,
+  UserPlus,
+  CheckSquare,
+  FileText,
+  Clock,
+  ChevronRight
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -24,6 +30,7 @@ import {
 } from 'recharts';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
+import { Link } from 'react-router-dom';
 
 interface DashboardProps {
   profile: UserProfile | null;
@@ -36,6 +43,7 @@ export default function Dashboard({ profile }: DashboardProps) {
     totalFees: 0,
     attendanceRate: 0,
   });
+  const [recentTasks, setRecentTasks] = useState<Task[]>([]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -61,7 +69,32 @@ export default function Dashboard({ profile }: DashboardProps) {
         console.error("Error fetching stats:", error);
       }
     };
+
+    // Only fetch tasks for staff/admin, or filter by assignedTo for others to avoid permission errors
+    let q;
+    if (profile.role === 'admin' || profile.role === 'staff') {
+      q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(5));
+    } else {
+      // For students/parents, only show tasks assigned to them
+      q = query(
+        collection(db, 'tasks'),
+        where('assignedTo', '==', profile.uid),
+        orderBy('createdAt', 'desc'),
+        limit(5)
+      );
+    }
+
+    const unsubscribeTasks = onSnapshot(q, (snap) => {
+      setRecentTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+    }, (error) => {
+      console.error("Error in task listener:", error);
+      if (error.code === 'permission-denied') {
+        setRecentTasks([]);
+      }
+    });
+
     fetchStats();
+    return () => unsubscribeTasks();
   }, [profile]);
 
   const feeData = [
@@ -153,52 +186,115 @@ export default function Dashboard({ profile }: DashboardProps) {
         />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <div className="card p-8">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">Fee Collection Overview</h3>
-            <div className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full uppercase tracking-widest">Monthly</div>
+      {/* Charts & Activity Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {/* Main Charts */}
+        <div className="lg:col-span-8 space-y-10">
+          <div className="card p-8">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Fee Collection Overview</h3>
+              <div className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full uppercase tracking-widest">Monthly</div>
+            </div>
+            <div className="h-80 min-h-[320px]">
+              <ResponsiveContainer width="100%" aspect={2}>
+                <AreaChart data={feeData}>
+                  <defs>
+                    <linearGradient id="colorFees" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Area type="monotone" dataKey="amount" stroke="#4f46e5" strokeWidth={4} fillOpacity={1} fill="url(#colorFees)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="h-80 min-h-[320px]">
-            <ResponsiveContainer width="100%" aspect={2}>
-              <AreaChart data={feeData}>
-                <defs>
-                  <linearGradient id="colorFees" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-                />
-                <Area type="monotone" dataKey="amount" stroke="#4f46e5" strokeWidth={4} fillOpacity={1} fill="url(#colorFees)" />
-              </AreaChart>
-            </ResponsiveContainer>
+
+          <div className="card p-8">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Weekly Attendance Rate</h3>
+              <div className="px-3 py-1 bg-purple-50 text-purple-600 text-[10px] font-black rounded-full uppercase tracking-widest">Weekly</div>
+            </div>
+            <div className="h-80 min-h-[320px]">
+              <ResponsiveContainer width="100%" aspect={2}>
+                <BarChart data={attendanceData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="rate" fill="#8b5cf6" radius={[8, 8, 0, 0]} barSize={45} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
-        <div className="card p-8">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">Weekly Attendance Rate</h3>
-            <div className="px-3 py-1 bg-purple-50 text-purple-600 text-[10px] font-black rounded-full uppercase tracking-widest">Weekly</div>
+        {/* Sidebar: Quick Actions & Activity */}
+        <div className="lg:col-span-4 space-y-8">
+          {/* Quick Actions */}
+          <div className="card p-8 bg-indigo-600 text-white border-0 shadow-xl shadow-indigo-100">
+            <h3 className="text-lg font-black tracking-tight mb-6">Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <Link to="/students" className="flex flex-col items-center gap-3 p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+                <UserPlus className="w-6 h-6" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Add Student</span>
+              </Link>
+              <Link to="/tasks" className="flex flex-col items-center gap-3 p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+                <CheckSquare className="w-6 h-6" />
+                <span className="text-[10px] font-black uppercase tracking-widest">New Task</span>
+              </Link>
+              <Link to="/communication" className="flex flex-col items-center gap-3 p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+                <FileText className="w-6 h-6" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Notice</span>
+              </Link>
+              <Link to="/finance" className="flex flex-col items-center gap-3 p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+                <Wallet className="w-6 h-6" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Fees</span>
+              </Link>
+            </div>
           </div>
-          <div className="h-80 min-h-[320px]">
-            <ResponsiveContainer width="100%" aspect={2}>
-              <BarChart data={attendanceData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="rate" fill="#8b5cf6" radius={[8, 8, 0, 0]} barSize={45} />
-              </BarChart>
-            </ResponsiveContainer>
+
+          {/* Recent Activity */}
+          <div className="card p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Recent Activity</h3>
+              <Link to="/tasks" className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">View All</Link>
+            </div>
+            <div className="space-y-6">
+              {recentTasks.length === 0 ? (
+                <div className="text-center py-10">
+                  <Clock className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-400">No recent activity</p>
+                </div>
+              ) : (
+                recentTasks.map(task => (
+                  <div key={task.id} className="flex gap-4 group cursor-pointer">
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110",
+                      task.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
+                    )}>
+                      {task.status === 'completed' ? <CheckSquare className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                    </div>
+                    <div className="flex-1 min-w-0 border-b border-slate-50 pb-4 group-last:border-0 group-last:pb-0">
+                      <p className="text-sm font-bold text-slate-900 truncate mb-0.5">{task.title}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {task.status === 'completed' ? 'Completed' : 'Assigned'} • {new Date(task.createdAt || '').toLocaleDateString()}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300 self-center opacity-0 group-hover:opacity-100 transition-all" />
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>

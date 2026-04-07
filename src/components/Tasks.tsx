@@ -66,13 +66,23 @@ export default function Tasks({ profile }: TasksProps) {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const q = query(
-        collection(db, 'tasks'),
-        where('campusId', '==', profile?.campusId || 'main'),
-        orderBy('createdAt', 'desc')
-      );
+      let q;
+      if (profile?.role === 'admin' || profile?.role === 'staff') {
+        q = query(
+          collection(db, 'tasks'),
+          where('campusId', '==', profile?.campusId || 'main'),
+          orderBy('createdAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'tasks'),
+          where('campusId', '==', profile?.campusId || 'main'),
+          where('assignedTo', '==', profile?.uid),
+          orderBy('createdAt', 'desc')
+        );
+      }
       const snap = await getDocs(q);
-      setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+      setTasks(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Task)));
     } catch (error) {
       console.error("Error fetching tasks:", error);
     } finally {
@@ -81,9 +91,10 @@ export default function Tasks({ profile }: TasksProps) {
   };
 
   const fetchStaff = async () => {
+    if (profile?.role !== 'admin' && profile?.role !== 'staff') return;
     try {
       const snap = await getDocs(collection(db, 'staff'));
-      setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
+      setStaff(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Staff)));
     } catch (error) {
       console.error("Error fetching staff:", error);
     }

@@ -17,12 +17,12 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        ( (request.auth.token.email == "qaisarabbas6496@gmail.com" && request.auth.token.email_verified == true) || 
+        ( request.auth.token.email == "qaisarabbas6496@gmail.com" || 
           (userExists() && getUserData().role == 'admin') );
     }
     
     function isStaff() {
-      return isAuthenticated() && ( (userExists() && getUserData().role == 'staff') || isAdmin() );
+      return isAuthenticated() && ( isAdmin() || (userExists() && getUserData().role == 'staff') );
     }
 
     function isParent() {
@@ -52,8 +52,15 @@ service cloud.firestore {
     }
 
     match /staff/{staffId} {
-      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == staffId);
+      allow read: if isStaff() || (isAuthenticated() && request.auth.uid == staffId);
       allow write: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isStaff() || (isAuthenticated() && request.auth.uid == resource.data.assignedTo);
+      allow create: if isStaff();
+      allow update: if isStaff() || (isAuthenticated() && request.auth.uid == resource.data.assignedTo);
+      allow delete: if isAdmin();
     }
 
     match /attendance/{id} {
@@ -67,12 +74,13 @@ service cloud.firestore {
     }
 
     match /fees/{id} {
-      allow read: if isAdmin() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
       allow write: if isAdmin();
     }
 
     match /expenses/{id} {
-      allow read, write: if isAdmin();
+      allow read: if isStaff();
+      allow write: if isAdmin();
     }
 
     match /inventory/{id} {

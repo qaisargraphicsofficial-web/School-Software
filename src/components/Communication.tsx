@@ -63,8 +63,12 @@ export default function Communication({ profile }: CommunicationProps) {
 
   useEffect(() => {
     fetchNotices();
-    fetchBulkMessages();
-    fetchStudents();
+    if (profile?.role === 'admin') {
+      fetchBulkMessages();
+    }
+    if (profile?.role === 'admin' || profile?.role === 'staff') {
+      fetchStudents();
+    }
     if (profile?.role === 'parent' && linkedStudentId) {
       fetchChildData(linkedStudentId);
     }
@@ -74,7 +78,7 @@ export default function Communication({ profile }: CommunicationProps) {
     try {
       const q = query(collection(db, 'notices'), orderBy('date', 'desc'));
       const snap = await getDocs(q);
-      setNotices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notice)));
+      setNotices(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Notice)));
     } catch (error) {
       console.error("Error fetching notices:", error);
     }
@@ -84,7 +88,7 @@ export default function Communication({ profile }: CommunicationProps) {
     try {
       const q = query(collection(db, 'bulk_messages'), orderBy('date', 'desc'));
       const snap = await getDocs(q);
-      setBulkMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BulkMessage)));
+      setBulkMessages(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as BulkMessage)));
     } catch (error) {
       console.error("Error fetching bulk messages:", error);
     }
@@ -93,7 +97,7 @@ export default function Communication({ profile }: CommunicationProps) {
   const fetchStudents = async () => {
     try {
       const snap = await getDocs(collection(db, 'students'));
-      setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
+      setStudents(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student)));
     } catch (error) {
       console.error("Error fetching students:", error);
     } finally {

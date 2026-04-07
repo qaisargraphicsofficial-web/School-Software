@@ -41,7 +41,7 @@ export default function Inventory({ profile }: InventoryProps) {
     try {
       const q = query(collection(db, 'inventory'), orderBy('lastUpdated', 'desc'));
       const snap = await getDocs(q);
-      setItems(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
+      setItems(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as InventoryItem)));
     } catch (error) {
       console.error("Error fetching inventory:", error);
     } finally {

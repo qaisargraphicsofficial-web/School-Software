@@ -13,12 +13,16 @@ import {
   ChevronRight,
   Save,
   QrCode,
-  Scan
+  Scan,
+  Upload,
+  Loader2,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { jsPDF } from 'jspdf';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import Papa from 'papaparse';
 
 interface AcademicProps {
   profile: UserProfile | null;
@@ -35,7 +39,10 @@ export default function Academic({ profile }: AcademicProps) {
   const [examType, setExamType] = useState('Monthly Test - April');
   const [marks, setMarks] = useState<Record<string, Record<string, number>>>({});
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const subjects = ['Mathematics', 'Science', 'English', 'History', 'Geography'];
 
@@ -178,6 +185,7 @@ export default function Academic({ profile }: AcademicProps) {
   };
 
   const saveAttendance = async () => {
+    setSaving(true);
     try {
       const date = new Date().toISOString().split('T')[0];
       const promises = Object.entries(attendance).map(([studentId, status]) => 
@@ -185,14 +193,62 @@ export default function Academic({ profile }: AcademicProps) {
           date,
           targetId: studentId,
           targetType: 'student',
-          status
+          status,
+          campusId: profile?.campusId || 'main'
         })
       );
       await Promise.all(promises);
       alert('Attendance saved successfully!');
     } catch (error) {
       console.error("Error saving attendance:", error);
+      alert('Failed to save attendance.');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const markAll = (status: 'present' | 'absent' | 'late') => {
+    const newAttendance = { ...attendance };
+    students.forEach(s => {
+      newAttendance[s.id!] = status;
+    });
+    setAttendance(newAttendance);
+  };
+
+  const handleImportAttendanceCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const data = results.data as any[];
+          const newAttendance = { ...attendance };
+          
+          data.forEach(row => {
+            const rollNo = row['Roll No'] || row['rollNumber'];
+            const status = (row['Status'] || row['status'] || 'present').toLowerCase() as any;
+            
+            const student = students.find(s => s.rollNumber === rollNo);
+            if (student && ['present', 'absent', 'late'].includes(status)) {
+              newAttendance[student.id!] = status;
+            }
+          });
+
+          setAttendance(newAttendance);
+          alert('CSV parsed. Review the grid and click Submit to save.');
+        } catch (error) {
+          console.error("Error importing attendance CSV:", error);
+          alert("Failed to parse CSV.");
+        } finally {
+          setImporting(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      }
+    });
   };
 
   const saveResults = async () => {
@@ -473,55 +529,94 @@ export default function Academic({ profile }: AcademicProps) {
             </AnimatePresence>
           </div>
         ) : activeTab === 'attendance' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
-                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">Roll No</th>
-                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {loading ? (
-                  <tr><td colSpan={3} className="px-6 py-8 text-center animate-pulse">Loading students...</td></tr>
-                ) : students.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{student.name}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.rollNumber}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        {[
-                          { id: 'present', icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
-                          { id: 'absent', icon: XCircle, color: 'text-rose-600 bg-rose-50' },
-                          { id: 'late', icon: Clock, color: 'text-amber-600 bg-amber-50' }
-                        ].map((btn) => (
-                          <button
-                            key={btn.id}
-                            onClick={() => setAttendance({ ...attendance, [student.id!]: btn.id as any })}
-                            className={cn(
-                              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                              attendance[student.id!] === btn.id ? btn.color : "text-slate-400 hover:bg-slate-100"
-                            )}
-                          >
-                            <btn.icon className="w-4 h-4" />
-                            <span className="capitalize">{btn.id}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </td>
+          <div className="flex flex-col">
+            <div className="p-6 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <Users className="w-5 h-5 text-slate-400" />
+                <h3 className="font-bold text-slate-900">Bulk Actions</h3>
+                <div className="h-4 w-px bg-slate-200 mx-2"></div>
+                <button 
+                  onClick={() => markAll('present')}
+                  className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+                >
+                  Mark All Present
+                </button>
+                <button 
+                  onClick={() => markAll('absent')}
+                  className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"
+                >
+                  Mark All Absent
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleImportAttendanceCSV} 
+                  accept=".csv" 
+                  className="hidden" 
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importing}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+                >
+                  {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  Import CSV
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Roll No</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="p-6 border-t border-slate-100 flex justify-end">
-              <button 
-                onClick={saveAttendance}
-                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-sm"
-              >
-                <Save className="w-5 h-5" />
-                Submit Attendance
-              </button>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {loading ? (
+                    <tr><td colSpan={3} className="px-6 py-8 text-center animate-pulse">Loading students...</td></tr>
+                  ) : students.map((student) => (
+                    <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-slate-900">{student.name}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{student.rollNumber}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          {[
+                            { id: 'present', icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
+                            { id: 'absent', icon: XCircle, color: 'text-rose-600 bg-rose-50' },
+                            { id: 'late', icon: Clock, color: 'text-amber-600 bg-amber-50' }
+                          ].map((btn) => (
+                            <button
+                              key={btn.id}
+                              onClick={() => setAttendance({ ...attendance, [student.id!]: btn.id as any })}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                attendance[student.id!] === btn.id ? btn.color : "text-slate-400 hover:bg-slate-100"
+                              )}
+                            >
+                              <btn.icon className="w-4 h-4" />
+                              <span className="capitalize">{btn.id}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="p-6 border-t border-slate-100 flex justify-end">
+                <button 
+                  onClick={saveAttendance}
+                  disabled={saving || students.length === 0}
+                  className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                  Submit Attendance
+                </button>
+              </div>
             </div>
           </div>
         ) : (

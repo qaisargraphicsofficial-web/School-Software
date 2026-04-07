@@ -20,6 +20,7 @@ import DailyDiary from './components/DailyDiary';
 import Certificates from './components/Certificates';
 import Campuses from './components/Campuses';
 import Tasks from './components/Tasks';
+import Settings from './components/Settings';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -72,19 +73,20 @@ export default function App() {
         ) : (
           <Route path="/" element={<Layout profile={profile} />}>
             <Route index element={<Dashboard profile={profile} />} />
-            <Route path="students" element={<Students profile={profile} />} />
-            <Route path="staff" element={<Staff profile={profile} />} />
+            <Route path="students" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Students profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="staff" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Staff profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="academic" element={<Academic profile={profile} />} />
-            <Route path="finance" element={<Finance profile={profile} />} />
-            <Route path="inventory" element={<Inventory profile={profile} />} />
+            <Route path="finance" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Finance profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="inventory" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Inventory profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="communication" element={<Communication profile={profile} />} />
             <Route path="curriculum" element={<Curriculum profile={profile} />} />
             <Route path="exams" element={<Exams profile={profile} />} />
             <Route path="library" element={<Library profile={profile} />} />
             <Route path="diary" element={<DailyDiary profile={profile} />} />
             <Route path="certificates" element={<Certificates profile={profile} />} />
-            <Route path="campuses" element={<Campuses profile={profile} />} />
+            <Route path="campuses" element={profile?.role === 'admin' ? <Campuses profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="tasks" element={<Tasks profile={profile} />} />
+            <Route path="settings" element={profile?.role === 'admin' ? <Settings profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         )}

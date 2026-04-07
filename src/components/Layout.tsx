@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -18,12 +18,19 @@ import {
   BookText,
   Award,
   Building2,
-  CheckSquare
+  CheckSquare,
+  Search,
+  Settings,
+  UserCircle,
+  Moon,
+  Sun
 } from 'lucide-react';
-import { auth } from '../firebase';
-import { UserProfile } from '../types';
+import { auth, db } from '../firebase';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, getDoc } from 'firebase/firestore';
+import { UserProfile, Task } from '../types';
 import { cn } from '../lib/utils';
 import AIAssistant from './AIAssistant';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface LayoutProps {
   profile: UserProfile | null;
@@ -31,32 +38,126 @@ interface LayoutProps {
 
 export default function Layout({ profile }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [notifications, setNotifications] = useState<Task[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [schoolName, setSchoolName] = useState('EduManage');
+  
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (profile?.displayName) {
+      setProfileName(profile.displayName);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    const fetchSchoolName = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'global');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setSchoolName(docSnap.data().schoolName);
+        }
+      } catch (error) {
+        console.error("Error fetching school name:", error);
+      }
+    };
+    fetchSchoolName();
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    
+    // Listen for urgent/upcoming tasks as notifications
+    // Only fetch tasks for staff/admin, or filter by assignedTo for others to avoid permission errors
+    let q;
+    if (profile.role === 'admin' || profile.role === 'staff') {
+      q = query(
+        collection(db, 'tasks'),
+        orderBy('createdAt', 'desc'),
+        limit(5)
+      );
+    } else {
+      // For students/parents, only show tasks assigned to them
+      q = query(
+        collection(db, 'tasks'),
+        where('assignedTo', '==', profile.uid),
+        orderBy('createdAt', 'desc'),
+        limit(5)
+      );
+    }
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+    }, (error) => {
+      console.error("Error in task listener:", error);
+      // If permission denied, set empty notifications to avoid repeated errors
+      if (error.code === 'permission-denied') {
+        setNotifications([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [profile]);
 
   const handleLogout = async () => {
     await auth.signOut();
     navigate('/');
   };
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile?.uid) return;
+    setIsSavingProfile(true);
+    try {
+      await updateDoc(doc(db, 'users', profile.uid), {
+        displayName: profileName
+      });
+      setIsProfileModalOpen(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const navItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
-    { name: 'Students', icon: Users, path: '/students' },
-    { name: 'Staff', icon: UserSquare2, path: '/staff' },
-    { name: 'Academic', icon: GraduationCap, path: '/academic' },
-    { name: 'Curriculum', icon: BookOpen, path: '/curriculum' },
-    { name: 'Exams', icon: FileText, path: '/exams' },
-    { name: 'Library', icon: Library, path: '/library' },
-    { name: 'Daily Diary', icon: BookText, path: '/diary' },
-    { name: 'Certificates', icon: Award, path: '/certificates' },
-    { name: 'Finance', icon: Wallet, path: '/finance' },
-    { name: 'Inventory', icon: Package, path: '/inventory' },
-    { name: 'Tasks', icon: CheckSquare, path: '/tasks' },
-    { name: 'Communication', icon: Bell, path: '/communication' },
+    { name: 'Students', icon: Users, path: '/students', roles: ['admin', 'staff'] },
+    { name: 'Staff', icon: UserSquare2, path: '/staff', roles: ['admin', 'staff'] },
+    { name: 'Academic', icon: GraduationCap, path: '/academic', roles: ['admin', 'staff', 'student', 'parent'] },
+    { name: 'Curriculum', icon: BookOpen, path: '/curriculum', roles: ['admin', 'staff', 'student', 'parent'] },
+    { name: 'Exams', icon: FileText, path: '/exams', roles: ['admin', 'staff', 'student', 'parent'] },
+    { name: 'Library', icon: Library, path: '/library', roles: ['admin', 'staff', 'student', 'parent'] },
+    { name: 'Daily Diary', icon: BookText, path: '/diary', roles: ['admin', 'staff', 'student', 'parent'] },
+    { name: 'Certificates', icon: Award, path: '/certificates', roles: ['admin', 'staff', 'student', 'parent'] },
+    { name: 'Finance', icon: Wallet, path: '/finance', roles: ['admin', 'staff'] },
+    { name: 'Inventory', icon: Package, path: '/inventory', roles: ['admin', 'staff'] },
+    { name: 'Tasks', icon: CheckSquare, path: '/tasks', roles: ['admin', 'staff', 'student', 'parent'] },
+    { name: 'Communication', icon: Bell, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'] },
+    { name: 'Settings', icon: Settings, path: '/settings', roles: ['admin'] },
   ];
 
+  const filteredNavItems = navItems.filter(item => 
+    !item.roles || (profile?.role && item.roles.includes(profile.role))
+  );
+
   if (profile?.role === 'admin') {
-    navItems.splice(navItems.length - 1, 0, { name: 'Campuses', icon: Building2, path: '/campuses' });
+    filteredNavItems.splice(filteredNavItems.length - 1, 0, { name: 'Campuses', icon: Building2, path: '/campuses' });
   }
 
   return (
@@ -72,13 +173,13 @@ export default function Layout({ profile }: LayoutProps) {
               <School className="w-7 h-7 text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="text-2xl font-bold text-slate-900 tracking-tight">EduManage</span>
+              <span className="text-2xl font-bold text-slate-900 tracking-tight">{schoolName}</span>
               <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Pro Edition</span>
             </div>
           </div>
 
           <nav className="flex-1 p-6 space-y-1.5 overflow-y-auto custom-scrollbar">
-            {navItems.map((item) => (
+            {filteredNavItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
@@ -124,7 +225,7 @@ export default function Layout({ profile }: LayoutProps) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-40">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-8 flex-1">
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-2.5 text-slate-500 hover:bg-slate-100 rounded-xl lg:hidden transition-colors"
@@ -132,13 +233,24 @@ export default function Layout({ profile }: LayoutProps) {
               <Menu className="w-6 h-6" />
             </button>
             
-            <div>
+            <div className="hidden lg:block">
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                 {navItems.find(item => item.path === location.pathname)?.name || 'Dashboard'}
               </h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
+            </div>
+
+            <div className="flex-1 max-w-md relative group hidden md:block">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              <input
+                type="text"
+                placeholder="Global search (Students, Staff, Tasks...)"
+                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
 
@@ -148,8 +260,82 @@ export default function Layout({ profile }: LayoutProps) {
               Live Session
             </div>
             
-            <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all cursor-pointer">
-              <Bell className="w-5 h-5" />
+            <div className="relative">
+              <button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all cursor-pointer"
+              >
+                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all cursor-pointer relative"
+              >
+                <Bell className="w-5 h-5" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white">
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 mt-4 w-80 bg-white rounded-[24px] shadow-2xl border border-slate-100 overflow-hidden z-50">
+                  <div className="p-5 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Recent Tasks</h3>
+                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">New</span>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-10 text-center">
+                        <Bell className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                        <p className="text-sm font-bold text-slate-400">No new notifications</p>
+                      </div>
+                    ) : (
+                      notifications.map(task => (
+                        <div key={task.id} className="p-4 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 cursor-pointer">
+                          <div className="flex gap-3">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full mt-1.5 shrink-0",
+                              task.priority === 'high' ? 'bg-rose-500' : task.priority === 'medium' ? 'bg-amber-500' : 'bg-indigo-500'
+                            )} />
+                            <div>
+                              <p className="text-sm font-bold text-slate-900 line-clamp-1">{task.title}</p>
+                              <p className="text-xs text-slate-500 line-clamp-1">{task.description}</p>
+                              <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Due: {task.dueDate}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <Link 
+                    to="/tasks" 
+                    onClick={() => setShowNotifications(false)}
+                    className="block p-4 text-center text-xs font-black text-indigo-600 hover:bg-indigo-50 transition-colors uppercase tracking-widest border-t border-slate-50"
+                  >
+                    View All Tasks
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div 
+              onClick={() => setIsProfileModalOpen(true)}
+              className="hidden sm:flex items-center gap-3 pl-5 border-l border-slate-100 cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <div className="text-right">
+                <p className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1">
+                  {profile?.displayName || profile?.email?.split('@')[0]}
+                </p>
+                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest leading-none">{profile?.role}</p>
+              </div>
+              <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-100">
+                {(profile?.displayName || profile?.email)?.[0].toUpperCase()}
+              </div>
             </div>
           </div>
         </header>
@@ -159,6 +345,76 @@ export default function Layout({ profile }: LayoutProps) {
           <Outlet />
         </main>
       </div>
+
+      {/* Profile Modal */}
+      <AnimatePresence>
+        {isProfileModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setIsProfileModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+                <div className="flex items-center gap-3">
+                  <UserCircle className="w-6 h-6" />
+                  <h2 className="text-2xl font-black tracking-tight">My Profile</h2>
+                </div>
+                <button onClick={() => setIsProfileModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <form onSubmit={handleUpdateProfile} className="p-8 space-y-6">
+                <div className="flex flex-col items-center mb-6">
+                  <div className="w-24 h-24 bg-indigo-100 rounded-[32px] flex items-center justify-center text-indigo-600 text-3xl font-black mb-4 shadow-inner">
+                    {(profileName || profile?.email)?.[0].toUpperCase()}
+                  </div>
+                  <p className="text-sm font-bold text-slate-900">{profile?.email}</p>
+                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mt-1">{profile?.role}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Display Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+                    value={profileName}
+                    onChange={e => setProfileName(e.target.value)}
+                    placeholder="Enter your name"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileModalOpen(false)}
+                    className="flex-1 px-6 py-4 text-slate-600 font-black uppercase tracking-widest hover:bg-slate-50 rounded-2xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingProfile}
+                    className="flex-1 px-6 py-4 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
+                  >
+                    {isSavingProfile ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Overlay for Mobile Sidebar */}
       {isSidebarOpen && (

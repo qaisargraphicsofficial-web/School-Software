@@ -4,6 +4,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   role: UserRole;
+  displayName?: string;
   studentId?: string; // For parents/students
   staffId?: string; // For staff
   campusId?: string; // For multi-campus
@@ -41,6 +42,11 @@ export interface Staff {
   contact: string;
   salary: number;
   joiningDate: string;
+  leavingDate?: string;
+  classIncharge?: string;
+  totalSalaryReceived?: number;
+  remainingDues?: number;
+  status: 'active' | 'inactive';
   campusId: string;
 }
 
@@ -197,4 +203,19 @@ export interface Task {
   createdAt: string;
   reminderDate?: string;
   reminderTime?: string;
+}
+
+export interface SchoolSettings {
+  id?: string;
+  schoolName: string;
+  schoolAddress: string;
+  schoolContact: string;
+  schoolEmail: string;
+  academicYear: string;
+  currency: string;
+  enableNotifications: boolean;
+  allowParentRegistration: boolean;
+  maintenanceMode: boolean;
+  logoUrl?: string;
+  updatedAt: string;
 }

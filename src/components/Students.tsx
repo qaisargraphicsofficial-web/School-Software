@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { Student, UserProfile, Attendance, ExamResult } from '../types';
@@ -11,6 +11,7 @@ import {
   UserPlus, 
   IdCard, 
   Download, 
+  Upload,
   Trash2, 
   X,
   Camera,
@@ -23,13 +24,18 @@ import {
   MapPin,
   Phone,
   Mail,
-  User
+  User,
+  FileSpreadsheet,
+  CheckCircle2,
+  XCircle,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { cn } from '../lib/utils';
 import { QRCodeCanvas } from 'qrcode.react';
+import Papa from 'papaparse';
 
 interface StudentsProps {
   profile: UserProfile | null;
@@ -38,17 +44,23 @@ interface StudentsProps {
 export default function Students({ profile }: StudentsProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'academic' | 'attendance'>('info');
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
   const [studentAttendance, setStudentAttendance] = useState<Attendance[]>([]);
   const [studentExamResults, setStudentExamResults] = useState<ExamResult[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [classFilter, setClassFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const idCardRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Student>>({
     name: '',
@@ -75,7 +87,7 @@ export default function Students({ profile }: StudentsProps) {
     try {
       const q = query(collection(db, 'students'), orderBy('admissionDate', 'desc'));
       const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student));
       setStudents(data);
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -88,15 +100,21 @@ export default function Students({ profile }: StudentsProps) {
     e.preventDefault();
     setUploading(true);
     try {
-      let photoUrl = '';
+      let photoUrl = formData.photoUrl || '';
       if (photoFile) {
         const photoRef = ref(storage, `students/${Date.now()}_${photoFile.name}`);
         const snapshot = await uploadBytes(photoRef, photoFile);
         photoUrl = await getDownloadURL(snapshot.ref);
       }
 
-      await addDoc(collection(db, 'students'), { ...formData, photoUrl });
+      if (isEditMode && viewingStudent?.id) {
+        await setDoc(doc(db, 'students', viewingStudent.id), { ...formData, photoUrl }, { merge: true });
+      } else {
+        await addDoc(collection(db, 'students'), { ...formData, photoUrl });
+      }
+
       setIsModalOpen(false);
+      setIsEditMode(false);
       setPhotoFile(null);
       setFormData({
         name: '',
@@ -112,10 +130,17 @@ export default function Students({ profile }: StudentsProps) {
       });
       fetchStudents();
     } catch (error) {
-      console.error("Error adding student:", error);
+      console.error("Error saving student:", error);
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleEdit = (student: Student) => {
+    setViewingStudent(student);
+    setFormData(student);
+    setIsEditMode(true);
+    setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -172,10 +197,106 @@ export default function Students({ profile }: StudentsProps) {
     }, 500);
   };
 
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.rollNumber.includes(searchQuery)
-  );
+  const exportToCSV = () => {
+    try {
+      const headers = ['Name', 'Roll Number', 'Class', 'Section', 'Parent Name', 'Contact', 'Email', 'Address', 'Admission Date', 'Status'];
+      const data = filteredStudents.map(s => [
+        s.name,
+        s.rollNumber,
+        s.class,
+        s.section,
+        s.parentName,
+        s.contact,
+        s.email,
+        s.address,
+        s.admissionDate,
+        s.status
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...data.map(row => row.map(cell => `"${cell || ''}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `students_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+    }
+  };
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const studentsToImport = results.data as any[];
+          const batchPromises = studentsToImport.map(async (row) => {
+            const studentData: Partial<Student> = {
+              name: row['Name'] || row['name'],
+              rollNumber: row['Roll Number'] || row['rollNumber'],
+              class: row['Class'] || row['class'],
+              section: row['Section'] || row['section'],
+              parentName: row['Parent Name'] || row['parentName'],
+              contact: row['Contact'] || row['contact'],
+              email: row['Email'] || row['email'],
+              address: row['Address'] || row['address'],
+              admissionDate: row['Admission Date'] || row['admissionDate'] || new Date().toISOString().split('T')[0],
+              status: (row['Status'] || row['status'] || 'active').toLowerCase() as 'active' | 'inactive',
+              campusId: profile?.campusId || 'main',
+            };
+            return addDoc(collection(db, 'students'), studentData);
+          });
+
+          await Promise.all(batchPromises);
+          fetchStudents();
+          alert(`Successfully imported ${studentsToImport.length} students.`);
+        } catch (error) {
+          console.error("Error importing CSV:", error);
+          alert("Failed to import students. Please check the CSV format.");
+        } finally {
+          setImporting(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      },
+      error: (error) => {
+        console.error("PapaParse error:", error);
+        setImporting(false);
+        alert("Error parsing CSV file.");
+      }
+    });
+  };
+
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.rollNumber.includes(searchQuery);
+    const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
+    const matchesClass = classFilter === 'all' || s.class === classFilter;
+    
+    let matchesDate = true;
+    if (dateFilter.start) {
+      matchesDate = matchesDate && s.admissionDate >= dateFilter.start;
+    }
+    if (dateFilter.end) {
+      matchesDate = matchesDate && s.admissionDate <= dateFilter.end;
+    }
+
+    return matchesSearch && matchesStatus && matchesClass && matchesDate;
+  });
+
+  const classes = Array.from(new Set(students.map(s => s.class))).sort();
 
   return (
     <div className="space-y-6">
@@ -185,15 +306,39 @@ export default function Students({ profile }: StudentsProps) {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Student Directory</h1>
           <p className="text-slate-500 font-medium">Manage and track all student records across campuses.</p>
         </div>
-        {profile?.role === 'admin' && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="btn-primary"
+        <div className="flex flex-wrap gap-3">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportCSV}
+            accept=".csv"
+            className="hidden"
+          />
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="btn-secondary px-5 py-2.5 text-sm flex items-center gap-2"
           >
-            <UserPlus className="w-5 h-5" />
-            Digital Admission
+            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import CSV
           </button>
-        )}
+          <button 
+            onClick={exportToCSV}
+            className="btn-secondary px-5 py-2.5 text-sm flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Export CSV
+          </button>
+          {profile?.role === 'admin' && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="btn-primary"
+            >
+              <UserPlus className="w-5 h-5" />
+              Digital Admission
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -208,15 +353,57 @@ export default function Students({ profile }: StudentsProps) {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-3">
-          <button className="btn-secondary px-5 py-2.5 text-sm">
-            <Filter className="w-4 h-4" />
-            Class
-          </button>
-          <button className="btn-secondary px-5 py-2.5 text-sm">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
+        <div className="flex flex-wrap gap-3">
+          {[
+            { id: 'all', label: 'All', icon: GraduationCap },
+            { id: 'active', label: 'Active', icon: CheckCircle2 },
+            { id: 'inactive', label: 'Inactive', icon: XCircle },
+          ].map((filter) => (
+            <button
+              key={filter.id}
+              onClick={() => setStatusFilter(filter.id as any)}
+              className={cn(
+                "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+                statusFilter === filter.id 
+                  ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200" 
+                  : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+              )}
+            >
+              <filter.icon className="w-3.5 h-3.5" />
+              {filter.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <select 
+              value={classFilter}
+              onChange={(e) => setClassFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold uppercase tracking-widest text-slate-600 focus:outline-none"
+            >
+              <option value="all">All Classes</option>
+              {classes.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <input 
+              type="date"
+              value={dateFilter.start}
+              onChange={(e) => setDateFilter({...dateFilter, start: e.target.value})}
+              className="bg-transparent text-[10px] font-bold uppercase text-slate-600 focus:outline-none"
+            />
+            <span className="text-slate-300">-</span>
+            <input 
+              type="date"
+              value={dateFilter.end}
+              onChange={(e) => setDateFilter({...dateFilter, end: e.target.value})}
+              className="bg-transparent text-[10px] font-bold uppercase text-slate-600 focus:outline-none"
+            />
+          </div>
         </div>
       </div>
 
@@ -296,6 +483,16 @@ export default function Students({ profile }: StudentsProps) {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(student);
+                          }}
+                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Edit Student"
+                        >
+                          <FileText className="w-5 h-5" />
+                        </button>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -608,8 +805,8 @@ export default function Students({ profile }: StudentsProps) {
               className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
-                <h2 className="text-xl font-bold">Digital Admission Form</h2>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                <h2 className="text-xl font-bold">{isEditMode ? 'Edit Student Profile' : 'Digital Admission Form'}</h2>
+                <button onClick={() => { setIsModalOpen(false); setIsEditMode(false); }} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
                   <X className="w-6 h-6" />
                 </button>
               </div>
@@ -728,7 +925,7 @@ export default function Students({ profile }: StudentsProps) {
                     className="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
                   >
                     {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {uploading ? "Uploading..." : "Complete Admission"}
+                    {uploading ? "Saving..." : isEditMode ? "Update Record" : "Complete Admission"}
                   </button>
                 </div>
               </form>
