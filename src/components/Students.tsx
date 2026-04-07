@@ -57,6 +57,10 @@ export default function Students({ profile }: StudentsProps) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const idCardRef = useRef<HTMLDivElement>(null);
@@ -240,43 +244,70 @@ export default function Students({ profile }: StudentsProps) {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const studentsToImport = results.data as any[];
-          const batchPromises = studentsToImport.map(async (row) => {
-            const studentData: Partial<Student> = {
-              name: row['Name'] || row['name'],
-              rollNumber: row['Roll Number'] || row['rollNumber'],
-              class: row['Class'] || row['class'],
-              section: row['Section'] || row['section'],
-              parentName: row['Parent Name'] || row['parentName'],
-              contact: row['Contact'] || row['contact'],
-              email: row['Email'] || row['email'],
-              address: row['Address'] || row['address'],
-              admissionDate: row['Admission Date'] || row['admissionDate'] || new Date().toISOString().split('T')[0],
-              status: (row['Status'] || row['status'] || 'active').toLowerCase() as 'active' | 'inactive',
-              campusId: profile?.campusId || 'main',
-            };
-            return addDoc(collection(db, 'students'), studentData);
+      complete: (results) => {
+        setImporting(false);
+        if (results.meta.fields) {
+          setCsvHeaders(results.meta.fields);
+          setCsvData(results.data);
+          
+          const initialMapping: Record<string, string> = {};
+          const studentFields = ['name', 'rollNumber', 'class', 'section', 'parentName', 'contact', 'email', 'address', 'admissionDate', 'status'];
+          
+          studentFields.forEach(field => {
+            const match = results.meta.fields?.find(h => h.toLowerCase().replace(/\s+/g, '') === field.toLowerCase());
+            if (match) {
+              initialMapping[field] = match;
+            } else {
+              initialMapping[field] = '';
+            }
           });
-
-          await Promise.all(batchPromises);
-          fetchStudents();
-          alert(`Successfully imported ${studentsToImport.length} students.`);
-        } catch (error) {
-          console.error("Error importing CSV:", error);
-          alert("Failed to import students. Please check the CSV format.");
-        } finally {
-          setImporting(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
+          
+          setColumnMapping(initialMapping);
+          setIsMappingModalOpen(true);
         }
+        if (fileInputRef.current) fileInputRef.current.value = '';
       },
       error: (error) => {
         console.error("PapaParse error:", error);
         setImporting(false);
         alert("Error parsing CSV file.");
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     });
+  };
+
+  const executeImport = async () => {
+    setImporting(true);
+    setIsMappingModalOpen(false);
+    try {
+      const batchPromises = csvData.map(async (row) => {
+        const studentData: Partial<Student> = {
+          name: row[columnMapping['name']] || '',
+          rollNumber: row[columnMapping['rollNumber']] || '',
+          class: row[columnMapping['class']] || '',
+          section: row[columnMapping['section']] || '',
+          parentName: row[columnMapping['parentName']] || '',
+          contact: row[columnMapping['contact']] || '',
+          email: row[columnMapping['email']] || '',
+          address: row[columnMapping['address']] || '',
+          admissionDate: row[columnMapping['admissionDate']] || new Date().toISOString().split('T')[0],
+          status: (row[columnMapping['status']] || 'active').toLowerCase() as 'active' | 'inactive',
+          campusId: profile?.campusId || 'main',
+        };
+        return addDoc(collection(db, 'students'), studentData);
+      });
+
+      await Promise.all(batchPromises);
+      fetchStudents();
+      alert(`Successfully imported ${csvData.length} students.`);
+    } catch (error) {
+      console.error("Error importing CSV:", error);
+      alert("Failed to import students.");
+    } finally {
+      setImporting(false);
+      setCsvData([]);
+      setCsvHeaders([]);
+    }
   };
 
   const filteredStudents = students.filter(s => {
@@ -929,6 +960,87 @@ export default function Students({ profile }: StudentsProps) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* CSV Mapping Modal */}
+      <AnimatePresence>
+        {isMappingModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900">Map CSV Columns</h2>
+                  <p className="text-sm text-slate-500 font-medium mt-1">Match your CSV headers to the student fields.</p>
+                </div>
+                <button 
+                  onClick={() => setIsMappingModalOpen(false)}
+                  className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="space-y-4">
+                  {[
+                    { key: 'name', label: 'Full Name *', required: true },
+                    { key: 'rollNumber', label: 'Roll Number *', required: true },
+                    { key: 'class', label: 'Class *', required: true },
+                    { key: 'section', label: 'Section *', required: true },
+                    { key: 'parentName', label: 'Parent Name', required: false },
+                    { key: 'contact', label: 'Contact Number', required: false },
+                    { key: 'email', label: 'Email Address', required: false },
+                    { key: 'address', label: 'Address', required: false },
+                    { key: 'admissionDate', label: 'Admission Date', required: false },
+                    { key: 'status', label: 'Status (active/inactive)', required: false },
+                  ].map(field => (
+                    <div key={field.key} className="flex items-center gap-4">
+                      <div className="w-1/3">
+                        <label className="block text-sm font-bold text-slate-700">
+                          {field.label}
+                        </label>
+                      </div>
+                      <div className="w-2/3">
+                        <select
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          value={columnMapping[field.key] || ''}
+                          onChange={(e) => setColumnMapping({ ...columnMapping, [field.key]: e.target.value })}
+                        >
+                          <option value="">-- Skip this field --</option>
+                          {csvHeaders.map(header => (
+                            <option key={header} value={header}>{header}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                <button
+                  onClick={() => setIsMappingModalOpen(false)}
+                  className="px-6 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-white transition-colors shadow-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeImport}
+                  disabled={importing || !columnMapping['name'] || !columnMapping['rollNumber'] || !columnMapping['class'] || !columnMapping['section']}
+                  className="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                >
+                  {importing && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {importing ? "Importing..." : "Import Students"}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

@@ -131,6 +131,7 @@ export interface Syllabus {
   term: string;
   content: string;
   fileUrl?: string;
+  linkedExams?: string[];
   campusId: string;
 }
 
