@@ -1,0 +1,122 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        ( (request.auth.token.email == "qaisarabbas6496@gmail.com" && request.auth.token.email_verified == true) || 
+          (userExists() && getUserData().role == 'admin') );
+    }
+    
+    function isStaff() {
+      return isAuthenticated() && ( (userExists() && getUserData().role == 'staff') || isAdmin() );
+    }
+
+    function isParent() {
+      return isAuthenticated() && userExists() && getUserData().role == 'parent';
+    }
+
+    function isStudent() {
+      return isAuthenticated() && userExists() && getUserData().role == 'student';
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId && 
+        (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /campuses/{campusId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /students/{studentId} {
+      allow read: if isStaff() || (isParent() && getUserData().studentId == studentId) || (isStudent() && getUserData().studentId == studentId);
+      allow write: if isAdmin();
+    }
+
+    match /staff/{staffId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == staffId);
+      allow write: if isAdmin();
+    }
+
+    match /attendance/{id} {
+      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.targetId) || (isStudent() && getUserData().studentId == resource.data.targetId);
+      allow write: if isStaff();
+    }
+
+    match /results/{id} {
+      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isStaff();
+    }
+
+    match /fees/{id} {
+      allow read: if isAdmin() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isAdmin();
+    }
+
+    match /expenses/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /inventory/{id} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /notices/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /bulk_messages/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /syllabus/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isStaff();
+    }
+
+    match /daily_diary/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isStaff();
+    }
+
+    match /certificates/{id} {
+      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isAdmin();
+    }
+
+    match /exam_papers/{id} {
+      allow read: if isStaff() || (isStudent() && getUserData().class == resource.data.class);
+      allow write: if isStaff();
+    }
+
+    match /library_loans/{id} {
+      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isStaff();
+    }
+
+    match /events/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

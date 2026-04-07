@@ -1,0 +1,8 @@
+{
+  "name": "EduManage Pro",
+  "description": "A comprehensive school management system for students, staff, academics, finance, and communication.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

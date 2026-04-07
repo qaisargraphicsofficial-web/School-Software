@@ -1,0 +1,807 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebase';
+import { Student, UserProfile, Attendance, ExamResult } from '../types';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  MoreVertical, 
+  UserPlus, 
+  IdCard, 
+  Download, 
+  Trash2, 
+  X,
+  Camera,
+  School,
+  Loader2,
+  Eye,
+  Calendar,
+  GraduationCap,
+  Info,
+  MapPin,
+  Phone,
+  Mail,
+  User
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import { cn } from '../lib/utils';
+import { QRCodeCanvas } from 'qrcode.react';
+
+interface StudentsProps {
+  profile: UserProfile | null;
+}
+
+export default function Students({ profile }: StudentsProps) {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'academic' | 'attendance'>('info');
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [studentAttendance, setStudentAttendance] = useState<Attendance[]>([]);
+  const [studentExamResults, setStudentExamResults] = useState<ExamResult[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const idCardRef = useRef<HTMLDivElement>(null);
+
+  const [formData, setFormData] = useState<Partial<Student>>({
+    name: '',
+    rollNumber: '',
+    class: '',
+    section: '',
+    parentName: '',
+    contact: '',
+    email: '',
+    address: '',
+    admissionDate: new Date().toISOString().split('T')[0],
+    status: 'active',
+    campusId: profile?.campusId || 'main',
+  });
+
+  useEffect(() => {
+    if (profile) {
+      fetchStudents();
+    }
+  }, [profile]);
+
+  const fetchStudents = async () => {
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'students'), orderBy('admissionDate', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+      setStudents(data);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
+    try {
+      let photoUrl = '';
+      if (photoFile) {
+        const photoRef = ref(storage, `students/${Date.now()}_${photoFile.name}`);
+        const snapshot = await uploadBytes(photoRef, photoFile);
+        photoUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      await addDoc(collection(db, 'students'), { ...formData, photoUrl });
+      setIsModalOpen(false);
+      setPhotoFile(null);
+      setFormData({
+        name: '',
+        rollNumber: '',
+        class: '',
+        section: '',
+        parentName: '',
+        contact: '',
+        email: '',
+        address: '',
+        admissionDate: new Date().toISOString().split('T')[0],
+        status: 'active',
+      });
+      fetchStudents();
+    } catch (error) {
+      console.error("Error adding student:", error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this student?')) {
+      try {
+        await deleteDoc(doc(db, 'students', id));
+        fetchStudents();
+      } catch (error) {
+        console.error("Error deleting student:", error);
+      }
+    }
+  };
+  
+  const handleViewDetails = async (student: Student) => {
+    setViewingStudent(student);
+    setIsDetailModalOpen(true);
+    setActiveDetailTab('info');
+    
+    // Fetch attendance and exam results
+    try {
+      const attendanceQuery = query(
+        collection(db, 'attendance'), 
+        where('targetId', '==', student.id),
+        where('targetType', '==', 'student'),
+        orderBy('date', 'desc')
+      );
+      const attendanceSnap = await getDocs(attendanceQuery);
+      setStudentAttendance(attendanceSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance)));
+
+      const examsQuery = query(
+        collection(db, 'results'),
+        where('studentId', '==', student.id),
+        orderBy('term', 'desc')
+      );
+      const examsSnap = await getDocs(examsQuery);
+      setStudentExamResults(examsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamResult)));
+    } catch (error) {
+      console.error("Error fetching student details:", error);
+    }
+  };
+
+  const generateIDCard = async (student: Student) => {
+    setSelectedStudent(student);
+    // Wait for modal to render
+    setTimeout(async () => {
+      if (idCardRef.current) {
+        const canvas = await html2canvas(idCardRef.current);
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        pdf.addImage(imgData, 'PNG', 10, 10, 85, 55); // Standard ID card size
+        pdf.save(`${student.name}_ID_Card.pdf`);
+        setSelectedStudent(null);
+      }
+    }, 500);
+  };
+
+  const filteredStudents = students.filter(s => 
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.rollNumber.includes(searchQuery)
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Student Directory</h1>
+          <p className="text-slate-500 font-medium">Manage and track all student records across campuses.</p>
+        </div>
+        {profile?.role === 'admin' && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="btn-primary"
+          >
+            <UserPlus className="w-5 h-5" />
+            Digital Admission
+          </button>
+        )}
+      </div>
+
+      {/* Search and Filters */}
+      <div className="card p-5 flex flex-col md:flex-row gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Search by name or roll number..."
+            className="input-field pl-12"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-3">
+          <button className="btn-secondary px-5 py-2.5 text-sm">
+            <Filter className="w-4 h-4" />
+            Class
+          </button>
+          <button className="btn-secondary px-5 py-2.5 text-sm">
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+        </div>
+      </div>
+
+      {/* Student List */}
+      <div className="card">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">Roll No</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">Class</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">Admission Date</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">Status</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                  </td>
+                </tr>
+              ) : filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                    No students found.
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((student) => (
+                  <tr 
+                    key={student.id} 
+                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                    onClick={() => handleViewDetails(student)}
+                  >
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-4">
+                        {student.photoUrl ? (
+                          <img 
+                            src={student.photoUrl} 
+                            alt={student.name} 
+                            className="w-12 h-12 rounded-2xl object-cover border-2 border-white shadow-sm ring-1 ring-slate-100"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-lg border border-indigo-100">
+                            {student.name[0]}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-slate-900 tracking-tight">{student.name}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{student.parentName}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <span className="font-mono text-sm font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
+                        {student.rollNumber}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-700">{student.class}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Section {student.section}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-sm font-bold text-slate-500">{student.admissionDate}</td>
+                    <td className="px-6 py-5">
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                        student.status === 'active' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-slate-50 text-slate-500 border border-slate-100"
+                      )}>
+                        {student.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDetails(student);
+                          }}
+                          className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                          title="View Details"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            generateIDCard(student);
+                          }}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Generate ID Card"
+                        >
+                          <IdCard className="w-5 h-5" />
+                        </button>
+                        {profile?.role === 'admin' && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(student.id!);
+                            }}
+                            className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Student Detail Modal */}
+      <AnimatePresence>
+        {isDetailModalOpen && viewingStudent && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setIsDetailModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Modal Header with Profile Info */}
+              <div className="p-8 bg-indigo-600 text-white relative">
+                <button 
+                  onClick={() => setIsDetailModalOpen(false)} 
+                  className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-xl transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <div className="w-32 h-32 rounded-[32px] bg-white/20 backdrop-blur-md border-4 border-white/30 overflow-hidden shadow-2xl">
+                    {viewingStudent.photoUrl ? (
+                      <img 
+                        src={viewingStudent.photoUrl} 
+                        alt={viewingStudent.name} 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-4xl font-black">
+                        {viewingStudent.name[0]}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-center md:text-left">
+                    <h2 className="text-3xl font-black tracking-tight mb-2">{viewingStudent.name}</h2>
+                    <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                      <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest border border-white/20">
+                        Roll: {viewingStudent.rollNumber}
+                      </span>
+                      <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest border border-white/20">
+                        Class: {viewingStudent.class} - {viewingStudent.section}
+                      </span>
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border",
+                        viewingStudent.status === 'active' ? "bg-emerald-400/20 text-emerald-100 border-emerald-400/30" : "bg-slate-400/20 text-slate-100 border-slate-400/30"
+                      )}>
+                        {viewingStudent.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tab Navigation */}
+              <div className="flex px-8 pt-6 bg-slate-50 border-b border-slate-200 gap-8">
+                {[
+                  { id: 'info', label: 'Student Info', icon: Info },
+                  { id: 'academic', label: 'Academic History', icon: GraduationCap },
+                  { id: 'attendance', label: 'Attendance Records', icon: Calendar },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveDetailTab(tab.id as any)}
+                    className={cn(
+                      "flex items-center gap-2 pb-4 text-sm font-bold uppercase tracking-widest transition-all relative",
+                      activeDetailTab === tab.id ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+                    )}
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    {tab.label}
+                    {activeDetailTab === tab.id && (
+                      <motion.div 
+                        layoutId="activeTab"
+                        className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full"
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                {activeDetailTab === 'info' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                        <User className="w-5 h-5 text-indigo-600" />
+                        Personal Details
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Parent/Guardian Name</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.parentName}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Admission Date</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.admissionDate}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                        <Phone className="w-5 h-5 text-indigo-600" />
+                        Contact Information
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <Phone className="w-5 h-5 text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Phone Number</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.contact}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <Mail className="w-5 h-5 text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Email Address</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.email || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <MapPin className="w-5 h-5 text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Residential Address</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.address}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeDetailTab === 'academic' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight">Examination History</h3>
+                      <div className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full uppercase tracking-widest">
+                        {studentExamResults.length} Records
+                      </div>
+                    </div>
+                    {studentExamResults.length === 0 ? (
+                      <div className="py-12 text-center bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200">
+                        <GraduationCap className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-500 font-bold">No examination records found for this student.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {studentExamResults.map((result) => (
+                          <div key={result.id} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full uppercase tracking-widest">
+                                {result.term}
+                              </span>
+                              <span className="text-2xl font-black text-slate-900">{result.percentage}%</span>
+                            </div>
+                            <h4 className="text-lg font-bold text-slate-900 mb-4">{result.examType}</h4>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="text-center">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Grade</p>
+                                <p className="text-lg font-black text-indigo-600">{result.grade}</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Marks</p>
+                                <p className="text-lg font-black text-slate-900">{Object.values(result.marks).reduce((a: number, b: number) => a + b, 0)}/{result.totalMarks}</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Position</p>
+                                <p className="text-lg font-black text-amber-600">{result.position}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeDetailTab === 'attendance' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight">Attendance Log</h3>
+                      <div className="flex gap-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Present</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Absent</span>
+                        </div>
+                      </div>
+                    </div>
+                    {studentAttendance.length === 0 ? (
+                      <div className="py-12 text-center bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200">
+                        <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-500 font-bold">No attendance records found for this student.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {studentAttendance.map((record) => (
+                          <div 
+                            key={record.id} 
+                            className={cn(
+                              "p-4 rounded-2xl border flex items-center justify-between transition-all",
+                              record.status === 'present' 
+                                ? "bg-emerald-50 border-emerald-100 text-emerald-700" 
+                                : record.status === 'absent'
+                                ? "bg-rose-50 border-rose-100 text-rose-700"
+                                : "bg-amber-50 border-amber-100 text-amber-700"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Calendar className="w-4 h-4 opacity-50" />
+                              <span className="font-bold text-sm">{record.date}</span>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest">{record.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button
+                  onClick={() => setIsDetailModalOpen(false)}
+                  className="btn-secondary"
+                >
+                  Close Profile
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Admission Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setIsModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+                <h2 className="text-xl font-bold">Digital Admission Form</h2>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Full Name</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.name}
+                      onChange={e => setFormData({...formData, name: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Roll Number</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.rollNumber}
+                      onChange={e => setFormData({...formData, rollNumber: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Class</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.class}
+                      onChange={e => setFormData({...formData, class: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Section</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.section}
+                      onChange={e => setFormData({...formData, section: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Parent/Guardian Name</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.parentName}
+                      onChange={e => setFormData({...formData, parentName: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Contact Number</label>
+                    <input
+                      required
+                      type="tel"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.contact}
+                      onChange={e => setFormData({...formData, contact: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Parent Email</label>
+                    <input
+                      required
+                      type="email"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.email}
+                      onChange={e => setFormData({...formData, email: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Student Photo</label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-slate-100 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden">
+                        {photoFile ? (
+                          <img src={URL.createObjectURL(photoFile)} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <Camera className="w-6 h-6 text-slate-300" />
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                        onChange={e => setPhotoFile(e.target.files?.[0] || null)}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Address</label>
+                  <textarea
+                    required
+                    rows={3}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    value={formData.address}
+                    onChange={e => setFormData({...formData, address: e.target.value})}
+                  />
+                </div>
+                <div className="flex justify-end gap-4 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-6 py-2.5 text-slate-600 font-semibold hover:bg-slate-50 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={uploading}
+                    className="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {uploading ? "Uploading..." : "Complete Admission"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Hidden ID Card Template for Generation */}
+      <div className="fixed -left-[9999px] top-0">
+        <div 
+          ref={idCardRef}
+          className="w-[350px] h-[220px] bg-white border-2 border-indigo-600 rounded-2xl overflow-hidden flex flex-col shadow-2xl"
+        >
+          <div className="bg-indigo-600 p-4 flex items-center gap-3">
+            <School className="w-8 h-8 text-white" />
+            <div>
+              <h3 className="text-white font-bold text-lg leading-tight">EduManage Pro</h3>
+              <p className="text-indigo-100 text-[10px] uppercase tracking-wider font-semibold">Student Identity Card</p>
+            </div>
+          </div>
+          <div className="flex-1 p-4 flex gap-4">
+            <div className="w-24 h-24 bg-slate-100 rounded-xl border-2 border-slate-200 flex items-center justify-center overflow-hidden">
+              {selectedStudent?.photoUrl ? (
+                <img 
+                  src={selectedStudent.photoUrl} 
+                  alt={selectedStudent.name} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                />
+              ) : (
+                <Camera className="w-8 h-8 text-slate-300" />
+              )}
+            </div>
+            <div className="flex-1 space-y-2">
+              <h4 className="text-xl font-black text-slate-900 tracking-tight">{selectedStudent?.name}</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Roll Number</p>
+                  <p className="text-xs font-bold text-slate-700">{selectedStudent?.rollNumber}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Class</p>
+                  <p className="text-xs font-bold text-slate-700">{selectedStudent?.class}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Section</p>
+                  <p className="text-xs font-bold text-slate-700">{selectedStudent?.section}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Campus</p>
+                  <p className="text-xs font-bold text-slate-700">{selectedStudent?.campusId || 'Main'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center">
+              {selectedStudent?.id && (
+                <QRCodeCanvas 
+                  value={selectedStudent.id} 
+                  size={64}
+                  level="H"
+                  includeMargin={false}
+                />
+              )}
+            </div>
+          </div>
+          <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex justify-between items-center">
+            <p className="text-[10px] text-slate-400 font-medium">Valid for Academic Year 2026-27</p>
+            <div className="w-12 h-6 bg-slate-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

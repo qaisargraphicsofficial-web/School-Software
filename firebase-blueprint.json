@@ -1,0 +1,256 @@
+{
+  "entities": {
+    "Campus": {
+      "title": "Campus",
+      "description": "School campus details for multi-campus management",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "contact": { "type": "string" }
+      },
+      "required": ["name", "location"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student profile and admission details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "class": { "type": "string" },
+        "section": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "parentName": { "type": "string" },
+        "contact": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "address": { "type": "string" },
+        "admissionDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "campusId": { "type": "string" }
+      },
+      "required": ["name", "rollNumber", "class", "campusId"]
+    },
+    "Staff": {
+      "title": "Staff",
+      "description": "Staff and teacher profiles",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "staffId": { "type": "string" },
+        "role": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "contact": { "type": "string" },
+        "salary": { "type": "number" },
+        "joiningDate": { "type": "string", "format": "date" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["name", "staffId", "role", "campusId"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily attendance records",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "targetId": { "type": "string", "description": "Student or Staff ID" },
+        "targetType": { "type": "string", "enum": ["student", "staff"] },
+        "status": { "type": "string", "enum": ["present", "absent", "late"] },
+        "method": { "type": "string", "enum": ["manual", "qr"] },
+        "campusId": { "type": "string" }
+      },
+      "required": ["date", "targetId", "status", "campusId"]
+    },
+    "ExamResult": {
+      "title": "ExamResult",
+      "description": "Academic performance records",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "examType": { "type": "string" },
+        "term": { "type": "string" },
+        "marks": { "type": "object" },
+        "totalMarks": { "type": "number" },
+        "percentage": { "type": "number" },
+        "grade": { "type": "string" },
+        "position": { "type": "number" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["studentId", "examType", "term", "marks", "campusId"]
+    },
+    "Fee": {
+      "title": "Fee",
+      "description": "Student fee records",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "amount": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["paid", "pending"] },
+        "receiptNumber": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["studentId", "amount", "status", "campusId"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "School utility and maintenance expenses",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "description": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["category", "amount", "date", "campusId"]
+    },
+    "Inventory": {
+      "title": "Inventory",
+      "description": "School assets and stocks",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "quantity": { "type": "number" },
+        "category": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["name", "quantity", "campusId"]
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "School announcements",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "targetAudience": { "type": "string", "enum": ["parents", "staff", "all", "students"] },
+        "campusId": { "type": "string" }
+      },
+      "required": ["title", "content", "date", "campusId"]
+    },
+    "BulkMessage": {
+      "title": "BulkMessage",
+      "description": "History of bulk messages sent to parents",
+      "type": "object",
+      "properties": {
+        "subject": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["email", "whatsapp", "sms"] },
+        "targetClass": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "recipientsCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["sent", "failed"] },
+        "campusId": { "type": "string" }
+      },
+      "required": ["content", "type", "date", "campusId"]
+    },
+    "Syllabus": {
+      "title": "Syllabus",
+      "description": "Curriculum and syllabus planning",
+      "type": "object",
+      "properties": {
+        "class": { "type": "string" },
+        "subject": { "type": "string" },
+        "term": { "type": "string" },
+        "content": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["class", "subject", "term", "campusId"]
+    },
+    "DailyDiary": {
+      "title": "DailyDiary",
+      "description": "Daily homework and tasks for students",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "class": { "type": "string" },
+        "section": { "type": "string" },
+        "subject": { "type": "string" },
+        "homework": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["date", "class", "subject", "homework", "campusId"]
+    },
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Digital certificates issued to students",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "type": { "type": "string", "enum": ["achievement", "completion", "participation"] },
+        "date": { "type": "string", "format": "date" },
+        "content": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["studentId", "type", "date", "campusId"]
+    },
+    "ExamPaper": {
+      "title": "ExamPaper",
+      "description": "Online exam papers and questions",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "class": { "type": "string" },
+        "subject": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "duration": { "type": "number" },
+        "questions": { "type": "array" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["title", "class", "subject", "date", "campusId"]
+    },
+    "LibraryLoan": {
+      "title": "LibraryLoan",
+      "description": "Library book loan records",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "bookTitle": { "type": "string" },
+        "loanDate": { "type": "string", "format": "date" },
+        "dueDate": { "type": "string", "format": "date" },
+        "returnDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["borrowed", "returned", "overdue"] },
+        "campusId": { "type": "string" }
+      },
+      "required": ["studentId", "bookTitle", "loanDate", "dueDate", "status", "campusId"]
+    },
+    "SchoolEvent": {
+      "title": "SchoolEvent",
+      "description": "School events and calendar",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["title", "date", "campusId"]
+    }
+  },
+  "firestore": {
+    "campuses": { "schema": "Campus", "description": "Collection of school campuses" },
+    "students": { "schema": "Student", "description": "Collection of students" },
+    "staff": { "schema": "Staff", "description": "Collection of staff members" },
+    "attendance": { "schema": "Attendance", "description": "Collection of attendance records" },
+    "results": { "schema": "ExamResult", "description": "Collection of exam results" },
+    "fees": { "schema": "Fee", "description": "Collection of fee records" },
+    "expenses": { "schema": "Expense", "description": "Collection of school expenses" },
+    "inventory": { "schema": "Inventory", "description": "Collection of inventory items" },
+    "notices": { "schema": "Notice", "description": "Collection of school notices" },
+    "bulk_messages": { "schema": "BulkMessage", "description": "Collection of bulk messages" },
+    "syllabus": { "schema": "Syllabus", "description": "Collection of syllabus records" },
+    "daily_diary": { "schema": "DailyDiary", "description": "Collection of daily diary entries" },
+    "certificates": { "schema": "Certificate", "description": "Collection of digital certificates" },
+    "exam_papers": { "schema": "ExamPaper", "description": "Collection of exam papers" },
+    "library_loans": { "schema": "LibraryLoan", "description": "Collection of library loans" },
+    "events": { "schema": "SchoolEvent", "description": "Collection of school events" }
+  }
+}
