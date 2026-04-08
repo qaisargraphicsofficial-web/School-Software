@@ -107,6 +107,20 @@
       },
       "required": ["category", "amount", "date", "campusId"]
     },
+    "Payroll": {
+      "title": "Payroll",
+      "description": "Staff salary records",
+      "type": "object",
+      "properties": {
+        "staffId": { "type": "string" },
+        "amount": { "type": "number" },
+        "month": { "type": "string" },
+        "paymentDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["paid", "pending"] },
+        "campusId": { "type": "string" }
+      },
+      "required": ["staffId", "amount", "month", "status", "campusId"]
+    },
     "Inventory": {
       "title": "Inventory",
       "description": "School assets and stocks",
@@ -243,6 +257,7 @@
     "results": { "schema": "ExamResult", "description": "Collection of exam results" },
     "fees": { "schema": "Fee", "description": "Collection of fee records" },
     "expenses": { "schema": "Expense", "description": "Collection of school expenses" },
+    "payroll": { "schema": "Payroll", "description": "Collection of payroll records" },
     "inventory": { "schema": "Inventory", "description": "Collection of inventory items" },
     "notices": { "schema": "Notice", "description": "Collection of school notices" },
     "bulk_messages": { "schema": "BulkMessage", "description": "Collection of bulk messages" },

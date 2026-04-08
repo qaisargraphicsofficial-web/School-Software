@@ -150,6 +150,8 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Payroll', icon: FileText, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Expenses', icon: FileText, path: '/expenses', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Teachers', icon: UserSquare2, path: '/teachers', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
+    { name: 'Schedule', icon: Calendar, path: '/schedule', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
+    { name: 'Leave', icon: FileText, path: '/leave', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
     { name: 'Tasks', icon: CheckSquare, path: '/tasks', roles: ['admin', 'staff', 'student', 'parent'], category: 'STAFF & OPS' },
     { name: 'Communication', icon: Bell, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION' },
     { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS' },

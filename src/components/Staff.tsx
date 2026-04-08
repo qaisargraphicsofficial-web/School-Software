@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Staff, UserProfile } from '../types';
+import { Staff, UserProfile, Payroll } from '../types';
 import { 
   Plus, 
   Search, 
@@ -38,7 +38,21 @@ export default function StaffManagement({ profile }: StaffProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'name' | 'staffId' | 'joiningDate'>('name');
   const [loading, setLoading] = useState(true);
+  const [viewingSalaryHistory, setViewingSalaryHistory] = useState<Staff | null>(null);
+  const [payrollHistory, setPayrollHistory] = useState<Payroll[]>([]);
+
+  const fetchPayrollHistory = async (staffId: string) => {
+    try {
+      const q = query(collection(db, 'payroll'), where('staffId', '==', staffId), orderBy('paymentDate', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Payroll));
+      setPayrollHistory(data);
+    } catch (error) {
+      console.error("Error fetching payroll history:", error);
+    }
+  };
 
   const initialFormData: Partial<Staff> = {
     name: '',
@@ -144,6 +158,10 @@ export default function StaffManagement({ profile }: StaffProps) {
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
     const matchesRole = roleFilter === 'all' || s.role === roleFilter;
     return matchesSearch && matchesStatus && matchesRole;
+  }).sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'staffId') return a.staffId.localeCompare(b.staffId);
+    return new Date(a.joiningDate).getTime() - new Date(b.joiningDate).getTime();
   });
 
   const roles = ['all', ...new Set(staffList.map(s => s.role))];
@@ -229,6 +247,15 @@ export default function StaffManagement({ profile }: StaffProps) {
               />
             </div>
             <div className="flex gap-2 w-full md:w-auto">
+              <select 
+                className="input-field py-2 text-sm w-full md:w-40"
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as any)}
+              >
+                <option value="name">Sort by Name</option>
+                <option value="staffId">Sort by ID</option>
+                <option value="joiningDate">Sort by Date</option>
+              </select>
               <select 
                 className="input-field py-2 text-sm w-full md:w-40"
                 value={roleFilter}
@@ -340,13 +367,25 @@ export default function StaffManagement({ profile }: StaffProps) {
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monthly Salary</p>
                         <p className="text-lg font-black text-slate-900">${staff.salary.toLocaleString()}</p>
                       </div>
-                      <button 
-                        onClick={() => handleQuickPay(staff)}
-                        className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                        title="Pay Salary"
-                      >
-                        <Wallet className="w-5 h-5" />
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            setViewingSalaryHistory(staff);
+                            fetchPayrollHistory(staff.id!);
+                          }}
+                          className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                          title="Salary History"
+                        >
+                          <History className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={() => handleQuickPay(staff)}
+                          className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                          title="Pay Salary"
+                        >
+                          <Wallet className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
@@ -411,6 +450,70 @@ export default function StaffManagement({ profile }: StaffProps) {
           </div>
         </div>
       </div>
+
+      {/* Salary History Modal */}
+      <AnimatePresence>
+        {viewingSalaryHistory && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setViewingSalaryHistory(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-4xl overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+                <div className="flex items-center gap-3">
+                  <History className="w-6 h-6" />
+                  <h2 className="text-2xl font-black tracking-tight">Salary History: {viewingSalaryHistory.name}</h2>
+                </div>
+                <button onClick={() => setViewingSalaryHistory(null)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Month</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment Date</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {payrollHistory.length === 0 ? (
+                      <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-500">No payroll history found.</td></tr>
+                    ) : (
+                      payrollHistory.map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4 text-sm font-medium text-slate-900">{p.month}</td>
+                          <td className="px-6 py-4 text-sm text-slate-600">{p.paymentDate}</td>
+                          <td className="px-6 py-4 text-sm font-bold text-slate-900">${p.amount.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <span className={cn(
+                              "px-2.5 py-1 rounded-full text-xs font-semibold",
+                              p.status === 'paid' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                            )}>
+                              {p.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add/Edit Staff Modal */}
       <AnimatePresence>

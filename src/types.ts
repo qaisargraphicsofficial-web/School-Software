@@ -94,6 +94,20 @@ export interface Expense {
   taxAmount?: number;
 }
 
+export interface Payroll {
+  id?: string;
+  staffId: string;
+  amount: number; // Gross salary
+  deductions: number;
+  netPay: number;
+  month: string; // e.g., '2026-04'
+  paymentDate: string;
+  paymentMethod: 'bank' | 'mobile';
+  accountDetails: string;
+  status: 'pending' | 'paid';
+  campusId: string;
+}
+
 export interface InventoryItem {
   id?: string;
   name: string;
@@ -223,6 +237,7 @@ export interface SchoolSettings {
     sms: boolean;
   };
   staffPermissions: Record<string, string[]>;
+  expenseCategories: string[];
   enableNotifications: boolean;
   allowParentRegistration: boolean;
   maintenanceMode: boolean;

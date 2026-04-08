@@ -10,7 +10,9 @@ import Dashboard from './components/Dashboard';
 import Students from './components/Students';
 import Staff from './components/Staff';
 import Academic from './components/Academic';
-import Fees from './components/Fees';
+import FeesManagement from './components/FeesManagement';
+import PayrollManagement from './components/PayrollManagement';
+import ExpensesManagement from './components/ExpensesManagement';
 import Inventory from './components/Inventory';
 import Communication from './components/Communication';
 import Curriculum from './components/Curriculum';
@@ -23,6 +25,8 @@ import Tasks from './components/Tasks';
 import Settings from './components/Settings';
 import Reports from './components/Reports';
 import Classes from './components/Classes';
+import Schedule from './components/Schedule';
+import Leave from './components/Leave';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -88,9 +92,11 @@ export default function App() {
             <Route path="attendance" element={<Academic profile={profile} />} />
             <Route path="results" element={<Exams profile={profile} />} />
             <Route path="teachers" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Staff profile={profile} /> : <Navigate to="/" replace />} />
-            <Route path="fees" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Fees profile={profile} /> : <Navigate to="/" replace />} />
-            <Route path="payroll" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Fees profile={profile} /> : <Navigate to="/" replace />} />
-            <Route path="expenses" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Fees profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="schedule" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Schedule profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="leave" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Leave profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="fees" element={profile?.role === 'admin' || profile?.role === 'staff' ? <FeesManagement profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="payroll" element={profile?.role === 'admin' || profile?.role === 'staff' ? <PayrollManagement profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="expenses" element={profile?.role === 'admin' || profile?.role === 'staff' ? <ExpensesManagement profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="inventory" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Inventory profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="communication" element={<Communication profile={profile} />} />
             <Route path="curriculum" element={<Curriculum profile={profile} />} />
