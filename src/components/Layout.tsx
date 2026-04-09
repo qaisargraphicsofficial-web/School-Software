@@ -25,7 +25,9 @@ import {
   Moon,
   Sun,
   PieChart,
-  Calendar
+  Calendar,
+  MessageSquare,
+  CreditCard
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, getDoc } from 'firebase/firestore';
@@ -49,6 +51,8 @@ export default function Layout({ profile }: LayoutProps) {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [schoolName, setSchoolName] = useState('EduManage');
   const [logoUrl, setLogoUrl] = useState('');
+  const [staffRole, setStaffRole] = useState<string | null>(null);
+  const [staffPermissions, setStaffPermissions] = useState<Record<string, string[]>>({});
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -76,6 +80,7 @@ export default function Layout({ profile }: LayoutProps) {
           const data = docSnap.data();
           setSchoolName(data.schoolName || 'EduManage');
           setLogoUrl(data.logoUrl || '');
+          setStaffPermissions(data.staffPermissions || {});
         }
       } catch (error) {
         console.error("Error fetching school settings:", error);
@@ -83,6 +88,46 @@ export default function Layout({ profile }: LayoutProps) {
     };
     fetchSchoolSettings();
   }, []);
+
+  useEffect(() => {
+    const fetchStaffRole = async () => {
+      if (profile?.role === 'staff' && profile.staffId) {
+        try {
+          const staffRef = doc(db, 'staff', profile.staffId);
+          const staffSnap = await getDoc(staffRef);
+          if (staffSnap.exists()) {
+            setStaffRole(staffSnap.data().role);
+          }
+        } catch (error) {
+          console.error("Error fetching staff role:", error);
+        }
+      }
+    };
+    fetchStaffRole();
+  }, [profile]);
+
+  useEffect(() => {
+    // Page access control
+    if (!profile || profile.role === 'admin') return;
+    
+    const currentItem = navItems.find(item => item.path === location.pathname);
+    if (currentItem) {
+      if (profile.role === 'staff') {
+        // Wait for staffRole to be loaded if it's staff
+        if (staffRole && Object.keys(staffPermissions).length > 0) {
+          const allowedModules = staffPermissions[staffRole] || [];
+          if (!allowedModules.includes(currentItem.name)) {
+            navigate('/');
+          }
+        }
+      } else {
+        // For students/parents, check hardcoded roles
+        if (currentItem.roles && !currentItem.roles.includes(profile.role)) {
+          navigate('/');
+        }
+      }
+    }
+  }, [location.pathname, profile, staffRole, staffPermissions]);
 
   useEffect(() => {
     if (!profile) return;
@@ -145,31 +190,35 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Students', icon: Users, path: '/students', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Classes', icon: BookOpen, path: '/classes', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Attendance', icon: Calendar, path: '/attendance', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
-    { name: 'Results', icon: FileText, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
+    { name: 'Results', icon: GraduationCap, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
     { name: 'Fees', icon: Wallet, path: '/fees', roles: ['admin', 'staff'], category: 'FINANCE' },
-    { name: 'Payroll', icon: FileText, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
+    { name: 'Payroll', icon: CreditCard, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Expenses', icon: FileText, path: '/expenses', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Teachers', icon: UserSquare2, path: '/teachers', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
     { name: 'Schedule', icon: Calendar, path: '/schedule', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
     { name: 'Leave', icon: FileText, path: '/leave', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
     { name: 'Tasks', icon: CheckSquare, path: '/tasks', roles: ['admin', 'staff', 'student', 'parent'], category: 'STAFF & OPS' },
-    { name: 'Communication', icon: Bell, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION' },
+    { name: 'Communication', icon: MessageSquare, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION' },
     { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS' },
     { name: 'Settings', icon: Settings, path: '/settings', roles: ['admin'], category: 'AI & SETTINGS' },
+    { name: 'Campuses', icon: Building2, path: '/campuses', roles: ['admin'], category: 'STAFF & OPS' },
+    { name: 'Library', icon: Library, path: '/library', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
+    { name: 'Inventory', icon: Package, path: '/inventory', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
+    { name: 'Curriculum', icon: BookText, path: '/curriculum', roles: ['admin', 'staff'], category: 'ACADEMICS' },
+    { name: 'Diary', icon: BookOpen, path: '/diary', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
+    { name: 'Certificates', icon: Award, path: '/certificates', roles: ['admin', 'staff'], category: 'ACADEMICS' },
   ];
 
-  const filteredNavItems = navItems.filter(item => 
-    !item.roles || (profile?.role && item.roles.includes(profile.role))
-  );
-
-  if (profile?.role === 'admin') {
-    const tasksIndex = filteredNavItems.findIndex(i => i.name === 'Tasks');
-    if (tasksIndex !== -1) {
-      filteredNavItems.splice(tasksIndex + 1, 0, { name: 'Campuses', icon: Building2, path: '/campuses', category: 'STAFF & OPS' });
-    } else {
-      filteredNavItems.push({ name: 'Campuses', icon: Building2, path: '/campuses', category: 'STAFF & OPS' });
+  const filteredNavItems = navItems.filter(item => {
+    if (profile?.role === 'admin') return true;
+    
+    if (profile?.role === 'staff' && staffRole) {
+      const allowedModules = staffPermissions[staffRole] || [];
+      return allowedModules.includes(item.name);
     }
-  }
+    
+    return !item.roles || (profile?.role && item.roles.includes(profile.role));
+  });
 
   // Group items by category
   const groupedNavItems = filteredNavItems.reduce((acc, item) => {

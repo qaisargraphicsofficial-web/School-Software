@@ -3,7 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { UserProfile, UserRole } from './types';
+import { UserProfile, UserRole, UserStatus } from './types';
+import { Clock } from 'lucide-react';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -28,6 +29,8 @@ import Classes from './components/Classes';
 import Schedule from './components/Schedule';
 import Leave from './components/Leave';
 
+import Registration from './components/Registration';
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -42,10 +45,14 @@ export default function App() {
         
         if (docSnap.exists()) {
           const existingProfile = docSnap.data() as UserProfile;
-          // Ensure primary admin always has admin role
-          if (firebaseUser.email === "qaisarabbas6496@gmail.com" && existingProfile.role !== 'admin') {
-            const updatedProfile = { ...existingProfile, role: 'admin' as UserRole };
-            await updateDoc(docRef, { role: 'admin' });
+          // Ensure primary admin always has admin role and is approved
+          if (firebaseUser.email === "qaisarabbas6496@gmail.com" && (existingProfile.role !== 'admin' || existingProfile.status !== 'approved')) {
+            const updatedProfile = { 
+              ...existingProfile, 
+              role: 'admin' as UserRole,
+              status: 'approved' as UserStatus 
+            };
+            await updateDoc(docRef, { role: 'admin', status: 'approved' });
             setProfile(updatedProfile);
           } else {
             setProfile(existingProfile);
@@ -53,10 +60,13 @@ export default function App() {
         } else {
           // Default to parent or staff if not set, but admin for the specific email
           const defaultRole: UserRole = firebaseUser.email === "qaisarabbas6496@gmail.com" ? 'admin' : 'parent';
+          const defaultStatus: UserStatus = firebaseUser.email === "qaisarabbas6496@gmail.com" ? 'approved' : 'pending';
           const newProfile: UserProfile = {
             uid: firebaseUser.uid,
             email: firebaseUser.email || '',
             role: defaultRole,
+            status: defaultStatus,
+            isSubscribed: firebaseUser.email === "qaisarabbas6496@gmail.com",
           };
           await setDoc(docRef, newProfile);
           setProfile(newProfile);
@@ -79,9 +89,33 @@ export default function App() {
     );
   }
 
+  // Handle pending approval
+  if (user && profile?.status === 'pending') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Clock className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Account Pending Approval</h2>
+          <p className="text-slate-600 mb-8">
+            Your account is currently under review. Once our team manually approves your application, you will gain full access to the system.
+          </p>
+          <button 
+            onClick={() => auth.signOut()}
+            className="w-full py-3 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <Routes>
+        <Route path="/register" element={<Registration />} />
         {!user ? (
           <Route path="*" element={<Login />} />
         ) : (

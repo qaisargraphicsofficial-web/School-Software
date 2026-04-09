@@ -21,7 +21,9 @@ import {
   Wallet,
   History,
   ArrowRight,
-  Users
+  Users,
+  Key,
+  ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -42,6 +44,37 @@ export default function StaffManagement({ profile }: StaffProps) {
   const [loading, setLoading] = useState(true);
   const [viewingSalaryHistory, setViewingSalaryHistory] = useState<Staff | null>(null);
   const [payrollHistory, setPayrollHistory] = useState<Payroll[]>([]);
+  const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
+  const [selectedStaffForCreds, setSelectedStaffForCreds] = useState<Staff | null>(null);
+  const [credFormData, setCredFormData] = useState({
+    username: '',
+    password: ''
+  });
+
+  const handleGenerateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStaffForCreds) return;
+    
+    try {
+      // Store credentials in a separate collection
+      // In a real app, password should be hashed
+      await setDoc(doc(db, 'staff_credentials', selectedStaffForCreds.staffId), {
+        username: credFormData.username,
+        password: credFormData.password,
+        staffId: selectedStaffForCreds.staffId,
+        campusId: profile?.campusId || 'main',
+        role: selectedStaffForCreds.role,
+        name: selectedStaffForCreds.name
+      });
+      
+      alert('Credentials generated successfully!');
+      setIsCredentialModalOpen(false);
+      setCredFormData({ username: '', password: '' });
+    } catch (error) {
+      console.error("Error generating credentials:", error);
+      alert('Failed to generate credentials.');
+    }
+  };
 
   const fetchPayrollHistory = async (staffId: string) => {
     try {
@@ -150,6 +183,16 @@ export default function StaffManagement({ profile }: StaffProps) {
       } catch (error) {
         console.error("Error updating salary:", error);
       }
+    }
+  };
+
+  const updateStaffStatus = async (staff: Staff) => {
+    const newStatus = staff.status === 'active' ? 'inactive' : 'active';
+    try {
+      await updateDoc(doc(db, 'staff', staff.id!), { status: newStatus });
+      fetchStaff();
+    } catch (error) {
+      console.error("Error updating staff status:", error);
     }
   };
 
@@ -309,12 +352,15 @@ export default function StaffManagement({ profile }: StaffProps) {
                       <div>
                         <h3 className="text-xl font-black text-slate-900 tracking-tight">{staff.name}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                            staff.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
-                          )}>
+                          <button
+                            onClick={() => updateStaffStatus(staff)}
+                            className={cn(
+                              "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-colors",
+                              staff.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100"
+                            )}
+                          >
                             {staff.status}
-                          </span>
+                          </button>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ID: {staff.staffId}</span>
                         </div>
                       </div>
@@ -385,6 +431,19 @@ export default function StaffManagement({ profile }: StaffProps) {
                         >
                           <Wallet className="w-5 h-5" />
                         </button>
+                        {profile?.role === 'admin' && (
+                          <button 
+                            onClick={() => {
+                              setSelectedStaffForCreds(staff);
+                              setCredFormData({ username: staff.staffId, password: '' });
+                              setIsCredentialModalOpen(true);
+                            }}
+                            className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all shadow-sm"
+                            title="Generate Login Credentials"
+                          >
+                            <Key className="w-5 h-5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     
@@ -673,6 +732,86 @@ export default function StaffManagement({ profile }: StaffProps) {
                     className="flex-1 px-6 py-4 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
                   >
                     {isEditMode ? 'Update Record' : 'Add Staff Member'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
+      {/* Credential Generation Modal */}
+      <AnimatePresence>
+        {isCredentialModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setIsCredentialModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-amber-600 text-white">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="w-6 h-6" />
+                  <h2 className="text-2xl font-black tracking-tight">Staff Credentials</h2>
+                </div>
+                <button onClick={() => setIsCredentialModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <form onSubmit={handleGenerateCredentials} className="p-8 space-y-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <p className="text-xs font-bold text-amber-700 mb-1">Staff Member</p>
+                    <p className="text-lg font-black text-slate-900">{selectedStaffForCreds?.name}</p>
+                    <p className="text-xs text-slate-500">ID: {selectedStaffForCreds?.staffId}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Login Username (Unique ID)</label>
+                    <input
+                      required
+                      type="text"
+                      className="input-field"
+                      value={credFormData.username}
+                      onChange={e => setCredFormData({...credFormData, username: e.target.value})}
+                      placeholder="e.g. STF-001"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Login Password</label>
+                    <input
+                      required
+                      type="password"
+                      className="input-field"
+                      value={credFormData.password}
+                      onChange={e => setCredFormData({...credFormData, password: e.target.value})}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-4 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsCredentialModalOpen(false)}
+                    className="flex-1 px-6 py-4 text-slate-600 font-black uppercase tracking-widest hover:bg-slate-50 rounded-2xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-6 py-4 bg-amber-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-amber-700 transition-all shadow-lg shadow-amber-100"
+                  >
+                    Generate
                   </button>
                 </div>
               </form>

@@ -70,7 +70,10 @@ export default function Certificates({ profile }: { profile: UserProfile | null 
     pdf.save(`Certificate-${cert.id}.pdf`);
   };
 
-  const getStudentName = (id: string) => students.find(s => s.id === id)?.name || 'Unknown';
+  const getStudentName = (id: string) => {
+    const s = students.find(s => s.id === id);
+    return s ? `${s.name} S/O ${s.parentName}` : 'Unknown';
+  };
 
   return (
     <div className="space-y-6">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { SchoolSettings, UserProfile } from '../types';
+import { SchoolSettings, UserProfile, SchoolApplication, UserStatus } from '../types';
 import { 
   Settings as SettingsIcon, 
   Building2, 
@@ -26,10 +26,67 @@ import {
   HelpCircle,
   Clock,
   Smartphone,
-  Layout
+  Layout,
+  Plus,
+  X,
+  UserCheck,
+  CreditCard,
+  FileText,
+  User,
+  Users,
+  BookOpen,
+  ClipboardList,
+  BarChart3,
+  Wallet,
+  Receipt,
+  Users2,
+  UserSquare2,
+  Book,
+  BookText,
+  Package,
+  ScrollText,
+  Award,
+  MessageSquare,
+  Map,
+  PieChart,
+  CheckSquare,
+  LayoutDashboard,
+  Library
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+
+const MODULE_CATEGORIES = {
+  'Core': [
+    { name: 'Dashboard', icon: LayoutDashboard },
+    { name: 'Communication', icon: MessageSquare },
+    { name: 'Reports', icon: PieChart },
+    { name: 'Settings', icon: SettingsIcon },
+    { name: 'Campuses', icon: Building2 },
+  ],
+  'Academic': [
+    { name: 'Students', icon: Users },
+    { name: 'Teachers', icon: UserSquare2 },
+    { name: 'Classes', icon: BookOpen },
+    { name: 'Attendance', icon: Calendar },
+    { name: 'Results', icon: GraduationCap },
+    { name: 'Schedule', icon: Calendar },
+    { name: 'Curriculum', icon: BookText },
+    { name: 'Diary', icon: BookOpen },
+    { name: 'Certificates', icon: Award },
+  ],
+  'Finance': [
+    { name: 'Fees', icon: Wallet },
+    { name: 'Payroll', icon: CreditCard },
+    { name: 'Expenses', icon: FileText },
+  ],
+  'Administrative': [
+    { name: 'Leave', icon: FileText },
+    { name: 'Tasks', icon: CheckSquare },
+    { name: 'Library', icon: Library },
+    { name: 'Inventory', icon: Package },
+  ]
+};
 
 interface SettingsProps {
   profile: UserProfile | null;
@@ -46,11 +103,69 @@ const Tooltip = ({ text }: { text: string }) => (
 );
 
 export default function Settings({ profile }: SettingsProps) {
-  const [activeTab, setActiveTab] = useState<'general' | 'academic' | 'security' | 'system'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'academic' | 'security' | 'system' | 'applications'>('general');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [applications, setApplications] = useState<SchoolApplication[]>([]);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
   
+  const [newRoleName, setNewRoleName] = useState('');
+  const [isAddingRole, setIsAddingRole] = useState(false);
+
+  const isSuperAdmin = profile?.email === "qaisarabbas6496@gmail.com";
+
+  useEffect(() => {
+    fetchSettings();
+    if (isSuperAdmin) {
+      fetchApplications();
+    }
+  }, [isSuperAdmin]);
+
+  const fetchApplications = async () => {
+    try {
+      const q = query(collection(db, 'school_applications'));
+      const snap = await getDocs(q);
+      setApplications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SchoolApplication)));
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+    }
+  };
+
+  const handleApproveApplication = async (app: SchoolApplication) => {
+    if (!app.id) return;
+    setApprovingId(app.id);
+    try {
+      // 1. Update application status
+      await updateDoc(doc(db, 'school_applications', app.id), {
+        status: 'approved',
+        paymentStatus: 'paid'
+      });
+
+      // 2. Find and update user profile
+      const userQ = query(collection(db, 'users'), where('email', '==', app.email));
+      const userSnap = await getDocs(userQ);
+      
+      if (!userSnap.empty) {
+        const userDoc = userSnap.docs[0];
+        await updateDoc(doc(db, 'users', userDoc.id), {
+          status: 'approved',
+          isSubscribed: true,
+          schoolId: app.id,
+          campusId: app.id // Use app ID as the isolation ID
+        });
+      }
+
+      alert(`Application for ${app.schoolName} approved!`);
+      fetchApplications();
+    } catch (error) {
+      console.error("Error approving application:", error);
+      alert("Failed to approve application.");
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
   const [settings, setSettings] = useState<SchoolSettings>({
     schoolName: 'EduManage Pro',
     schoolAddress: '123 Education Way, Knowledge City',
@@ -67,10 +182,10 @@ export default function Settings({ profile }: SettingsProps) {
       sms: false
     },
     staffPermissions: {
-      'Teacher': ['Students', 'Academic', 'Attendance', 'Diary'],
-      'Administrator': ['Students', 'Staff', 'Academic', 'Finance', 'Inventory', 'Settings'],
-      'Accountant': ['Finance', 'Inventory'],
-      'Librarian': ['Library']
+      'Teacher': ['Dashboard', 'Students', 'Academic', 'Attendance', 'Diary'],
+      'Administrator': ['Dashboard', 'Students', 'Staff', 'Academic', 'Finance', 'Inventory', 'Settings', 'Campuses'],
+      'Accountant': ['Dashboard', 'Finance', 'Inventory'],
+      'Librarian': ['Dashboard', 'Library']
     },
     enableNotifications: true,
     allowParentRegistration: true,
@@ -128,6 +243,7 @@ export default function Settings({ profile }: SettingsProps) {
     { id: 'academic', name: 'Academic', icon: Calendar },
     { id: 'security', name: 'Security & Access', icon: ShieldCheck },
     { id: 'system', name: 'System', icon: Database },
+    ...(isSuperAdmin ? [{ id: 'applications', name: 'System Applications', icon: FileText }] : []),
   ];
 
   if (loading) {
@@ -506,53 +622,159 @@ export default function Settings({ profile }: SettingsProps) {
                           <Lock className="w-4 h-4 text-indigo-600" />
                           Granular Role Permissions
                         </h4>
-                        <Tooltip text="Define which modules each staff role can access. This controls the sidebar visibility and page access." />
+                        <div className="flex items-center gap-4">
+                          {isAddingRole ? (
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="text" 
+                                placeholder="Role Name (e.g. Clerk)" 
+                                className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                                value={newRoleName}
+                                onChange={e => setNewRoleName(e.target.value)}
+                                autoFocus
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  if (newRoleName && !settings.staffPermissions[newRoleName]) {
+                                    setSettings({
+                                      ...settings,
+                                      staffPermissions: {
+                                        ...settings.staffPermissions,
+                                        [newRoleName]: []
+                                      }
+                                    });
+                                    setNewRoleName('');
+                                    setIsAddingRole(false);
+                                  }
+                                }}
+                                className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setIsAddingRole(false)}
+                                className="p-1.5 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              type="button"
+                              onClick={() => setIsAddingRole(true)}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Add New Role
+                            </button>
+                          )}
+                          <Tooltip text="Define which modules each staff role can access. This controls the sidebar visibility and page access." />
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-1 gap-8">
                         {Object.entries(settings.staffPermissions).map(([role, permissions]) => {
                           const perms = permissions as string[];
                           return (
-                            <div key={role} className="space-y-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200 shadow-sm">
-                                  <Briefcase className="w-4 h-4 text-indigo-600" />
+                            <div key={role} className="space-y-4 p-6 bg-white rounded-2xl border border-slate-100 shadow-sm relative group/role">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`Delete role "${role}"?`)) {
+                                    const newPerms = { ...settings.staffPermissions };
+                                    delete newPerms[role];
+                                    setSettings({ ...settings, staffPermissions: newPerms });
+                                  }
+                                }}
+                                className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-600 opacity-0 group-hover/role:opacity-100 transition-all"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center border border-indigo-100">
+                                    <Briefcase className="w-4 h-4 text-indigo-600" />
+                                  </div>
+                                  <div>
+                                    <h5 className="text-sm font-black text-slate-900">{role}</h5>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Module Access</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <h5 className="text-sm font-black text-slate-900">{role}</h5>
-                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Module Access</p>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const allModules = Object.values(MODULE_CATEGORIES).flat().map(m => m.name);
+                                    const isAllSelected = allModules.every(m => perms.includes(m));
+                                    setSettings({
+                                      ...settings,
+                                      staffPermissions: {
+                                        ...settings.staffPermissions,
+                                        [role]: isAllSelected ? [] : allModules
+                                      }
+                                    });
+                                  }}
+                                  className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                                >
+                                  {Object.values(MODULE_CATEGORIES).flat().every(m => perms.includes(m.name)) ? 'Deselect All' : 'Select All'}
+                                </button>
                               </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                {['Students', 'Staff', 'Academic', 'Finance', 'Inventory', 'Library', 'Diary', 'Exams', 'Settings'].map((module) => (
-                                  <label
-                                    key={module}
-                                    className={cn(
-                                      "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                                      perms.includes(module)
-                                        ? "bg-white border-indigo-200 shadow-sm"
-                                        : "bg-slate-100/50 border-transparent opacity-60"
-                                    )}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                      checked={perms.includes(module)}
-                                      onChange={(e) => {
-                                        const newPermissions = e.target.checked
-                                          ? [...perms, module]
-                                          : perms.filter(p => p !== module);
-                                        setSettings({
-                                          ...settings,
-                                          staffPermissions: {
-                                            ...settings.staffPermissions,
-                                            [role]: newPermissions
-                                          }
-                                        });
-                                      }}
-                                    />
-                                    <span className="text-[11px] font-bold text-slate-700">{module}</span>
-                                  </label>
+                              <div className="space-y-6">
+                                {Object.entries(MODULE_CATEGORIES).map(([category, modules]) => (
+                                  <div key={category} className="space-y-3">
+                                    <h6 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{category}</h6>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                      {modules.map((module) => (
+                                        <label
+                                          key={module.name}
+                                          className={cn(
+                                            "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all group/module",
+                                            perms.includes(module.name)
+                                              ? "bg-indigo-50 border-indigo-200"
+                                              : "bg-slate-50 border-transparent hover:bg-slate-100"
+                                          )}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <module.icon className={cn(
+                                              "w-4 h-4",
+                                              perms.includes(module.name) ? "text-indigo-600" : "text-slate-400"
+                                            )} />
+                                            <span className={cn(
+                                              "text-[11px] font-bold",
+                                              perms.includes(module.name) ? "text-indigo-900" : "text-slate-600"
+                                            )}>{module.name}</span>
+                                          </div>
+                                          <div className={cn(
+                                            "w-8 h-4 rounded-full relative transition-all",
+                                            perms.includes(module.name) ? "bg-indigo-600" : "bg-slate-300"
+                                          )}>
+                                            <div className={cn(
+                                              "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm",
+                                              perms.includes(module.name) ? "left-[18px]" : "left-0.5"
+                                            )} />
+                                          </div>
+                                          <input
+                                            type="checkbox"
+                                            className="hidden"
+                                            checked={perms.includes(module.name)}
+                                            onChange={(e) => {
+                                              const newPermissions = e.target.checked
+                                                ? [...perms, module.name]
+                                                : perms.filter(p => p !== module.name);
+                                              setSettings({
+                                                ...settings,
+                                                staffPermissions: {
+                                                  ...settings.staffPermissions,
+                                                  [role]: newPermissions
+                                                }
+                                              });
+                                            }}
+                                          />
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
                                 ))}
                               </div>
                             </div>
@@ -643,6 +865,90 @@ export default function Settings({ profile }: SettingsProps) {
                         </button>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'applications' && isSuperAdmin && (
+                <div className="space-y-8">
+                  <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
+                    <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900">School Applications</h3>
+                      <p className="text-sm text-slate-500 font-medium">Review and approve new school registrations.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {applications.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                        No applications found.
+                      </div>
+                    ) : (
+                      applications.map((app) => (
+                        <div key={app.id} className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex flex-col md:flex-row justify-between gap-6">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3">
+                                <h4 className="text-lg font-black text-slate-900">{app.schoolName}</h4>
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border",
+                                  app.status === 'approved' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                                )}>
+                                  {app.status}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                  <User className="w-4 h-4 text-slate-400" />
+                                  <span className="font-medium">{app.adminName}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                  <Mail className="w-4 h-4 text-slate-400" />
+                                  <span>{app.email}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                  <Phone className="w-4 h-4 text-slate-400" />
+                                  <span>{app.phone}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                  <MapPin className="w-4 h-4 text-slate-400" />
+                                  <span>{app.address}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4 pt-2">
+                                <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-600">
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  Plan: {app.plan.toUpperCase()}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                  Applied: {new Date(app.createdAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex flex-col justify-center gap-2 min-w-[140px]">
+                              {app.status === 'pending' ? (
+                                <button
+                                  type="button"
+                                  disabled={approvingId === app.id}
+                                  onClick={() => handleApproveApplication(app)}
+                                  className="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
+                                >
+                                  {approvingId === app.id ? 'Approving...' : 'Approve & Pay'}
+                                </button>
+                              ) : (
+                                <div className="flex items-center justify-center gap-2 text-emerald-600 font-black text-xs uppercase tracking-widest">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  Approved
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}

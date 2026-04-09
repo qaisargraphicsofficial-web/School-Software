@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'staff' | 'parent' | 'student';
+export type UserStatus = 'pending' | 'approved' | 'rejected';
 
 export interface UserProfile {
   uid: string;
@@ -7,7 +8,23 @@ export interface UserProfile {
   displayName?: string;
   studentId?: string; // For parents/students
   staffId?: string; // For staff
-  campusId?: string; // For multi-campus
+  campusId?: string; // For multi-campus/school isolation
+  status: UserStatus;
+  isSubscribed?: boolean;
+  schoolId?: string; // Unique ID for the school
+}
+
+export interface SchoolApplication {
+  id?: string;
+  schoolName: string;
+  adminName: string;
+  email: string;
+  phone: string;
+  address: string;
+  status: UserStatus;
+  createdAt: string;
+  paymentStatus: 'pending' | 'paid';
+  plan: 'basic' | 'premium';
 }
 
 export interface Campus {
@@ -84,6 +101,37 @@ export interface Fee {
   taxAmount?: number;
 }
 
+export interface FeeType {
+  id?: string;
+  name: string;
+  defaultAmount: number;
+  defaultDueDate: string;
+  campusId: string;
+}
+
+export interface FeeRecord {
+  id?: string;
+  studentId: string;
+  feeTypeId: string;
+  amount: number;
+  dueDate: string;
+  status: 'paid' | 'pending' | 'overdue' | 'partial';
+  paidAmount: number;
+  termOrYear: string;
+  campusId: string;
+}
+
+export interface PaymentHistory {
+  id?: string;
+  feeRecordId: string;
+  studentId: string;
+  amount: number;
+  date: string;
+  method: 'cash' | 'online' | 'bank_transfer';
+  transactionId?: string;
+  campusId: string;
+}
+
 export interface Expense {
   id?: string;
   category: string;
@@ -92,6 +140,7 @@ export interface Expense {
   description: string;
   campusId: string;
   taxAmount?: number;
+  invoiceNumber?: string;
 }
 
 export interface Payroll {
@@ -168,6 +217,13 @@ export interface Certificate {
   campusId: string;
 }
 
+export interface ExamType {
+  id?: string;
+  name: string;
+  term: string;
+  campusId: string;
+}
+
 export interface ExamPaper {
   id?: string;
   title: string;
@@ -175,6 +231,8 @@ export interface ExamPaper {
   subject: string;
   date: string;
   duration: number; // in minutes
+  examTypeId?: string;
+  term?: string;
   questions: {
     question: string;
     options?: string[];

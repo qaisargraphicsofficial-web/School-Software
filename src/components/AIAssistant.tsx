@@ -569,7 +569,7 @@ const tools = {
       .map(doc => doc.data())
       .filter((r: any) => r.studentId === student.id);
     
-    return { studentName: student.name, results };
+    return { studentName: `${student.name} S/O ${student.parentName}`, results };
   },
   get_staff_salary_summary: async () => {
     const staffRef = collection(db, 'staff');
@@ -626,7 +626,7 @@ const tools = {
     
     if (results.length === 0) {
       return { 
-        studentName: student.name,
+        studentName: `${student.name} S/O ${student.parentName}`,
         class: student.class,
         attendance: {
           totalDays,
@@ -645,7 +645,7 @@ const tools = {
     const avgPercentage = results.reduce((acc: number, r: any) => acc + (r.percentage || 0), 0) / results.length;
     
     return {
-      studentName: student.name,
+      studentName: `${student.name} S/O ${student.parentName}`,
       class: student.class,
       totalExams: results.length,
       averagePercentage: avgPercentage.toFixed(2) + '%',
@@ -672,12 +672,12 @@ const tools = {
 
     const rankings = classStudents.map(student => {
       const studentResults = allResults.filter(r => r.studentId === student.id);
-      if (studentResults.length === 0) return { name: student.name, average: 0 };
+      if (studentResults.length === 0) return { name: `${student.name} S/O ${student.parentName}`, average: 0 };
       
       const totalMarks = studentResults.reduce((acc, r) => acc + (r.marksObtained || 0), 0);
       const maxMarks = studentResults.reduce((acc, r) => acc + (r.totalMarks || 100), 0);
       return {
-        name: student.name,
+        name: `${student.name} S/O ${student.parentName}`,
         average: (totalMarks / maxMarks) * 100
       };
     });

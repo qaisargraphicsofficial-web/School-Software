@@ -409,7 +409,7 @@ export default function Communication({ profile }: CommunicationProps) {
                         {childData.student?.name?.[0]}
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-slate-900 tracking-tight">{childData.student?.name}</h3>
+                        <h3 className="text-xl font-black text-slate-900 tracking-tight">{childData.student?.name} S/O {childData.student?.parentName}</h3>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-full tracking-widest">
                             Roll: {childData.student?.rollNumber}

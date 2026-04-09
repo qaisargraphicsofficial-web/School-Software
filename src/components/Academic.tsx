@@ -316,7 +316,7 @@ export default function Academic({ profile }: AcademicProps) {
     doc.setFont('helvetica', 'bold');
     doc.text('STUDENT INFORMATION', 20, 55);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Name: ${student.name}`, 20, 65);
+    doc.text(`Name: ${student.name} S/O ${student.parentName}`, 20, 65);
     doc.text(`Roll No: ${student.rollNumber}`, 20, 75);
     doc.text(`Class: ${student.class} - ${student.section}`, 120, 65);
     doc.text(`Term: ${selectedTerm}`, 120, 75);
@@ -365,7 +365,7 @@ export default function Academic({ profile }: AcademicProps) {
     doc.setFontSize(8);
     doc.text(`Generated on ${new Date().toLocaleDateString()} | EduManage Pro School Management System`, 105, 285, { align: 'center' });
 
-    doc.save(`${student.name}_${selectedTerm}_Report.pdf`);
+    doc.save(`${student.name}_S_O_${student.parentName}_${selectedTerm}_Report.pdf`);
   };
 
   return (
@@ -580,7 +580,7 @@ export default function Academic({ profile }: AcademicProps) {
                     <tr><td colSpan={3} className="px-6 py-8 text-center animate-pulse">Loading students...</td></tr>
                   ) : students.map((student) => (
                     <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-900">{student.name}</td>
+                      <td className="px-6 py-4 font-medium text-slate-900">{student.name} S/O {student.parentName}</td>
                       <td className="px-6 py-4 text-sm text-slate-600">{student.rollNumber}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
@@ -636,7 +636,7 @@ export default function Academic({ profile }: AcademicProps) {
                   <tr><td colSpan={subjects.length + 2} className="px-6 py-8 text-center animate-pulse">Loading students...</td></tr>
                 ) : students.map((student) => (
                   <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{student.name}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">{student.name} S/O {student.parentName}</td>
                     {subjects.map(sub => (
                       <td key={sub} className="px-6 py-4">
                         <input

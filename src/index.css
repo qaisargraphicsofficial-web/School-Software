@@ -16,6 +16,12 @@
   --color-brand-800: #373daf;
   --color-brand-900: #31378c;
   --color-brand-950: #21245a;
+
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  --animate-spin-slow: spin-slow 3s linear infinite;
 }
 
 @layer base {

@@ -199,17 +199,6 @@ export default function Tasks({ profile }: TasksProps) {
     setIsModalOpen(true);
   };
 
-  const toggleTaskStatus = async (task: Task) => {
-    if (!task.id) return;
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-    try {
-      await updateDoc(doc(db, 'tasks', task.id), { status: newStatus });
-      fetchTasks();
-    } catch (error) {
-      console.error("Error updating task status:", error);
-    }
-  };
-
   const deleteTask = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
       try {
@@ -228,6 +217,23 @@ export default function Tasks({ profile }: TasksProps) {
     const matchesAssignee = filterAssignee === 'all' || task.assignedTo === filterAssignee;
     return matchesSearch && matchesStatus && matchesAssignee;
   });
+
+  const stats = {
+    total: tasks.length,
+    pending: tasks.filter(t => t.status === 'pending').length,
+    inProgress: tasks.filter(t => t.status === 'in-progress').length,
+    completed: tasks.filter(t => t.status === 'completed').length,
+    percent: tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100) : 0
+  };
+
+  const updateTaskStatus = async (taskId: string, newStatus: Task['status']) => {
+    try {
+      await updateDoc(doc(db, 'tasks', taskId), { status: newStatus });
+      fetchTasks();
+    } catch (error) {
+      console.error("Error updating task status:", error);
+    }
+  };
 
   const sortedTasks = [...filteredTasks].sort((a, b) => {
     if (sortBy === 'dueDate') {
@@ -279,6 +285,51 @@ export default function Tasks({ profile }: TasksProps) {
             <Plus className="w-5 h-5" />
             Create New Task
           </button>
+        </div>
+      </div>
+
+      {/* Progress Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="md:col-span-3 card p-6 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Overall Progress</h3>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Task Completion Rate</p>
+            </div>
+            <div className="text-3xl font-black text-indigo-600">{stats.percent}%</div>
+          </div>
+          <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${stats.percent}%` }}
+              className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600"
+            />
+          </div>
+          <div className="flex justify-between mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <span>0%</span>
+            <span>{stats.completed} of {stats.total} Tasks Completed</span>
+            <span>100%</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
+            <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xl font-black text-slate-900">{stats.pending}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending</div>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
+            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+              <Loader2 className="w-5 h-5 animate-spin-slow" />
+            </div>
+            <div>
+              <div className="text-xl font-black text-slate-900">{stats.inProgress}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">In Progress</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -368,7 +419,7 @@ export default function Tasks({ profile }: TasksProps) {
               <div className="flex items-start justify-between mb-4">
                 <motion.button
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => toggleTaskStatus(task)}
+                  onClick={() => task.id && updateTaskStatus(task.id, task.status === 'completed' ? 'pending' : 'completed')}
                   className={cn(
                     "p-2 rounded-xl transition-all",
                     task.status === 'completed' ? "text-emerald-600 bg-emerald-100" : "text-slate-300 hover:text-indigo-600 hover:bg-indigo-50"
@@ -460,14 +511,27 @@ export default function Tasks({ profile }: TasksProps) {
                   )}>
                     {task.status}
                   </div>
-                  {task.status !== 'completed' && (
-                    <button
-                      onClick={() => toggleTaskStatus(task)}
-                      className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-indigo-100 transition-colors"
-                    >
-                      Complete
-                    </button>
-                  )}
+                  
+                  <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-full">
+                    {(['pending', 'in-progress', 'completed'] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => task.id && updateTaskStatus(task.id, s)}
+                        title={`Mark as ${s}`}
+                        className={cn(
+                          "p-1.5 rounded-full transition-all",
+                          task.status === s 
+                            ? s === 'completed' ? "bg-emerald-600 text-white" :
+                              s === 'in-progress' ? "bg-indigo-600 text-white" : "bg-slate-600 text-white"
+                            : "text-slate-300 hover:bg-slate-200"
+                        )}
+                      >
+                        {s === 'pending' && <Clock className="w-3 h-3" />}
+                        {s === 'in-progress' && <Loader2 className={cn("w-3 h-3", task.status === s && "animate-spin")} />}
+                        {s === 'completed' && <CheckCircle2 className="w-3 h-3" />}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </motion.div>

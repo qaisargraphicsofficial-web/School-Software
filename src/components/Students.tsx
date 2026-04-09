@@ -195,7 +195,7 @@ export default function Students({ profile }: StudentsProps) {
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
         pdf.addImage(imgData, 'PNG', 10, 10, 85, 55); // Standard ID card size
-        pdf.save(`${student.name}_ID_Card.pdf`);
+        pdf.save(`${student.name}_S_O_${student.parentName}_ID_Card.pdf`);
         setSelectedStudent(null);
       }
     }, 500);
@@ -251,7 +251,7 @@ export default function Students({ profile }: StudentsProps) {
           setCsvData(results.data);
           
           const initialMapping: Record<string, string> = {};
-          const studentFields = ['name', 'rollNumber', 'class', 'section', 'parentName', 'contact', 'email', 'address', 'admissionDate', 'status'];
+          const studentFields = ['name', 'parentName', 'rollNumber', 'class', 'section', 'contact', 'email', 'address', 'admissionDate', 'status'];
           
           studentFields.forEach(field => {
             const match = results.meta.fields?.find(h => h.toLowerCase().replace(/\s+/g, '') === field.toLowerCase());
@@ -487,8 +487,8 @@ export default function Students({ profile }: StudentsProps) {
                           </div>
                         )}
                         <div>
-                          <p className="font-bold text-slate-900 tracking-tight">{student.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{student.parentName}</p>
+                          <p className="font-bold text-slate-900 tracking-tight">{student.name} S/O {student.parentName}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{student.rollNumber}</p>
                         </div>
                       </div>
                     </td>
@@ -608,7 +608,7 @@ export default function Students({ profile }: StudentsProps) {
                     )}
                   </div>
                   <div className="text-center md:text-left">
-                    <h2 className="text-3xl font-black tracking-tight mb-2">{viewingStudent.name}</h2>
+                    <h2 className="text-3xl font-black tracking-tight mb-2">{viewingStudent.name} S/O {viewingStudent.parentName}</h2>
                     <div className="flex flex-wrap justify-center md:justify-start gap-3">
                       <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest border border-white/20">
                         Roll: {viewingStudent.rollNumber}
@@ -1023,6 +1023,27 @@ export default function Students({ profile }: StudentsProps) {
                     </div>
                   ))}
                 </div>
+
+                {csvData.length > 0 && (
+                  <div className="mt-8 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Data Preview (First Row)</h3>
+                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                      {[
+                        { key: 'name', label: 'Name' },
+                        { key: 'rollNumber', label: 'Roll No.' },
+                        { key: 'class', label: 'Class' },
+                        { key: 'section', label: 'Section' },
+                      ].map(field => (
+                        <div key={field.key} className="flex justify-between border-b border-slate-200 pb-1">
+                          <span className="text-slate-500 font-medium">{field.label}:</span>
+                          <span className="font-bold text-slate-900 truncate max-w-[150px]">
+                            {columnMapping[field.key] ? csvData[0][columnMapping[field.key]] || '-' : '-'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
