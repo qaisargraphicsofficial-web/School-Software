@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, query, orderBy, addDoc, updateDoc, doc, deleteDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { FeeType, FeeRecord, PaymentHistory, Student, UserProfile } from '../types';
-import { Wallet, Receipt, Plus, Printer, Download, CheckCircle2, XCircle, Search, Calendar, CreditCard, BarChart3, Settings, AlertCircle, FileText, Trash2, Edit2, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Wallet, Receipt, Plus, Printer, Download, CheckCircle2, XCircle, Search, Calendar, CreditCard, BarChart3, Settings, AlertCircle, FileText, Trash2, Edit2, ChevronRight, ArrowLeft, Mail, Bell, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
@@ -33,8 +33,12 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   const [selectedFeeRecord, setSelectedFeeRecord] = useState<FeeRecord | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  const [generateForm, setGenerateForm] = useState({ feeTypeId: '', termOrYear: '', dueDate: '' });
+  const [feeRecordSearch, setFeeRecordSearch] = useState('');
+  const [feeRecordStatusFilter, setFeeRecordStatusFilter] = useState('all');
+
+  const [generateForm, setGenerateForm] = useState({ feeTypeId: '', termOrYear: '', dueDate: '', targetClass: 'All' });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -111,11 +115,20 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       const feeType = feeTypes.find(f => f.id === generateForm.feeTypeId);
       if (!feeType) throw new Error("Fee type not found");
 
-      const activeStudents = students.filter(s => s.status === 'active');
+      let targetStudents = students.filter(s => s.status === 'active');
+      if (generateForm.targetClass !== 'All') {
+        targetStudents = targetStudents.filter(s => s.class === generateForm.targetClass);
+      }
+
+      if (targetStudents.length === 0) {
+        alert("No active students found for the selected criteria.");
+        setIsGenerating(false);
+        return;
+      }
       
       const batch = writeBatch(db);
       
-      activeStudents.forEach(student => {
+      targetStudents.forEach(student => {
         const newRecordRef = doc(collection(db, 'fee_records'));
         batch.set(newRecordRef, {
           studentId: student.id,
@@ -130,8 +143,8 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       });
 
       await batch.commit();
-      alert(`Successfully generated fee records for ${activeStudents.length} students.`);
-      setGenerateForm({ feeTypeId: '', termOrYear: '', dueDate: '' });
+      alert(`Successfully generated fee records for ${targetStudents.length} students.`);
+      setGenerateForm({ feeTypeId: '', termOrYear: '', dueDate: '', targetClass: 'All' });
       fetchData();
     } catch (error) {
       console.error("Error generating fees:", error);
@@ -189,6 +202,77 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     }
   };
 
+  // --- Send Reminders ---
+  const handleSendReminders = async () => {
+    if (!profile) return;
+    
+    const pendingFees = feeRecords.filter(r => r.status === 'pending' || r.status === 'partial');
+    if (pendingFees.length === 0) {
+      alert("No pending fees found.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to scan and send reminders for ${pendingFees.length} pending fee records?`)) {
+      return;
+    }
+
+    setIsSendingReminders(true);
+    try {
+      const today = new Date();
+      const nextWeek = new Date();
+      nextWeek.setDate(today.getDate() + 7);
+
+      const reminders = pendingFees.map(record => {
+        const student = students.find(s => s.id === record.studentId);
+        if (!student || !student.email) return null;
+
+        const dueDate = new Date(record.dueDate);
+        const outstanding = record.amount - record.paidAmount;
+        
+        let type: 'upcoming' | 'overdue' | null = null;
+        if (dueDate < today) {
+          type = 'overdue';
+        } else if (dueDate <= nextWeek) {
+          type = 'upcoming';
+        }
+
+        if (!type) return null;
+
+        return {
+          email: student.email,
+          studentName: student.name,
+          amount: outstanding,
+          dueDate: record.dueDate,
+          type
+        };
+      }).filter(Boolean);
+
+      if (reminders.length === 0) {
+        alert("No upcoming (within 7 days) or overdue fees found to notify parents about.");
+        setIsSendingReminders(false);
+        return;
+      }
+
+      const response = await fetch('/api/send-fee-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminders })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert(`Successfully sent ${result.count} fee reminders to parents.`);
+      } else {
+        throw new Error(result.error || "Failed to send reminders");
+      }
+    } catch (error) {
+      console.error("Error sending reminders:", error);
+      alert("An error occurred while sending reminders.");
+    } finally {
+      setIsSendingReminders(false);
+    }
+  };
+
   // --- Dashboard Data Calculations ---
   const dashboardStats = useMemo(() => {
     let totalExpected = 0;
@@ -240,12 +324,48 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     s.rollNumber.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
+  const studentFeeSummary = useMemo(() => {
+    if (!selectedStudent) return { totalDue: 0, totalPaid: 0, outstanding: 0 };
+    const studentFees = feeRecords.filter(f => f.studentId === selectedStudent.id);
+    const totalDue = studentFees.reduce((sum, f) => sum + f.amount, 0);
+    const totalPaid = studentFees.reduce((sum, f) => sum + f.paidAmount, 0);
+    const outstanding = totalDue - totalPaid;
+    return { totalDue, totalPaid, outstanding };
+  }, [selectedStudent, feeRecords]);
+
+  const filteredStudentFeeRecords = useMemo(() => {
+    if (!selectedStudent) return [];
+    return feeRecords
+      .filter(f => f.studentId === selectedStudent.id)
+      .filter(f => {
+        const feeType = feeTypes.find(t => t.id === f.feeTypeId);
+        const matchesSearch = (feeType?.name || '').toLowerCase().includes(feeRecordSearch.toLowerCase()) || 
+                             f.termOrYear.toLowerCase().includes(feeRecordSearch.toLowerCase());
+        const matchesStatus = feeRecordStatusFilter === 'all' || f.status === feeRecordStatusFilter;
+        return matchesSearch && matchesStatus;
+      });
+  }, [selectedStudent, feeRecords, feeTypes, feeRecordSearch, feeRecordStatusFilter]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Fees Management</h1>
           <p className="text-slate-500 text-sm">Manage fee types, records, and online payments</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSendReminders}
+            disabled={isSendingReminders}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition-all disabled:opacity-50"
+          >
+            {isSendingReminders ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Bell className="w-4 h-4" />
+            )}
+            Send Reminders
+          </button>
         </div>
       </div>
 
@@ -402,7 +522,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                           return (
                             <tr key={student.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedStudent(student)}>
                               <td className="p-4">
-                                <div className="font-medium text-slate-900">{student.name}</div>
+                                <div className="font-medium text-slate-900">{student.name} S/O {student.parentName}</div>
                                 <div className="text-xs text-slate-500">{student.rollNumber}</div>
                               </td>
                               <td className="p-4 text-sm text-slate-700">{student.class}</td>
@@ -433,14 +553,51 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
 
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
                     <div>
-                      <h2 className="text-xl font-bold text-slate-900">{selectedStudent.name}</h2>
+                      <h2 className="text-xl font-bold text-slate-900">{selectedStudent.name} S/O {selectedStudent.parentName}</h2>
                       <p className="text-slate-500">{selectedStudent.class} | Roll: {selectedStudent.rollNumber}</p>
+                    </div>
+                    <div className="flex gap-4 text-right">
+                      <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase">Total Due</p>
+                        <p className="text-lg font-bold text-slate-900">${studentFeeSummary.totalDue.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase">Paid</p>
+                        <p className="text-lg font-bold text-emerald-600">${studentFeeSummary.totalPaid.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase">Outstanding</p>
+                        <p className="text-lg font-bold text-rose-600">${studentFeeSummary.outstanding.toLocaleString()}</p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-4 border-b border-slate-100">
+                    <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <h3 className="font-bold text-slate-900">Fee Records</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search records..."
+                            value={feeRecordSearch}
+                            onChange={(e) => setFeeRecordSearch(e.target.value)}
+                            className="pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-48"
+                          />
+                        </div>
+                        <select
+                          value={feeRecordStatusFilter}
+                          onChange={(e) => setFeeRecordStatusFilter(e.target.value)}
+                          className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                          <option value="all">All Status</option>
+                          <option value="paid">Paid</option>
+                          <option value="pending">Pending</option>
+                          <option value="partial">Partial</option>
+                          <option value="overdue">Overdue</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
@@ -456,7 +613,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {feeRecords.filter(f => f.studentId === selectedStudent.id).map(record => {
+                          {filteredStudentFeeRecords.map(record => {
                             const feeType = feeTypes.find(t => t.id === record.feeTypeId);
                             return (
                               <tr key={record.id} className="hover:bg-slate-50 transition-colors">
@@ -555,6 +712,20 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                     <option value="">Select Fee Type...</option>
                     {feeTypes.map(f => (
                       <option key={f.id} value={f.id}>{f.name} (${f.defaultAmount})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Target Class</label>
+                  <select
+                    required
+                    value={generateForm.targetClass}
+                    onChange={(e) => setGenerateForm({...generateForm, targetClass: e.target.value})}
+                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="All">All Active Students</option>
+                    {Array.from(new Set(students.map(s => s.class))).sort().map(cls => (
+                      <option key={cls} value={cls}>Class {cls}</option>
                     ))}
                   </select>
                 </div>

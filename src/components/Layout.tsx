@@ -212,11 +212,14 @@ export default function Layout({ profile }: LayoutProps) {
   const filteredNavItems = navItems.filter(item => {
     if (profile?.role === 'admin') return true;
     
-    if (profile?.role === 'staff' && staffRole) {
+    if (profile?.role === 'staff') {
+      // While loading staff role or permissions, show nothing to avoid snapping
+      if (!staffRole || Object.keys(staffPermissions).length === 0) return false;
       const allowedModules = staffPermissions[staffRole] || [];
       return allowedModules.includes(item.name);
     }
     
+    // For parents, students, and other roles
     return !item.roles || (profile?.role && item.roles.includes(profile.role));
   });
 

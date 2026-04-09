@@ -23,10 +23,15 @@ import {
   ArrowRight,
   Users,
   Key,
-  ShieldCheck
+  ShieldCheck,
+  QrCode,
+  Scan,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { QRCodeSVG } from 'qrcode.react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 interface StaffProps {
   profile: UserProfile | null;
@@ -45,6 +50,9 @@ export default function StaffManagement({ profile }: StaffProps) {
   const [viewingSalaryHistory, setViewingSalaryHistory] = useState<Staff | null>(null);
   const [payrollHistory, setPayrollHistory] = useState<Payroll[]>([]);
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scanResult, setScanResult] = useState<string | null>(null);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
   const [selectedStaffForCreds, setSelectedStaffForCreds] = useState<Staff | null>(null);
   const [credFormData, setCredFormData] = useState({
     username: '',
@@ -109,6 +117,70 @@ export default function StaffManagement({ profile }: StaffProps) {
       fetchStaff();
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (isScannerOpen) {
+      const scanner = new Html5QrcodeScanner("staff-reader", { fps: 10, qrbox: 250 }, false);
+      scanner.render(onScanSuccess, onScanError);
+      return () => {
+        scanner.clear().catch(error => console.error("Failed to clear scanner", error));
+      };
+    }
+  }, [isScannerOpen]);
+
+  const onScanSuccess = async (decodedText: string) => {
+    if (isProcessingScan) return;
+    setIsProcessingScan(true);
+    
+    try {
+      // Find staff by staffId
+      const staff = staffList.find(s => s.staffId === decodedText);
+      if (!staff) {
+        setScanResult(`Error: Staff ID ${decodedText} not found.`);
+        setTimeout(() => setScanResult(null), 3000);
+        setIsProcessingScan(false);
+        return;
+      }
+
+      const date = new Date().toISOString().split('T')[0];
+      
+      // Check if already marked for today
+      const q = query(
+        collection(db, 'attendance'), 
+        where('targetId', '==', staff.staffId),
+        where('date', '==', date),
+        where('targetType', '==', 'staff')
+      );
+      const existing = await getDocs(q);
+      
+      if (!existing.empty) {
+        setScanResult(`${staff.name} already marked present for today.`);
+      } else {
+        await addDoc(collection(db, 'attendance'), {
+          date,
+          targetId: staff.staffId,
+          targetType: 'staff',
+          status: 'present',
+          method: 'qr',
+          campusId: profile?.campusId || 'main',
+          timestamp: new Date().toISOString()
+        });
+        setScanResult(`Attendance marked for ${staff.name}`);
+      }
+      
+      setTimeout(() => setScanResult(null), 3000);
+    } catch (error) {
+      console.error("Staff QR Scan Error:", error);
+      setScanResult("Error processing scan.");
+      setTimeout(() => setScanResult(null), 3000);
+    } finally {
+      setIsProcessingScan(false);
+    }
+  };
+
+  const onScanError = (err: any) => {
+    // console.warn(err);
+  };
 
   const fetchStaff = async () => {
     setLoading(true);
@@ -260,17 +332,26 @@ export default function StaffManagement({ profile }: StaffProps) {
             Export CSV
           </button>
           {profile?.role === 'admin' && (
-            <button
-              onClick={() => {
-                setFormData(initialFormData);
-                setIsEditMode(false);
-                setIsModalOpen(true);
-              }}
-              className="btn-primary"
-            >
-              <UserPlus className="w-5 h-5" />
-              Add Staff Member
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsScannerOpen(true)}
+                className="btn-secondary px-5 py-2.5 text-sm flex items-center gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+              >
+                <Scan className="w-4 h-4" />
+                Scan Attendance
+              </button>
+              <button
+                onClick={() => {
+                  setFormData(initialFormData);
+                  setIsEditMode(false);
+                  setIsModalOpen(true);
+                }}
+                className="btn-primary"
+              >
+                <UserPlus className="w-5 h-5" />
+                Add Staff Member
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -346,8 +427,11 @@ export default function StaffManagement({ profile }: StaffProps) {
                   
                   <div className="flex items-start justify-between mb-6 relative">
                     <div className="flex gap-4">
-                      <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-100">
-                        {staff.name[0]}
+                      <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-100 overflow-hidden relative group/qr">
+                        <span className="group-hover/qr:opacity-0 transition-opacity">{staff.name[0]}</span>
+                        <div className="absolute inset-0 bg-white p-1 opacity-0 group-hover/qr:opacity-100 transition-opacity flex items-center justify-center">
+                          <QRCodeSVG value={staff.staffId} size={56} />
+                        </div>
                       </div>
                       <div>
                         <h3 className="text-xl font-black text-slate-900 tracking-tight">{staff.name}</h3>
@@ -735,6 +819,85 @@ export default function StaffManagement({ profile }: StaffProps) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* QR Scanner Modal */}
+      <AnimatePresence>
+        {isScannerOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"
+              onClick={() => setIsScannerOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+                <div className="flex items-center gap-3">
+                  <Scan className="w-6 h-6" />
+                  <h2 className="text-2xl font-black tracking-tight">Staff Attendance</h2>
+                </div>
+                <button 
+                  onClick={() => setIsScannerOpen(false)} 
+                  className="p-2 hover:bg-white/10 rounded-2xl transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="p-8 space-y-6">
+                <div className="relative aspect-square bg-slate-100 rounded-[32px] overflow-hidden border-4 border-slate-100 shadow-inner">
+                  <div id="staff-reader" className="w-full h-full"></div>
+                  {isProcessingScan && (
+                    <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center">
+                      <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <AnimatePresence mode="wait">
+                  {scanResult ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className={cn(
+                        "p-4 rounded-2xl text-center font-bold text-sm",
+                        scanResult.startsWith('Error') ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                      )}
+                    >
+                      {scanResult}
+                    </motion.div>
+                  ) : (
+                    <div className="p-4 bg-slate-50 rounded-2xl text-center text-slate-500 text-sm font-medium">
+                      Point the camera at a staff QR code
+                    </div>
+                  )}
+                </AnimatePresence>
+
+                <div className="bg-indigo-50 p-6 rounded-[32px] border border-indigo-100">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-indigo-600 text-white rounded-xl">
+                      <QrCode className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-indigo-900 uppercase tracking-tight">Quick Access</p>
+                      <p className="text-xs text-indigo-600/80 font-medium leading-relaxed mt-1">
+                        Scan staff ID cards to automatically log attendance and track entry times.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

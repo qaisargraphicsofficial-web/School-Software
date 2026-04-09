@@ -153,7 +153,7 @@ export default function Certificates({ profile }: { profile: UserProfile | null 
                 >
                   <option value="">Select a student</option>
                   {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.rollNumber})</option>
+                    <option key={s.id} value={s.id}>{s.name} S/O {s.parentName} ({s.rollNumber})</option>
                   ))}
                 </select>
               </div>

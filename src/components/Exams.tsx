@@ -457,7 +457,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               >
                 <option value="">All Students</option>
                 {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.class})</option>
+                  <option key={s.id} value={s.id}>{s.name} S/O {s.parentName} ({s.class})</option>
                 ))}
               </select>
             </div>
@@ -522,7 +522,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                       return (
                         <tr key={result.id} className="hover:bg-slate-50 transition-colors">
                           <td className="p-4">
-                            <div className="font-medium text-slate-900">{student?.name || 'Unknown'}</div>
+                            <div className="font-medium text-slate-900">{student ? `${student.name} S/O ${student.parentName}` : 'Unknown'}</div>
                             <div className="text-xs text-slate-500">{student?.class}</div>
                           </td>
                           <td className="p-4 text-sm text-slate-700">{result.examType}</td>
@@ -1071,7 +1071,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                   >
                     <option value="">Select Student</option>
                     {students.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.class})</option>
+                      <option key={s.id} value={s.id}>{s.name} S/O {s.parentName} ({s.class})</option>
                     ))}
                   </select>
                 </div>

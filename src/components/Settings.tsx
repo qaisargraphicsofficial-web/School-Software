@@ -182,10 +182,10 @@ export default function Settings({ profile }: SettingsProps) {
       sms: false
     },
     staffPermissions: {
-      'Teacher': ['Dashboard', 'Students', 'Academic', 'Attendance', 'Diary'],
-      'Administrator': ['Dashboard', 'Students', 'Staff', 'Academic', 'Finance', 'Inventory', 'Settings', 'Campuses'],
-      'Accountant': ['Dashboard', 'Finance', 'Inventory'],
-      'Librarian': ['Dashboard', 'Library']
+      'Teacher': ['Dashboard', 'Students', 'Classes', 'Attendance', 'Diary', 'Results', 'Schedule', 'Communication', 'Tasks'],
+      'Administrator': ['Dashboard', 'Students', 'Teachers', 'Classes', 'Attendance', 'Results', 'Fees', 'Payroll', 'Expenses', 'Schedule', 'Leave', 'Tasks', 'Communication', 'Reports', 'Settings', 'Campuses', 'Library', 'Inventory', 'Curriculum', 'Diary', 'Certificates'],
+      'Accountant': ['Dashboard', 'Fees', 'Payroll', 'Expenses', 'Inventory', 'Reports'],
+      'Librarian': ['Dashboard', 'Library', 'Tasks']
     },
     enableNotifications: true,
     allowParentRegistration: true,

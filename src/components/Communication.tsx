@@ -41,6 +41,7 @@ export default function Communication({ profile }: CommunicationProps) {
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [sendingProgress, setSendingProgress] = useState<{ current: number; total: number } | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [childData, setChildData] = useState<{
     student: Student | null;
     results: ExamResult[];
@@ -60,6 +61,23 @@ export default function Communication({ profile }: CommunicationProps) {
     type: 'email',
     targetClass: 'All',
   });
+
+  const templates = [
+    { id: 'general', name: 'General Announcement', content: 'Dear Parent, this is an important announcement from EduManage Pro regarding [TOPIC]. Please check the school portal for more details.' },
+    { id: 'fee', name: 'Fee Reminder', content: 'Dear Parent, this is a reminder regarding the outstanding fees for your child. Please ensure payment is made by the due date to avoid any inconvenience.' },
+    { id: 'attendance', name: 'Attendance Alert', content: 'Dear Parent, your child was marked absent today. Please provide a justification or contact the school office if this is an error.' },
+    { id: 'exam', name: 'Exam Result', content: 'Dear Parent, the exam results for the recent term have been published. You can view your child\'s performance on the school portal.' },
+  ];
+
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setBulkFormData({ ...bulkFormData, content: template.content });
+      setSelectedTemplate(templateId);
+    } else {
+      setSelectedTemplate('');
+    }
+  };
 
   useEffect(() => {
     fetchNotices();
@@ -178,6 +196,27 @@ export default function Communication({ profile }: CommunicationProps) {
         const result = await response.json();
         if (!result.success) {
           throw new Error(result.error || "Failed to send emails");
+        }
+      } else if (bulkFormData.type === 'sms') {
+        const phoneNumbers = recipients.map(s => s.contact).filter(Boolean) as string[];
+        if (phoneNumbers.length === 0) {
+          setSendingProgress(null);
+          alert("No parent contact numbers found for the selected students.");
+          return;
+        }
+
+        const response = await fetch('/api/send-bulk-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: bulkFormData.content,
+            recipients: phoneNumbers
+          })
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || "Failed to send SMS");
         }
       } else if (bulkFormData.type === 'whatsapp') {
         // WhatsApp bulk simulation: Open first recipient as demo
@@ -569,9 +608,13 @@ export default function Communication({ profile }: CommunicationProps) {
                           <td className="px-6 py-4">
                             <div className={cn(
                               "w-8 h-8 rounded-lg flex items-center justify-center",
-                              msg.type === 'email' ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600"
+                              msg.type === 'email' ? "bg-blue-100 text-blue-600" : 
+                              msg.type === 'sms' ? "bg-amber-100 text-amber-600" :
+                              "bg-emerald-100 text-emerald-600"
                             )}>
-                              {msg.type === 'email' ? <Mail className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+                              {msg.type === 'email' ? <Mail className="w-4 h-4" /> : 
+                               msg.type === 'sms' ? <Bell className="w-4 h-4" /> :
+                               <MessageSquare className="w-4 h-4" />}
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -612,6 +655,17 @@ export default function Communication({ profile }: CommunicationProps) {
                   </div>
                   <span className="text-xl font-bold text-slate-900">
                     {bulkMessages.filter(m => m.type === 'whatsapp').length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-50 rounded-lg">
+                      <Bell className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <span className="text-sm font-medium text-slate-600">SMS Sent</span>
+                  </div>
+                  <span className="text-xl font-bold text-slate-900">
+                    {bulkMessages.filter(m => m.type === 'sms').length}
                   </span>
                 </div>
               </div>
@@ -745,6 +799,31 @@ export default function Communication({ profile }: CommunicationProps) {
                     <MessageSquare className="w-4 h-4" />
                     WhatsApp
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkFormData({...bulkFormData, type: 'sms'})}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all",
+                      bulkFormData.type === 'sms' ? "bg-white text-amber-600 shadow-sm" : "text-slate-500"
+                    )}
+                  >
+                    <Bell className="w-4 h-4" />
+                    SMS
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Message Template (Optional)</label>
+                  <select
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={selectedTemplate}
+                    onChange={e => handleTemplateSelect(e.target.value)}
+                  >
+                    <option value="">Select a template...</option>
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
@@ -812,7 +891,7 @@ export default function Communication({ profile }: CommunicationProps) {
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        Send Bulk {bulkFormData.type === 'email' ? 'Emails' : 'Messages'}
+                        Send Bulk {bulkFormData.type === 'email' ? 'Emails' : bulkFormData.type === 'sms' ? 'SMS' : 'WhatsApp'}
                       </>
                     )}
                   </button>
