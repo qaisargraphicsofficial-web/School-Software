@@ -18,6 +18,7 @@ import {
   X,
   Camera,
   School,
+  Bus,
   Loader2,
   Eye,
   Calendar,
@@ -91,6 +92,9 @@ export default function Students({ profile }: StudentsProps) {
     bloodGroup: '',
     whatsappNumber: '',
     caste: '',
+    busNumber: '',
+    route: '',
+    pickupPoint: '',
   });
 
   useEffect(() => {
@@ -184,6 +188,9 @@ export default function Students({ profile }: StudentsProps) {
         dateOfBirth: '',
         gender: 'male',
         bloodGroup: '',
+        busNumber: '',
+        route: '',
+        pickupPoint: '',
       });
       fetchStudents();
     } catch (error) {
@@ -809,6 +816,26 @@ export default function Students({ profile }: StudentsProps) {
                     </div>
                     <div className="space-y-6">
                       <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                        <Bus className="w-5 h-5 text-indigo-600" />
+                        Transport Details
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Bus Number</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.busNumber || 'N/A'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Route</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.route || 'N/A'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pickup Point</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.pickupPoint || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
                         <Phone className="w-5 h-5 text-indigo-600" />
                         Contact Information
                       </h3>
@@ -865,6 +892,33 @@ export default function Students({ profile }: StudentsProps) {
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 text-rose-500">Emergency Contact</p>
                             <p className="font-bold text-slate-900">{viewingStudent.emergencyContact || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <School className="w-5 h-5 text-indigo-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Bus Number</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.busNumber || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <MapPin className="w-5 h-5 text-indigo-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Route</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.route || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <MapPin className="w-5 h-5 text-indigo-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Pickup Point</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.pickupPoint || 'N/A'}</p>
                           </div>
                         </div>
                       </div>
@@ -1156,6 +1210,33 @@ export default function Students({ profile }: StudentsProps) {
                     />
                   </div>
                   <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Bus Number</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.busNumber}
+                      onChange={e => setFormData({...formData, busNumber: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Route</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.route}
+                      onChange={e => setFormData({...formData, route: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Pickup Point</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.pickupPoint}
+                      onChange={e => setFormData({...formData, pickupPoint: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Student Photo</label>
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-slate-100 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden">
@@ -1243,6 +1324,9 @@ export default function Students({ profile }: StudentsProps) {
                     { key: 'address', label: 'Address', required: false },
                     { key: 'admissionDate', label: 'Admission Date', required: false },
                     { key: 'status', label: 'Status (active/inactive)', required: false },
+                    { key: 'busNumber', label: 'Bus Number', required: false },
+                    { key: 'route', label: 'Route', required: false },
+                    { key: 'pickupPoint', label: 'Pickup Point', required: false },
                   ].map(field => (
                     <div key={field.key} className="flex items-center gap-4">
                       <div className="w-1/3">

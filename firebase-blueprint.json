@@ -33,7 +33,10 @@
         "previousSchool": { "type": "string" },
         "dateOfBirth": { "type": "string", "format": "date" },
         "gender": { "type": "string", "enum": ["male", "female", "other"] },
-        "bloodGroup": { "type": "string" }
+        "bloodGroup": { "type": "string" },
+        "busNumber": { "type": "string" },
+        "route": { "type": "string" },
+        "pickupPoint": { "type": "string" }
       },
       "required": ["name", "rollNumber", "class", "campusId"]
     },
@@ -253,6 +256,75 @@
         "campusId": { "type": "string" }
       },
       "required": ["title", "date", "campusId"]
+    },
+    "TransportVehicle": {
+      "title": "TransportVehicle",
+      "description": "School bus and vehicle details",
+      "type": "object",
+      "properties": {
+        "vehicleNumber": { "type": "string" },
+        "capacity": { "type": "number" },
+        "driverName": { "type": "string" },
+        "driverContact": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "maintenance", "inactive"] },
+        "campusId": { "type": "string" }
+      },
+      "required": ["vehicleNumber", "driverName", "campusId"]
+    },
+    "TransportRoute": {
+      "title": "TransportRoute",
+      "description": "Transport routes and stops",
+      "type": "object",
+      "properties": {
+        "routeName": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "stops": { "type": "array" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["routeName", "vehicleId", "campusId"]
+    },
+    "LeaveRequest": {
+      "title": "LeaveRequest",
+      "description": "Staff leave requests",
+      "type": "object",
+      "properties": {
+        "staffId": { "type": "string" },
+        "staffName": { "type": "string" },
+        "type": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "appliedOn": { "type": "string", "format": "date-time" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["staffId", "type", "startDate", "endDate", "status", "campusId"]
+    },
+    "LeaveBalance": {
+      "title": "LeaveBalance",
+      "description": "Staff leave balances",
+      "type": "object",
+      "properties": {
+        "staffId": { "type": "string" },
+        "sickLeave": { "type": "number" },
+        "casualLeave": { "type": "number" },
+        "paidLeave": { "type": "number" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["staffId", "campusId"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Subjects taught in the school",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "class": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["name", "code", "class", "campusId"]
     }
   },
   "firestore": {
@@ -272,6 +344,11 @@
     "certificates": { "schema": "Certificate", "description": "Collection of digital certificates" },
     "exam_papers": { "schema": "ExamPaper", "description": "Collection of exam papers" },
     "library_loans": { "schema": "LibraryLoan", "description": "Collection of library loans" },
-    "events": { "schema": "SchoolEvent", "description": "Collection of school events" }
+    "events": { "schema": "SchoolEvent", "description": "Collection of school events" },
+    "transport_vehicles": { "schema": "TransportVehicle", "description": "Collection of transport vehicles" },
+    "transport_routes": { "schema": "TransportRoute", "description": "Collection of transport routes" },
+    "leave_requests": { "schema": "LeaveRequest", "description": "Collection of staff leave requests" },
+    "leave_balances": { "schema": "LeaveBalance", "description": "Collection of staff leave balances" },
+    "subjects": { "schema": "Subject", "description": "Collection of subjects" }
   }
 }

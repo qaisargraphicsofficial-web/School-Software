@@ -57,6 +57,9 @@ export interface Student {
   bloodGroup?: string;
   whatsappNumber?: string;
   caste?: string;
+  busNumber?: string;
+  route?: string;
+  pickupPoint?: string;
 }
 
 export interface Staff {
@@ -127,6 +130,9 @@ export interface FeeRecord {
   status: 'paid' | 'pending' | 'overdue' | 'partial';
   paidAmount: number;
   discountAmount?: number;
+  discountReason?: string;
+  waiverAmount?: number;
+  waiverReason?: string;
   termOrYear: string;
   campusId: string;
 }
@@ -293,7 +299,7 @@ export interface Task {
   dueDate: string;
   priority: 'low' | 'medium' | 'high';
   status: 'pending' | 'in-progress' | 'completed';
-  assignedTo?: string; // staffId or uid
+  assignedToIds?: string[]; // array of staffIds or uids
   createdBy: string; // uid
   campusId: string;
   createdAt: string;
@@ -325,3 +331,53 @@ export interface SchoolSettings {
   logoUrl?: string;
   updatedAt: string;
 }
+
+export interface TransportVehicle {
+  id?: string;
+  vehicleNumber: string;
+  capacity: number;
+  driverName: string;
+  driverContact: string;
+  status: 'active' | 'maintenance' | 'inactive';
+  campusId: string;
+}
+
+export interface TransportRoute {
+  id?: string;
+  routeName: string;
+  vehicleId: string;
+  stops: string[];
+  campusId: string;
+}
+
+export interface Subject {
+  id?: string;
+  name: string;
+  code: string;
+  class: string;
+  teacherId?: string;
+  campusId: string;
+}
+
+export interface LeaveRequest {
+  id?: string;
+  staffId: string;
+  staffName: string;
+  type: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  appliedOn: string;
+  campusId: string;
+}
+
+export interface LeaveBalance {
+  id?: string;
+  staffId: string;
+  sickLeave: number;
+  casualLeave: number;
+  paidLeave: number;
+  campusId: string;
+}
+

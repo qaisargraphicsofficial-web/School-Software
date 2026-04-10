@@ -51,7 +51,7 @@ export default function Tasks({ profile }: TasksProps) {
     dueDate: new Date().toISOString().split('T')[0],
     priority: 'medium',
     status: 'pending',
-    assignedTo: '',
+    assignedToIds: [],
     reminderDate: '',
     reminderTime: '',
   });
@@ -77,7 +77,7 @@ export default function Tasks({ profile }: TasksProps) {
         q = query(
           collection(db, 'tasks'),
           where('campusId', '==', profile?.campusId || 'main'),
-          where('assignedTo', '==', profile?.uid),
+          where('assignedToIds', 'array-contains', profile?.uid),
           orderBy('createdAt', 'desc')
         );
       }
@@ -126,7 +126,7 @@ export default function Tasks({ profile }: TasksProps) {
         dueDate: new Date().toISOString().split('T')[0],
         priority: 'medium',
         status: 'pending',
-        assignedTo: '',
+        assignedToIds: [],
         reminderDate: '',
         reminderTime: '',
       });
@@ -144,7 +144,7 @@ export default function Tasks({ profile }: TasksProps) {
       dueDate: task.dueDate,
       priority: task.priority,
       status: task.status,
-      assignedTo: task.assignedTo || '',
+      assignedToIds: task.assignedToIds || [],
       reminderDate: task.reminderDate || '',
       reminderTime: task.reminderTime || '',
     });
@@ -167,7 +167,7 @@ export default function Tasks({ profile }: TasksProps) {
           dueDate: new Date().toISOString().split('T')[0],
           priority: 'medium',
           status: 'pending',
-          assignedTo: '',
+          assignedToIds: [],
           createdBy: profile.uid,
           campusId: profile.campusId || 'main',
           createdAt: new Date().toISOString(),
@@ -192,7 +192,7 @@ export default function Tasks({ profile }: TasksProps) {
       dueDate: new Date().toISOString().split('T')[0],
       priority: 'medium',
       status: 'pending',
-      assignedTo: '',
+      assignedToIds: [],
       reminderDate: '',
       reminderTime: '',
     });
@@ -250,10 +250,10 @@ export default function Tasks({ profile }: TasksProps) {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'text-rose-600 bg-rose-50 border-rose-100';
-      case 'medium': return 'text-amber-600 bg-amber-50 border-amber-100';
-      case 'low': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
-      default: return 'text-slate-600 bg-slate-50 border-slate-100';
+      case 'high': return 'bg-rose-500 text-white';
+      case 'medium': return 'bg-amber-500 text-white';
+      case 'low': return 'bg-emerald-500 text-white';
+      default: return 'bg-slate-500 text-white';
     }
   };
 
@@ -449,7 +449,7 @@ export default function Tasks({ profile }: TasksProps) {
                 </motion.button>
                 <div className="flex items-center gap-2">
                   <span className={cn(
-                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
                     getPriorityColor(task.priority)
                   )}>
                     {task.priority}
@@ -491,7 +491,24 @@ export default function Tasks({ profile }: TasksProps) {
                     </div>
                     <div className="flex items-center gap-2 text-slate-400">
                       <User className="w-3.5 h-3.5" />
-                      <span>{staff.find(s => s.id === task.assignedTo)?.name || 'Unassigned'}</span>
+                      <div className="flex -space-x-2">
+                        {task.assignedToIds && task.assignedToIds.length > 0 ? (
+                          task.assignedToIds.map((id, idx) => {
+                            const s = staff.find(st => st.id === id);
+                            return (
+                              <div 
+                                key={id} 
+                                title={s?.name || 'Unknown'}
+                                className="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-indigo-600"
+                              >
+                                {s?.name.charAt(0) || '?'}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <span className="text-[10px]">Unassigned</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
@@ -682,18 +699,31 @@ export default function Tasks({ profile }: TasksProps) {
                     </select>
                   </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Assign To</label>
-                  <select
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold appearance-none"
-                    value={formData.assignedTo}
-                    onChange={e => setFormData({...formData, assignedTo: e.target.value})}
-                  >
-                    <option value="">Unassigned</option>
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Assign To Staff Members</label>
+                  <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     {staff.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+                      <label key={s.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-xl cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={formData.assignedToIds?.includes(s.id || '')}
+                          onChange={(e) => {
+                            const currentIds = formData.assignedToIds || [];
+                            if (e.target.checked) {
+                              setFormData({...formData, assignedToIds: [...currentIds, s.id || '']});
+                            } else {
+                              setFormData({...formData, assignedToIds: currentIds.filter(id => id !== s.id)});
+                            }
+                          }}
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-700">{s.name}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">{s.role}</span>
+                        </div>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

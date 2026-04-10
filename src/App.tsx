@@ -18,6 +18,7 @@ import Inventory from './components/Inventory';
 import Communication from './components/Communication';
 import Curriculum from './components/Curriculum';
 import Exams from './components/Exams';
+import Results from './components/Results';
 import Library from './components/Library';
 import DailyDiary from './components/DailyDiary';
 import Certificates from './components/Certificates';
@@ -28,6 +29,8 @@ import Reports from './components/Reports';
 import Classes from './components/Classes';
 import Schedule from './components/Schedule';
 import Leave from './components/Leave';
+import Transport from './components/Transport';
+import SubjectsManagement from './components/Subjects';
 
 import Registration from './components/Registration';
 
@@ -124,10 +127,11 @@ export default function App() {
             <Route path="students" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Students profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="classes" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Classes profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="attendance" element={<Academic profile={profile} />} />
-            <Route path="results" element={<Exams profile={profile} />} />
+            <Route path="results" element={<Results profile={profile} />} />
             <Route path="teachers" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Staff profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="schedule" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Schedule profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="leave" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Leave profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="subjects" element={profile?.role === 'admin' || profile?.role === 'staff' ? <SubjectsManagement profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="fees" element={profile?.role === 'admin' || profile?.role === 'staff' ? <FeesManagement profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="payroll" element={profile?.role === 'admin' || profile?.role === 'staff' ? <PayrollManagement profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="expenses" element={profile?.role === 'admin' || profile?.role === 'staff' ? <ExpensesManagement profile={profile} /> : <Navigate to="/" replace />} />
@@ -138,6 +142,7 @@ export default function App() {
             <Route path="library" element={<Library profile={profile} />} />
             <Route path="diary" element={<DailyDiary profile={profile} />} />
             <Route path="certificates" element={<Certificates profile={profile} />} />
+            <Route path="transport" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Transport profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="campuses" element={profile?.role === 'admin' ? <Campuses profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="tasks" element={<Tasks profile={profile} />} />
             <Route path="reports" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Reports profile={profile} /> : <Navigate to="/" replace />} />

@@ -27,7 +27,8 @@ import {
   PieChart,
   Calendar,
   MessageSquare,
-  CreditCard
+  CreditCard,
+  Bus
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, getDoc } from 'firebase/firestore';
@@ -190,8 +191,9 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Students', icon: Users, path: '/students', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Classes', icon: BookOpen, path: '/classes', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Attendance', icon: Calendar, path: '/attendance', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
-    { name: 'Results', icon: GraduationCap, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
-    { name: 'Exams', icon: FileText, path: '/exams', roles: ['admin', 'staff'], category: 'ACADEMICS' },
+    { name: 'Results', icon: GraduationCap, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'EXAMINATIONS' },
+    { name: 'Exams', icon: FileText, path: '/exams', roles: ['admin', 'staff'], category: 'EXAMINATIONS' },
+    { name: 'Subjects', icon: BookOpen, path: '/subjects', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Fees', icon: Wallet, path: '/fees', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Payroll', icon: CreditCard, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Expenses', icon: FileText, path: '/expenses', roles: ['admin', 'staff'], category: 'FINANCE' },
@@ -208,6 +210,7 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Curriculum', icon: BookText, path: '/curriculum', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Diary', icon: BookOpen, path: '/diary', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
     { name: 'Certificates', icon: Award, path: '/certificates', roles: ['admin', 'staff'], category: 'ACADEMICS' },
+    { name: 'Transport', icon: Bus, path: '/transport', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
   ];
 
   const filteredNavItems = navItems.filter(item => {
@@ -233,7 +236,7 @@ export default function Layout({ profile }: LayoutProps) {
   }, {} as Record<string, typeof filteredNavItems>);
 
   // Define category order
-  const categoryOrder = ['OVERVIEW', 'ACADEMICS', 'FINANCE', 'STAFF & OPS', 'COMMUNICATION', 'AI & SETTINGS', 'OTHER'];
+  const categoryOrder = ['OVERVIEW', 'ACADEMICS', 'EXAMINATIONS', 'FINANCE', 'STAFF & OPS', 'COMMUNICATION', 'AI & SETTINGS', 'OTHER'];
 
   return (
     <div className="min-h-screen bg-slate-50 flex">

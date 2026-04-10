@@ -405,7 +405,7 @@ const createTask = {
       description: { type: Type.STRING, description: "Detailed description of the task." },
       dueDate: { type: Type.STRING, description: "Due date in YYYY-MM-DD format." },
       priority: { type: Type.STRING, enum: ["low", "medium", "high"], description: "Task priority." },
-      assignedTo: { type: Type.STRING, description: "Optional name of the staff member to assign to." },
+      assignedTo: { type: Type.STRING, description: "Optional comma-separated names of staff members to assign to (e.g. 'John Doe, Jane Smith')." },
       reminderDate: { type: Type.STRING, description: "Optional reminder date in YYYY-MM-DD format." },
       reminderTime: { type: Type.STRING, description: "Optional reminder time in HH:MM format." },
     },
@@ -805,12 +805,17 @@ const tools = {
     const { profile } = context;
     if (!profile) return { error: "User not authenticated." };
 
-    let assignedToId = "";
+    let assignedToIds: string[] = [];
     if (assignedTo) {
+      const names = assignedTo.split(',').map((n: string) => n.trim().toLowerCase());
       const staffRef = collection(db, 'staff');
       const snap = await getDocs(staffRef);
-      const staff = snap.docs.find(doc => doc.data().name.toLowerCase().includes(assignedTo.toLowerCase()));
-      if (staff) assignedToId = staff.id;
+      const staffDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      
+      names.forEach((name: string) => {
+        const found = staffDocs.find(s => s.name.toLowerCase().includes(name));
+        if (found && found.id) assignedToIds.push(found.id);
+      });
     }
 
     await addDoc(collection(db, 'tasks'), {
@@ -819,7 +824,7 @@ const tools = {
       dueDate,
       priority,
       status: "pending",
-      assignedTo: assignedToId,
+      assignedToIds,
       createdBy: profile.uid,
       campusId: profile.campusId || "main",
       createdAt: new Date().toISOString(),
@@ -909,8 +914,24 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
         if (!audioContextRef.current) {
           audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         }
+
+        if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
         
-        const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
+        let audioBuffer: AudioBuffer;
+        try {
+          audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
+        } catch (e) {
+          // Fallback for raw PCM L16 24kHz which is common for this model
+          const samples = new Int16Array(bytes.buffer);
+          audioBuffer = audioContextRef.current.createBuffer(1, samples.length, 24000);
+          const channelData = audioBuffer.getChannelData(0);
+          for (let i = 0; i < samples.length; i++) {
+            channelData[i] = samples[i] / 32768;
+          }
+        }
+
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContextRef.current.destination);

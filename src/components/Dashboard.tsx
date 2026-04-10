@@ -78,7 +78,7 @@ export default function Dashboard({ profile }: DashboardProps) {
       // For students/parents, only show tasks assigned to them
       q = query(
         collection(db, 'tasks'),
-        where('assignedTo', '==', profile.uid),
+        where('assignedToIds', 'array-contains', profile.uid),
         orderBy('createdAt', 'desc'),
         limit(5)
       );

@@ -11,26 +11,17 @@ import html2canvas from 'html2canvas';
 import { cn } from '../lib/utils';
 
 export default function Exams({ profile }: { profile: UserProfile | null }) {
-  const [papers, setPapers] = useState<ExamPaper[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
+  const [examPapers, setExamPapers] = useState<ExamPaper[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [results, setResults] = useState<ExamResult[]>([]);
   const [schedules, setSchedules] = useState<ExamSchedule[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
-  const [activeTab, setActiveTab] = useState<'papers' | 'results' | 'schedule'>('papers');
+  const [activeTab, setActiveTab] = useState<'papers' | 'schedule'>('papers');
   
-  // Filters for results
-  const [resultFilters, setResultFilters] = useState({
-    studentId: '',
-    examType: '',
-    term: ''
-  });
-
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAIGenModalOpen, setIsAIGenModalOpen] = useState(false);
   const [isExamTypesModalOpen, setIsExamTypesModalOpen] = useState(false);
-  const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
@@ -38,15 +29,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   const [viewingPaper, setViewingPaper] = useState<ExamPaper | null>(null);
   
   const [newExamType, setNewExamType] = useState({ name: '', term: '' });
-
-  const [subjectMarks, setSubjectMarks] = useState<{subject: string, score: number}[]>([{subject: '', score: 0}]);
-  const [newResult, setNewResult] = useState<Partial<ExamResult>>({
-    studentId: '',
-    examType: '',
-    term: '',
-    totalMarks: 100,
-    position: 1
-  });
 
   const [newSchedule, setNewSchedule] = useState<Partial<ExamSchedule>>({
     examTypeId: '',
@@ -80,18 +62,28 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   });
 
   useEffect(() => {
-    fetchPapers();
+    fetchExamPapers();
     fetchExamTypes();
     fetchStudents();
-    fetchResults();
     fetchSchedules();
     fetchStaff();
   }, []);
 
+  const fetchExamPapers = async () => {
+    try {
+      const q = query(collection(db, 'exam_papers'));
+      const snap = await getDocs(q);
+      setExamPapers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamPaper)));
+    } catch (error) {
+      console.error("Error fetching exam papers:", error);
+    }
+  };
+
   const [editingPaperId, setEditingPaperId] = useState<string | null>(null);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
-  const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
-  const reportCardRef = useRef<HTMLDivElement>(null);
+  const dateSheetRef = useRef<HTMLDivElement>(null);
+  const [filterClass, setFilterClass] = useState<string>('All');
+  const [filterSubject, setFilterSubject] = useState<string>('All');
 
   const fetchStudents = async () => {
     try {
@@ -100,16 +92,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
     } catch (error) {
       console.error("Error fetching students:", error);
-    }
-  };
-
-  const fetchResults = async () => {
-    try {
-      const q = query(collection(db, 'results'));
-      const snap = await getDocs(q);
-      setResults(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamResult)));
-    } catch (error) {
-      console.error("Error fetching results:", error);
     }
   };
 
@@ -140,44 +122,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     if (percentage >= 60) return 'C';
     if (percentage >= 50) return 'D';
     return 'F';
-  };
-
-  const filteredResults = results.filter(result => {
-    if (resultFilters.studentId && result.studentId !== resultFilters.studentId) return false;
-    if (resultFilters.examType && result.examType !== resultFilters.examType) return false;
-    if (resultFilters.term && result.term !== resultFilters.term) return false;
-    return true;
-  });
-
-  const handleSaveResult = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const marksRecord: Record<string, number> = {};
-      let obtainedMarks = 0;
-      subjectMarks.forEach(sm => {
-        if (sm.subject) {
-          marksRecord[sm.subject] = sm.score;
-          obtainedMarks += sm.score;
-        }
-      });
-      
-      const percentage = (obtainedMarks / (newResult.totalMarks || 100)) * 100;
-      const grade = calculateGrade(percentage);
-
-      await addDoc(collection(db, 'results'), {
-        ...newResult,
-        marks: marksRecord,
-        percentage,
-        grade,
-        campusId: profile?.campusId || 'main'
-      });
-      setIsResultModalOpen(false);
-      setSubjectMarks([{subject: '', score: 0}]);
-      setNewResult({ studentId: '', examType: '', term: '', totalMarks: 100, position: 1 });
-      fetchResults();
-    } catch (error) {
-      console.error("Error saving result:", error);
-    }
   };
 
   const handleSaveSchedule = async (e: React.FormEvent) => {
@@ -258,18 +202,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     }
   };
 
-  const fetchPapers = async () => {
-    try {
-      const q = query(collection(db, 'exam_papers'));
-      const snap = await getDocs(q);
-      setPapers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamPaper)));
-    } catch (error) {
-      console.error("Error fetching papers:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAddPaper = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -297,7 +229,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
         examTypeId: '',
         questions: [],
       });
-      fetchPapers();
+      fetchExamPapers();
     } catch (error) {
       handleFirestoreError(error, editingPaperId ? OperationType.UPDATE : OperationType.CREATE, 'exam_papers');
     }
@@ -307,7 +239,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     if (window.confirm('Are you sure you want to delete this exam paper?')) {
       try {
         await deleteDoc(doc(db, 'exam_papers', id));
-        fetchPapers();
+        fetchExamPapers();
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, 'exam_papers');
       }
@@ -335,23 +267,31 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
-      const prompt = `Generate an exam paper for Class ${aiPrompt.class} on the subject of ${aiPrompt.subject}.
-      Topic: ${aiPrompt.topic}
-      Duration: ${aiPrompt.duration} minutes
-      Number of Questions: ${aiPrompt.numQuestions}
-      Difficulty Level: ${aiPrompt.difficulty}
+      const prompt = `You are an expert educator. Generate a high-quality, comprehensive exam paper for Class ${aiPrompt.class} on the subject of ${aiPrompt.subject}.
       
-      Return the output as a JSON array of question objects. Each object should have:
-      - "question": The question text
-      - "marks": Suggested marks for the question (integer)
-      - "type": "multiple_choice", "short_answer", or "long_answer"
-      - "options": An array of strings if it's multiple choice, otherwise omit or empty array
-      - "answer": The correct answer or key points expected.
+      SPECIFICATIONS:
+      - Topic/Syllabus: ${aiPrompt.topic}
+      - Difficulty Level: ${aiPrompt.difficulty}
+      - Number of Questions: ${aiPrompt.numQuestions}
+      - Duration: ${aiPrompt.duration} minutes
       
-      Ensure the total questions match ${aiPrompt.numQuestions}. Do not include markdown formatting like \`\`\`json, just return the raw JSON array.`;
+      QUESTION TYPES TO INCLUDE:
+      - A mix of multiple choice, short answer, and long answer questions.
+      - Questions should be challenging and test conceptual understanding.
+      
+      OUTPUT FORMAT:
+      Return the output as a JSON array of question objects. Each object MUST have:
+      - "question": The question text.
+      - "marks": Suggested marks for the question (integer).
+      - "type": One of "multiple_choice", "short_answer", or "long_answer".
+      - "options": An array of 4 strings if type is "multiple_choice", otherwise an empty array [].
+      - "answer": The correct answer or detailed key points expected for grading.
+      
+      Ensure the total questions exactly match ${aiPrompt.numQuestions}. 
+      Return ONLY the raw JSON array. Do not include any markdown formatting or explanations.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -404,7 +344,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
         difficulty: 'Medium',
         examTypeId: ''
       });
-      fetchPapers();
+      fetchExamPapers();
     } catch (error) {
       console.error("Error saving AI paper:", error);
       alert("Failed to save exam paper.");
@@ -445,34 +385,41 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     window.print();
   };
 
-  const generateReportCard = async (result: ExamResult) => {
-    setSelectedResult(result);
-    // Wait for the template to render with the new result
-    setTimeout(async () => {
-      if (reportCardRef.current) {
-        try {
-          const canvas = await html2canvas(reportCardRef.current, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#ffffff'
-          });
-          const imgData = canvas.toDataURL('image/png');
-          const pdf = new jsPDF('p', 'mm', 'a4');
-          const imgProps = pdf.getImageProperties(imgData);
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-          
-          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-          const student = students.find(s => s.id === result.studentId);
-          pdf.save(`Report_Card_${student?.name || 'Student'}_${result.term}.pdf`);
-        } catch (error) {
-          console.error("Error generating report card:", error);
-          alert("Failed to generate report card PDF.");
-        } finally {
-          setSelectedResult(null);
-        }
-      }
-    }, 500);
+  const generateDateSheet = async () => {
+    if (!dateSheetRef.current) return;
+
+    try {
+      const canvas = await html2canvas(dateSheetRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      // Header
+      const schoolName = 'EduManage'; // Fallback
+      pdf.setFontSize(18);
+      pdf.text(schoolName, pdfWidth / 2, 15, { align: 'center' });
+      pdf.setFontSize(10);
+      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, pdfWidth / 2, 22, { align: 'center' });
+
+      // Content
+      pdf.addImage(imgData, 'PNG', 0, 30, pdfWidth, imgHeight);
+
+      // Footer
+      pdf.setFontSize(8);
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, pdfWidth / 2, pdfHeight - 10, { align: 'center' });
+
+      pdf.save(`Date_Sheet_${filterClass}_${filterSubject}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error("Error generating date sheet:", error);
+      // alert("Failed to generate date sheet PDF.");
+    }
   };
 
   return (
@@ -494,41 +441,12 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               </button>
             )}
             {activeTab === 'papers' ? (
-              <>
-                <button
-                  onClick={() => setIsAIGenModalOpen(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors font-medium shadow-sm"
-                >
-                  <Sparkles className="w-5 h-5 text-indigo-600" />
-                  AI Generate
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingPaperId(null);
-                    setNewPaper({
-                      title: '',
-                      class: '',
-                      subject: '',
-                      date: new Date().toISOString().split('T')[0],
-                      duration: 60,
-                      examTypeId: '',
-                      questions: [],
-                    });
-                    setIsModalOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
-                >
-                  <FilePlus className="w-5 h-5" />
-                  Create Paper
-                </button>
-              </>
-            ) : activeTab === 'results' ? (
               <button
-                onClick={() => setIsResultModalOpen(true)}
+                onClick={() => setIsModalOpen(true)}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
               >
-                <Award className="w-5 h-5" />
-                Record Result
+                <FilePlus className="w-5 h-5" />
+                Create Paper
               </button>
             ) : (
               <button
@@ -569,17 +487,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
           )}
         </button>
         <button
-          onClick={() => setActiveTab('results')}
-          className={`pb-4 px-2 text-sm font-medium transition-colors relative ${
-            activeTab === 'results' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Student Results
-          {activeTab === 'results' && (
-            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
-          )}
-        </button>
-        <button
           onClick={() => setActiveTab('schedule')}
           className={`pb-4 px-2 text-sm font-medium transition-colors relative ${
             activeTab === 'schedule' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'
@@ -594,7 +501,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
       {activeTab === 'papers' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
-        {papers.map((p) => (
+        {examPapers.map((p) => (
           <motion.div
             key={p.id}
             initial={{ opacity: 0, y: 20 }}
@@ -668,127 +575,54 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
           </motion.div>
         ))}
       </div>
-      ) : activeTab === 'results' ? (
-        <div className="space-y-4 print:hidden">
-          <div className="flex flex-wrap gap-4 items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 flex-1 min-w-[200px]">
-              <Search className="w-4 h-4 text-slate-400" />
+      ) : (
+        <div className="space-y-6 print:hidden">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4 flex-1">
               <select
-                value={resultFilters.studentId}
-                onChange={(e) => setResultFilters({...resultFilters, studentId: e.target.value})}
-                className="bg-transparent text-sm font-medium text-slate-600 focus:outline-none w-full"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                value={filterClass}
+                onChange={(e) => setFilterClass(e.target.value)}
               >
-                <option value="">All Students</option>
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} S/O {s.parentName} ({s.class})</option>
+                <option value="All">All Classes</option>
+                {Array.from(new Set(schedules.map(s => s.class))).map(c => (
+                  <option key={c} value={c}>{c}</option>
                 ))}
               </select>
-            </div>
-            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 flex-1 min-w-[200px]">
-              <FileText className="w-4 h-4 text-slate-400" />
               <select
-                value={resultFilters.examType}
-                onChange={(e) => setResultFilters({...resultFilters, examType: e.target.value})}
-                className="bg-transparent text-sm font-medium text-slate-600 focus:outline-none w-full"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                value={filterSubject}
+                onChange={(e) => setFilterSubject(e.target.value)}
               >
-                <option value="">All Exam Types</option>
-                {Array.from(new Set(results.map(r => r.examType))).map(type => (
-                  <option key={type} value={type}>{type}</option>
+                <option value="All">All Subjects</option>
+                {Array.from(new Set(schedules.map(s => s.subject))).map(s => (
+                  <option key={s} value={s}>{s}</option>
                 ))}
               </select>
-            </div>
-            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 flex-1 min-w-[200px]">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <select
-                value={resultFilters.term}
-                onChange={(e) => setResultFilters({...resultFilters, term: e.target.value})}
-                className="bg-transparent text-sm font-medium text-slate-600 focus:outline-none w-full"
-              >
-                <option value="">All Terms</option>
-                {Array.from(new Set(results.map(r => r.term))).map(term => (
-                  <option key={term} value={term}>{term}</option>
-                ))}
-              </select>
-            </div>
-            {(resultFilters.studentId || resultFilters.examType || resultFilters.term) && (
               <button
-                onClick={() => setResultFilters({ studentId: '', examType: '', term: '' })}
-                className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors"
+                onClick={generateDateSheet}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold"
               >
-                Clear Filters
+                <Download className="w-4 h-4" />
+                Download Date Sheet
+              </button>
+            </div>
+            {(profile?.role === 'admin' || profile?.role === 'staff') && (
+              <button
+                onClick={() => setIsScheduleModalOpen(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 font-bold uppercase tracking-widest text-xs"
+              >
+                <Plus className="w-4 h-4" />
+                Schedule Exam
               </button>
             )}
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</th>
-                    <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Exam Type</th>
-                    <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Term</th>
-                    <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Marks</th>
-                    <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Grade</th>
-                    <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Position</th>
-                    <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredResults.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-500">No results found matching your filters.</td>
-                    </tr>
-                  ) : (
-                    filteredResults.map(result => {
-                      const student = students.find(s => s.id === result.studentId);
-                      const obtainedMarks = Object.values(result.marks || {}).reduce((a: number, b: number) => a + b, 0);
-                      return (
-                        <tr key={result.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-4">
-                            <div className="font-medium text-slate-900">{student ? `${student.name} S/O ${student.parentName}` : 'Unknown'}</div>
-                            <div className="text-xs text-slate-500">{student?.class}</div>
-                          </td>
-                          <td className="p-4 text-sm text-slate-700">{result.examType}</td>
-                          <td className="p-4 text-sm text-slate-700">{result.term}</td>
-                          <td className="p-4">
-                            <div className="font-medium text-slate-900">{obtainedMarks} / {result.totalMarks}</div>
-                            <div className="text-xs text-slate-500">{result.percentage.toFixed(1)}%</div>
-                          </td>
-                          <td className="p-4">
-                            <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                              result.grade === 'A+' || result.grade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                              result.grade === 'B' ? 'bg-blue-100 text-blue-700' :
-                              result.grade === 'C' ? 'bg-amber-100 text-amber-700' :
-                              result.grade === 'D' ? 'bg-orange-100 text-orange-700' :
-                              'bg-rose-100 text-rose-700'
-                            }`}>
-                              {result.grade}
-                            </span>
-                          </td>
-                          <td className="p-4 text-sm font-medium text-slate-700">{result.position}</td>
-                          <td className="p-4 text-right">
-                            <button
-                              onClick={() => generateReportCard(result)}
-                              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                              title="Download Report Card"
-                            >
-                              <Download className="w-5 h-5" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6 print:hidden">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {schedules.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((s) => (
+            {schedules
+              .filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject))
+              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+              .map((s) => (
               <motion.div
                 key={s.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -1444,165 +1278,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
         </div>
       )}
 
-      {isResultModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh]"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-slate-900">Record Exam Result</h2>
-              <button onClick={() => setIsResultModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSaveResult} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Student</label>
-                  <select
-                    required
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={newResult.studentId}
-                    onChange={e => setNewResult({...newResult, studentId: e.target.value})}
-                  >
-                    <option value="">Select Student</option>
-                    {students.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} S/O {s.parentName} ({s.class})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Exam Type</label>
-                  <select
-                    required
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={newResult.examType}
-                    onChange={e => {
-                      const type = examTypes.find(t => t.name === e.target.value);
-                      setNewResult({...newResult, examType: e.target.value, term: type?.term || newResult.term});
-                    }}
-                  >
-                    <option value="">Select Exam Type</option>
-                    {examTypes.map(t => (
-                      <option key={t.id} value={t.name}>{t.name} ({t.term})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Term</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={newResult.term}
-                    onChange={e => setNewResult({...newResult, term: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Total Marks (Overall)</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={newResult.totalMarks}
-                    onChange={e => setNewResult({...newResult, totalMarks: parseInt(e.target.value)})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Class Position</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={newResult.position}
-                    onChange={e => setNewResult({...newResult, position: parseInt(e.target.value)})}
-                  />
-                </div>
-              </div>
-
-              <div className="border-t border-slate-100 pt-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-slate-900">Subject Marks</h3>
-                  <button
-                    type="button"
-                    onClick={() => setSubjectMarks([...subjectMarks, {subject: '', score: 0}])}
-                    className="flex items-center gap-1 text-sm text-indigo-600 font-medium hover:text-indigo-700"
-                  >
-                    <Plus className="w-4 h-4" /> Add Subject
-                  </button>
-                </div>
-                
-                <div className="space-y-3">
-                  {subjectMarks.map((sm, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <input
-                        type="text"
-                        placeholder="Subject Name"
-                        required
-                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={sm.subject}
-                        onChange={e => {
-                          const newSm = [...subjectMarks];
-                          newSm[idx].subject = e.target.value;
-                          setSubjectMarks(newSm);
-                        }}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Marks"
-                        required
-                        min="0"
-                        className="w-32 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={sm.score}
-                        onChange={e => {
-                          const newSm = [...subjectMarks];
-                          newSm[idx].score = parseInt(e.target.value) || 0;
-                          setSubjectMarks(newSm);
-                        }}
-                      />
-                      {subjectMarks.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newSm = [...subjectMarks];
-                            newSm.splice(idx, 1);
-                            setSubjectMarks(newSm);
-                          }}
-                          className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsResultModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors"
-                >
-                  Save Result
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
-
       {viewingPaper && (
         <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm print:bg-white print:p-0">
           <motion.div
@@ -1678,137 +1353,67 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
           </motion.div>
         </div>
       )}
-      {/* Report Card Template (Hidden) */}
-      {selectedResult && (
-        <div className="fixed -left-[9999px] top-0">
-          <div 
-            ref={reportCardRef}
-            className="w-[800px] bg-white p-12 border-[12px] border-double border-indigo-600"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-10 pb-8 border-b-2 border-slate-200">
-              <div className="flex items-center gap-6">
-                <div className="w-24 h-24 bg-indigo-600 rounded-2xl flex items-center justify-center">
-                  <Award className="w-14 h-14 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Academic Report Card</h1>
-                  <p className="text-indigo-600 font-bold tracking-widest uppercase text-sm mt-1">Excellence in Education</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Academic Year</p>
-                <p className="text-2xl font-black text-slate-900">2026 - 2027</p>
-              </div>
-            </div>
 
-            {/* Student Info */}
-            <div className="grid grid-cols-2 gap-12 mb-12">
-              <div className="space-y-4">
-                <div className="flex border-b border-slate-100 pb-2">
-                  <span className="w-32 text-xs font-bold text-slate-400 uppercase tracking-wider">Student Name</span>
-                  <span className="font-bold text-slate-900">{students.find(s => s.id === selectedResult.studentId)?.name}</span>
-                </div>
-                <div className="flex border-b border-slate-100 pb-2">
-                  <span className="w-32 text-xs font-bold text-slate-400 uppercase tracking-wider">Parent Name</span>
-                  <span className="font-bold text-slate-900">{students.find(s => s.id === selectedResult.studentId)?.parentName}</span>
-                </div>
-                <div className="flex border-b border-slate-100 pb-2">
-                  <span className="w-32 text-xs font-bold text-slate-400 uppercase tracking-wider">Roll Number</span>
-                  <span className="font-bold text-slate-900">{students.find(s => s.id === selectedResult.studentId)?.rollNumber}</span>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex border-b border-slate-100 pb-2">
-                  <span className="w-32 text-xs font-bold text-slate-400 uppercase tracking-wider">Class / Sec</span>
-                  <span className="font-bold text-slate-900">
-                    {students.find(s => s.id === selectedResult.studentId)?.class} - {students.find(s => s.id === selectedResult.studentId)?.section}
-                  </span>
-                </div>
-                <div className="flex border-b border-slate-100 pb-2">
-                  <span className="w-32 text-xs font-bold text-slate-400 uppercase tracking-wider">Exam Type</span>
-                  <span className="font-bold text-slate-900">{selectedResult.examType}</span>
-                </div>
-                <div className="flex border-b border-slate-100 pb-2">
-                  <span className="w-32 text-xs font-bold text-slate-400 uppercase tracking-wider">Term</span>
-                  <span className="font-bold text-slate-900">{selectedResult.term}</span>
-                </div>
-              </div>
-            </div>
+      {/* Date Sheet Template (Hidden) */}
+      <div className="fixed -left-[9999px] top-0">
+        <div 
+          ref={dateSheetRef}
+          className="w-[800px] bg-white p-12 border-[12px] border-double border-indigo-600"
+        >
+          <div className="text-center mb-10 pb-8 border-b-2 border-slate-200">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase mb-2">Examination Date Sheet</h1>
+            <p className="text-indigo-600 font-bold tracking-widest uppercase text-sm">Academic Session 2026 - 2027</p>
+            {filterClass !== 'All' && (
+              <p className="text-slate-500 font-bold mt-2 uppercase tracking-widest">Class: {filterClass}</p>
+            )}
+            {filterSubject !== 'All' && (
+              <p className="text-slate-500 font-bold mt-2 uppercase tracking-widest">Subject: {filterSubject}</p>
+            )}
+          </div>
 
-            {/* Marks Table */}
-            <table className="w-full mb-12 border-collapse">
-              <thead>
-                <tr className="bg-slate-900 text-white">
-                  <th className="p-4 text-left text-xs font-bold uppercase tracking-widest border border-slate-800">Subject</th>
-                  <th className="p-4 text-center text-xs font-bold uppercase tracking-widest border border-slate-800 w-32">Obtained</th>
-                  <th className="p-4 text-center text-xs font-bold uppercase tracking-widest border border-slate-800 w-32">Total</th>
-                  <th className="p-4 text-center text-xs font-bold uppercase tracking-widest border border-slate-800 w-32">Grade</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(selectedResult.marks || {}).map(([subject, score]) => (
-                  <tr key={subject} className="border-b border-slate-200">
-                    <td className="p-4 font-bold text-slate-700 border-x border-slate-200">{subject}</td>
-                    <td className="p-4 text-center font-black text-slate-900 border-r border-slate-200">{score}</td>
-                    <td className="p-4 text-center text-slate-400 border-r border-slate-200">-</td>
-                    <td className="p-4 text-center font-bold text-indigo-600 border-r border-slate-200">
-                      {calculateGrade((Number(score) / 100) * 100)}
-                    </td>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-slate-900 text-white">
+                <th className="p-4 text-left text-xs font-bold uppercase tracking-widest border border-slate-800">Date</th>
+                <th className="p-4 text-left text-xs font-bold uppercase tracking-widest border border-slate-800">Subject</th>
+                <th className="p-4 text-left text-xs font-bold uppercase tracking-widest border border-slate-800">Class</th>
+                <th className="p-4 text-center text-xs font-bold uppercase tracking-widest border border-slate-800 w-32">Time</th>
+                <th className="p-4 text-center text-xs font-bold uppercase tracking-widest border border-slate-800 w-32">Room</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schedules
+                .filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject))
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .map((s, idx) => (
+                  <tr key={idx} className="border-b border-slate-200">
+                    <td className="p-4 font-bold text-slate-900 border-x border-slate-200">{s.date}</td>
+                    <td className="p-4 font-black text-indigo-600 border-r border-slate-200">{s.subject}</td>
+                    <td className="p-4 font-bold text-slate-700 border-r border-slate-200">{s.class}</td>
+                    <td className="p-4 text-center font-bold text-slate-600 border-r border-slate-200">{s.time}</td>
+                    <td className="p-4 text-center font-bold text-slate-600 border-r border-slate-200">{s.roomNumber || 'TBD'}</td>
                   </tr>
                 ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-slate-50">
-                  <td className="p-4 font-black text-slate-900 uppercase tracking-wider border border-slate-200">Grand Total</td>
-                  <td className="p-4 text-center font-black text-indigo-600 text-xl border border-slate-200">
-                    {Object.values(selectedResult.marks || {}).reduce((a: number, b: number) => a + b, 0)}
-                  </td>
-                  <td className="p-4 text-center font-black text-slate-900 border border-slate-200">{selectedResult.totalMarks}</td>
-                  <td className="p-4 text-center font-black text-indigo-600 border border-slate-200">{selectedResult.grade}</td>
-                </tr>
-              </tfoot>
-            </table>
+            </tbody>
+          </table>
 
-            {/* Summary Grid */}
-            <div className="grid grid-cols-3 gap-6 mb-16">
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-center">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Percentage</p>
-                <p className="text-3xl font-black text-slate-900">{selectedResult.percentage.toFixed(1)}%</p>
-              </div>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-center">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Final Grade</p>
-                <p className="text-3xl font-black text-indigo-600">{selectedResult.grade}</p>
-              </div>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-center">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Class Position</p>
-                <p className="text-3xl font-black text-slate-900">{selectedResult.position}</p>
-              </div>
+          <div className="mt-20 flex justify-between px-4">
+            <div className="text-center w-48">
+              <div className="border-b-2 border-slate-900 mb-2"></div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Controller Exams</p>
             </div>
-
-            {/* Signatures */}
-            <div className="flex justify-between items-end mt-20 px-4">
-              <div className="text-center w-48">
-                <div className="border-b-2 border-slate-900 mb-2"></div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Class Teacher</p>
-              </div>
-              <div className="text-center w-48">
-                <div className="border-b-2 border-slate-900 mb-2"></div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Principal</p>
-              </div>
-              <div className="text-center w-48">
-                <div className="border-b-2 border-slate-900 mb-2"></div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Parent Signature</p>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="mt-16 text-center">
-              <p className="text-[10px] text-slate-300 font-medium uppercase tracking-[0.3em]">This is a computer generated document</p>
+            <div className="text-center w-48">
+              <div className="border-b-2 border-slate-900 mb-2"></div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Principal</p>
             </div>
           </div>
+
+          <div className="mt-16 text-center">
+            <p className="text-[10px] text-slate-300 font-medium uppercase tracking-[0.3em]">Generated on {new Date().toLocaleDateString()}</p>
+          </div>
         </div>
-      )}
+      </div>
+
       <AnimatePresence>
         {isScheduleModalOpen && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 no-print">

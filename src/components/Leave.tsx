@@ -1,20 +1,12 @@
-import React, { useState } from 'react';
-import { UserProfile } from '../types';
+import React, { useState, useEffect } from 'react';
+import { collection, query, getDocs, addDoc, updateDoc, doc, onSnapshot, where } from 'firebase/firestore';
+import { db } from '../firebase';
+import { UserProfile, LeaveRequest, LeaveBalance, Staff } from '../types';
 import { Calendar as CalendarIcon, Check, X, Plus, Settings, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LeaveProps {
   profile: UserProfile | null;
-}
-
-interface LeaveRequest {
-  id: string;
-  staffName: string;
-  type: string;
-  startDate: string;
-  endDate: string;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
 }
 
 interface LeaveType {
@@ -30,34 +22,119 @@ export default function Leave({ profile }: LeaveProps) {
     { name: 'Paid Leave', allocated: 20 },
   ]);
 
-  const [requests, setRequests] = useState<LeaveRequest[]>([
-    { id: '1', staffName: 'Mr. Smith', type: 'Sick Leave', startDate: '2026-04-10', endDate: '2026-04-12', reason: 'Fever', status: 'pending' },
-    { id: '2', staffName: 'Ms. Johnson', type: 'Casual Leave', startDate: '2026-04-15', endDate: '2026-04-15', reason: 'Personal work', status: 'approved' },
-  ]);
-
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [balances, setBalances] = useState<LeaveBalance[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [newRequest, setNewRequest] = useState({ type: 'Sick Leave', startDate: '', endDate: '', reason: '' });
+  const [loading, setLoading] = useState(true);
 
-  const handleStatusChange = (id: string, status: 'approved' | 'rejected') => {
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-  };
+  useEffect(() => {
+    if (!profile?.campusId) return;
 
-  const handleSubmitRequest = () => {
-    if (!newRequest.startDate || !newRequest.endDate || !newRequest.reason) return;
-    
-    const request: LeaveRequest = {
-      id: Date.now().toString(),
-      staffName: profile?.displayName || 'Staff Member',
-      ...newRequest,
-      status: 'pending'
+    // Fetch Staff
+    const fetchStaff = async () => {
+      const q = query(collection(db, 'staff'), where('campusId', '==', profile.campusId));
+      const snap = await getDocs(q);
+      setStaffList(snap.docs.map(d => ({ id: d.id, ...d.data() } as Staff)));
     };
-    
-    setRequests(prev => [...prev, request]);
-    setIsRequestModalOpen(false);
-    setNewRequest({ type: 'Sick Leave', startDate: '', endDate: '', reason: '' });
+    fetchStaff();
+
+    // Listen to Leave Requests
+    let requestsQuery = query(collection(db, 'leave_requests'), where('campusId', '==', profile.campusId));
+    if (profile.role !== 'admin') {
+      requestsQuery = query(collection(db, 'leave_requests'), where('campusId', '==', profile.campusId), where('staffId', '==', profile.staffId || profile.uid));
+    }
+
+    const unsubRequests = onSnapshot(requestsQuery, (snap) => {
+      setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest)));
+      setLoading(false);
+    });
+
+    // Listen to Leave Balances
+    let balancesQuery = query(collection(db, 'leave_balances'), where('campusId', '==', profile.campusId));
+    if (profile.role !== 'admin') {
+      balancesQuery = query(collection(db, 'leave_balances'), where('campusId', '==', profile.campusId), where('staffId', '==', profile.staffId || profile.uid));
+    }
+
+    const unsubBalances = onSnapshot(balancesQuery, (snap) => {
+      setBalances(snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveBalance)));
+    });
+
+    return () => {
+      unsubRequests();
+      unsubBalances();
+    };
+  }, [profile]);
+
+  const handleStatusChange = async (id: string, status: 'approved' | 'rejected') => {
+    const request = requests.find(r => r.id === id);
+    if (!request) return;
+    const oldStatus = request.status;
+    if (oldStatus === status) return; // No change
+
+    try {
+      await updateDoc(doc(db, 'leave_requests', id), { status });
+      
+      const balance = balances.find(b => b.staffId === request.staffId);
+      if (!balance) return;
+
+      const start = new Date(request.startDate);
+      const end = new Date(request.endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      
+      const balanceRef = doc(db, 'leave_balances', balance.id!);
+      const updateData: any = {};
+
+      let change = 0;
+      // If approved, subtract days. If rejected, add days back if it was previously approved.
+      if (status === 'approved') {
+        change = -diffDays;
+      } else if (status === 'rejected' && oldStatus === 'approved') {
+        change = diffDays;
+      }
+
+      if (change === 0) return;
+
+      if (request.type === 'Sick Leave') updateData.sickLeave = (balance.sickLeave || 0) + change;
+      else if (request.type === 'Casual Leave') updateData.casualLeave = (balance.casualLeave || 0) + change;
+      else if (request.type === 'Paid Leave') updateData.paidLeave = (balance.paidLeave || 0) + change;
+      
+      await updateDoc(balanceRef, updateData);
+    } catch (error) {
+      console.error("Error updating leave request:", error);
+    }
   };
 
-  const getTakenCount = (type: string) => requests.filter(r => r.type === type && r.status === 'approved').length;
+  const handleSubmitRequest = async () => {
+    if (!newRequest.startDate || !newRequest.endDate || !newRequest.reason || !profile?.campusId) return;
+    
+    try {
+      const requestData: Omit<LeaveRequest, 'id'> = {
+        staffId: profile.staffId || profile.uid,
+        staffName: profile.displayName || 'Staff Member',
+        type: newRequest.type,
+        startDate: newRequest.startDate,
+        endDate: newRequest.endDate,
+        reason: newRequest.reason,
+        status: 'pending',
+        appliedOn: new Date().toISOString(),
+        campusId: profile.campusId
+      };
+      
+      await addDoc(collection(db, 'leave_requests'), requestData);
+      setIsRequestModalOpen(false);
+      setNewRequest({ type: 'Sick Leave', startDate: '', endDate: '', reason: '' });
+    } catch (error) {
+      console.error("Error submitting leave request:", error);
+    }
+  };
+
+  const getTakenCount = (type: string) => {
+    return requests.filter(r => r.type === type && r.status === 'approved').length;
+  };
 
   return (
     <div className="space-y-6">
@@ -68,7 +145,7 @@ export default function Leave({ profile }: LeaveProps) {
         </div>
         <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
           {(['requests', 'calendar', 'settings'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-all ${activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-all ${activeTab === tab ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               {tab}
             </button>
           ))}
@@ -79,7 +156,7 @@ export default function Leave({ profile }: LeaveProps) {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-bold text-slate-900">Leave Balances</h2>
-            <button onClick={() => setIsRequestModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm">
+            <button onClick={() => setIsRequestModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm shadow-sm">
               <Plus className="w-4 h-4" /> Apply for Leave
             </button>
           </div>
@@ -100,37 +177,53 @@ export default function Leave({ profile }: LeaveProps) {
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 font-bold text-slate-900">Recent Requests</div>
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500">Staff</th>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500">Type</th>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500">Dates</th>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500">Status</th>
-                  {profile?.role === 'admin' && <th className="px-6 py-3 text-right font-bold text-slate-500">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map(r => (
-                  <tr key={r.id} className="border-t border-slate-100">
-                    <td className="px-6 py-4 font-medium text-slate-900">{r.staffName}</td>
-                    <td className="px-6 py-4 text-slate-600">{r.type}</td>
-                    <td className="px-6 py-4 text-slate-600">{r.startDate} to {r.endDate}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : r.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {r.status.toUpperCase()}
-                      </span>
-                    </td>
-                    {profile?.role === 'admin' && r.status === 'pending' && (
-                      <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
-                        <button onClick={() => handleStatusChange(r.id, 'approved')} className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100"><Check className="w-4 h-4" /></button>
-                        <button onClick={() => handleStatusChange(r.id, 'rejected')} className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><X className="w-4 h-4" /></button>
-                      </td>
-                    )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-6 py-3 font-bold text-slate-500">Staff</th>
+                    <th className="px-6 py-3 font-bold text-slate-500">Type</th>
+                    <th className="px-6 py-3 font-bold text-slate-500">Dates</th>
+                    <th className="px-6 py-3 font-bold text-slate-500">Reason</th>
+                    <th className="px-6 py-3 font-bold text-slate-500">Status</th>
+                    {profile?.role === 'admin' && <th className="px-6 py-3 text-right font-bold text-slate-500">Actions</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">Loading...</td></tr>
+                  ) : requests.length === 0 ? (
+                    <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No leave requests found.</td></tr>
+                  ) : (
+                    requests.map(r => (
+                      <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 font-medium text-slate-900">{r.staffName}</td>
+                        <td className="px-6 py-4 text-slate-600">{r.type}</td>
+                        <td className="px-6 py-4 text-slate-600">{r.startDate} to {r.endDate}</td>
+                        <td className="px-6 py-4 text-slate-600">{r.reason}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${r.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : r.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {r.status.toUpperCase()}
+                          </span>
+                        </td>
+                        {profile?.role === 'admin' && (
+                          <td className="px-6 py-4 text-right">
+                            {r.status === 'pending' ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <button onClick={() => handleStatusChange(r.id!, 'approved')} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100"><Check className="w-4 h-4" /></button>
+                                <button onClick={() => handleStatusChange(r.id!, 'rejected')} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100"><X className="w-4 h-4" /></button>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">{r.status}</span>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -144,9 +237,9 @@ export default function Leave({ profile }: LeaveProps) {
               const date = `2026-04-${(i + 1).toString().padStart(2, '0')}`;
               const approvedRequests = requests.filter(r => r.status === 'approved' && date >= r.startDate && date <= r.endDate);
               return (
-                <div key={i} className={`h-24 border border-slate-100 rounded-lg p-2 ${approvedRequests.length > 0 ? 'bg-blue-50' : ''}`}>
+                <div key={i} className={`h-24 border border-slate-100 rounded-lg p-2 ${approvedRequests.length > 0 ? 'bg-indigo-50' : ''}`}>
                   <span className="text-xs font-bold text-slate-500">{i + 1}</span>
-                  {approvedRequests.map(r => <div key={r.id} className="text-[10px] bg-blue-100 text-blue-700 p-1 rounded mt-1 truncate">{r.staffName}</div>)}
+                  {approvedRequests.map(r => <div key={r.id} className="text-[10px] bg-indigo-100 text-indigo-700 p-1 rounded mt-1 truncate">{r.staffName}</div>)}
                 </div>
               );
             })}
@@ -182,7 +275,7 @@ export default function Leave({ profile }: LeaveProps) {
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button onClick={() => setIsRequestModalOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-600">Cancel</button>
-                <button onClick={handleSubmitRequest} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Submit</button>
+                <button onClick={handleSubmitRequest} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold">Submit</button>
               </div>
             </motion.div>
           </div>

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, query, orderBy, addDoc, updateDoc, doc, deleteDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
+import { FeeReceipt } from './FeeReceipt';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { FeeType, FeeRecord, PaymentHistory, Student, UserProfile } from '../types';
 import { Wallet, Receipt, Plus, Printer, Download, CheckCircle2, XCircle, Search, Calendar, CreditCard, BarChart3, Settings, AlertCircle, FileText, Trash2, Edit2, ChevronRight, ArrowLeft, Mail, Bell, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -159,7 +162,31 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     }
   };
 
-  // --- Process Payment ---
+  const [receiptData, setReceiptData] = useState<{feeRecord: FeeRecord, student: Student, payment: PaymentHistory} | null>(null);
+
+  const handleDownloadReceipt = async (payment: PaymentHistory) => {
+    const feeRecord = feeRecords.find(f => f.id === payment.feeRecordId);
+    const student = students.find(s => s.id === payment.studentId);
+    if (!feeRecord || !student) return;
+
+    setReceiptData({ feeRecord, student, payment });
+    
+    setTimeout(async () => {
+      const element = document.getElementById('fee-receipt');
+      if (element) {
+        const canvas = await html2canvas(element, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`Receipt_${student.name}_${payment.date}.pdf`);
+      }
+      setReceiptData(null);
+    }, 500);
+  };
+
   const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !selectedFeeRecord || paymentForm.amount <= 0) return;
@@ -172,7 +199,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       }
 
       const newPaidAmount = selectedFeeRecord.paidAmount + Number(paymentForm.amount);
-      const totalPayable = selectedFeeRecord.amount - (selectedFeeRecord.discountAmount || 0);
+      const totalPayable = selectedFeeRecord.amount - (selectedFeeRecord.waiverAmount || 0);
       
       let newStatus = selectedFeeRecord.status;
       if (newPaidAmount >= totalPayable) {
@@ -216,12 +243,12 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
 
     setIsApplyingWaiver(true);
     try {
-      const currentDiscount = selectedRecordForWaiver.discountAmount || 0;
-      const newDiscount = Number(waiverForm.amount);
+      const currentWaiver = selectedRecordForWaiver.waiverAmount || 0;
+      const newWaiver = Number(waiverForm.amount);
       const totalPaid = selectedRecordForWaiver.paidAmount;
       const totalAmount = selectedRecordForWaiver.amount;
       
-      const remainingBalance = totalAmount - totalPaid - newDiscount;
+      const remainingBalance = totalAmount - totalPaid - newWaiver;
       
       let newStatus = selectedRecordForWaiver.status;
       if (remainingBalance <= 0) {
@@ -233,7 +260,8 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       }
 
       await updateDoc(doc(db, 'fee_records', selectedRecordForWaiver.id!), {
-        discountAmount: newDiscount,
+        waiverAmount: newWaiver,
+        waiverReason: waiverForm.reason,
         status: newStatus
       });
 
@@ -331,10 +359,10 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     const monthlyCollection: Record<string, number> = {};
 
     feeRecords.forEach(record => {
-      const discount = record.discountAmount || 0;
+      const waiver = record.waiverAmount || 0;
       totalExpected += record.amount;
       totalCollected += record.paidAmount;
-      const outstanding = Math.max(0, record.amount - record.paidAmount - discount);
+      const outstanding = Math.max(0, record.amount - record.paidAmount - waiver);
       totalOutstanding += outstanding;
 
       const student = students.find(s => s.id === record.studentId);
@@ -378,9 +406,9 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     const studentFees = feeRecords.filter(f => f.studentId === selectedStudent.id);
     const totalDue = studentFees.reduce((sum, f) => sum + f.amount, 0);
     const totalPaid = studentFees.reduce((sum, f) => sum + f.paidAmount, 0);
-    const totalDiscount = studentFees.reduce((sum, f) => sum + (f.discountAmount || 0), 0);
-    const outstanding = Math.max(0, totalDue - totalPaid - totalDiscount);
-    return { totalDue, totalPaid, totalDiscount, outstanding };
+    const totalWaiver = studentFees.reduce((sum, f) => sum + (f.waiverAmount || 0), 0);
+    const outstanding = Math.max(0, totalDue - totalPaid - totalWaiver);
+    return { totalDue, totalPaid, totalWaiver, outstanding };
   }, [selectedStudent, feeRecords]);
 
   const filteredStudentFeeRecords = useMemo(() => {
@@ -695,8 +723,8 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                           <p className="text-lg font-bold text-slate-900">${studentFeeSummary.totalDue.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase">Discount</p>
-                          <p className="text-lg font-bold text-indigo-600">${studentFeeSummary.totalDiscount.toLocaleString()}</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase">Waiver</p>
+                          <p className="text-lg font-bold text-indigo-600">${studentFeeSummary.totalWaiver.toLocaleString()}</p>
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 uppercase">Paid</p>
@@ -744,7 +772,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Term/Year</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Due Date</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Amount</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Discount</th>
+                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Waiver</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Paid</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Status</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase text-right">Action</th>
@@ -759,8 +787,15 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                                 <td className="p-4 text-sm text-slate-700">{record.termOrYear}</td>
                                 <td className="p-4 text-sm text-slate-700">{record.dueDate}</td>
                                 <td className="p-4 text-sm font-medium text-slate-900">${record.amount.toLocaleString()}</td>
-                                <td className="p-4 text-sm font-medium text-indigo-600">
-                                  {record.discountAmount ? `$${record.discountAmount.toLocaleString()}` : '-'}
+                                <td className="p-4">
+                                  <div className="text-sm font-medium text-indigo-600">
+                                    {record.waiverAmount ? `$${record.waiverAmount.toLocaleString()}` : '-'}
+                                  </div>
+                                  {record.waiverReason && (
+                                    <div className="text-[10px] text-slate-400 italic truncate max-w-[100px]" title={record.waiverReason}>
+                                      {record.waiverReason}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="p-4 text-sm font-medium text-emerald-600">${record.paidAmount.toLocaleString()}</td>
                                 <td className="p-4">
@@ -781,18 +816,18 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                                         <button 
                                           onClick={() => {
                                             setSelectedRecordForWaiver(record);
-                                            setWaiverForm({ amount: record.discountAmount || 0, reason: '' });
+                                            setWaiverForm({ amount: record.waiverAmount || 0, reason: record.waiverReason || '' });
                                             setIsWaiverModalOpen(true);
                                           }}
                                           className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                          title="Apply Waiver/Discount"
+                                          title="Apply Waiver"
                                         >
                                           <Settings className="w-4 h-4" />
                                         </button>
                                         <button 
                                           onClick={() => {
                                             setSelectedFeeRecord(record);
-                                            setPaymentForm({ feeRecordId: record.id!, amount: Math.max(0, record.amount - record.paidAmount - (record.discountAmount || 0)), method: 'online' });
+                                            setPaymentForm({ feeRecordId: record.id!, amount: Math.max(0, record.amount - record.paidAmount - (record.waiverAmount || 0)), method: 'online' });
                                             setIsPaymentModalOpen(true);
                                           }}
                                           className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors"
@@ -823,6 +858,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Amount</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Method</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Transaction ID</th>
+                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -832,6 +868,14 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                               <td className="p-4 text-sm font-medium text-emerald-600">${payment.amount.toLocaleString()}</td>
                               <td className="p-4 text-sm text-slate-700 capitalize">{payment.method.replace('_', ' ')}</td>
                               <td className="p-4 text-sm text-slate-500 font-mono">{payment.transactionId || '-'}</td>
+                              <td className="p-4">
+                                <button 
+                                  onClick={() => handleDownloadReceipt(payment)}
+                                  className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -840,6 +884,12 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {receiptData && (
+            <div className="fixed -left-[9999px] top-0">
+              <FeeReceipt {...receiptData} />
             </div>
           )}
 
@@ -914,6 +964,19 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                   {isGenerating ? 'Generating...' : 'Generate Fees for All Active Students'}
                 </button>
               </form>
+
+              <div className="mt-8 pt-8 border-t border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Automated Reminders</h3>
+                <p className="text-sm text-slate-500 mb-4">Send email/SMS reminders for all pending/overdue fees.</p>
+                <button 
+                  onClick={handleSendReminders}
+                  disabled={isSendingReminders}
+                  className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-bold disabled:opacity-50"
+                >
+                  {isSendingReminders ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                  Send Reminders
+                </button>
+              </div>
             </div>
           )}
 
@@ -1057,12 +1120,12 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                 </div>
                 <div className="flex justify-between text-sm pt-2 border-t border-slate-200 mt-2">
                   <span className="text-slate-700 font-bold">Current Balance:</span>
-                  <span className="font-bold text-rose-600">${(selectedRecordForWaiver.amount - selectedRecordForWaiver.paidAmount - (selectedRecordForWaiver.discountAmount || 0)).toLocaleString()}</span>
+                  <span className="font-bold text-rose-600">${(selectedRecordForWaiver.amount - selectedRecordForWaiver.paidAmount - (selectedRecordForWaiver.waiverAmount || 0)).toLocaleString()}</span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Waiver/Discount Amount ($)</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Waiver Amount ($)</label>
                 <input
                   type="number"
                   required
@@ -1077,7 +1140,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Reason for Waiver</label>
                 <textarea
-                  placeholder="e.g. Merit scholarship, sibling discount, etc."
+                  placeholder="e.g. Merit scholarship, financial hardship, etc."
                   value={waiverForm.reason}
                   onChange={(e) => setWaiverForm({...waiverForm, reason: e.target.value})}
                   className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm h-24 resize-none"

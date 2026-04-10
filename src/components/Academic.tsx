@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, getDocs, query, where, orderBy, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Student, Attendance, ExamResult, UserProfile, Staff } from '../types';
@@ -21,6 +21,8 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import { ReportCard } from './ReportCard';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { QRCodeSVG } from 'qrcode.react';
 import Papa from 'papaparse';
@@ -47,6 +49,8 @@ export default function Academic({ profile }: AcademicProps) {
   const [importing, setImporting] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
+  const [selectedStudentForReport, setSelectedStudentForReport] = useState<Student | null>(null);
+  const reportCardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const subjects = ['Mathematics', 'Science', 'English', 'History', 'Geography'];
@@ -330,88 +334,20 @@ export default function Academic({ profile }: AcademicProps) {
     }
   };
 
-  const generateReportCard = (student: Student) => {
-    const studentMarks = marks[student.id!];
-    const total = Object.values(studentMarks).reduce((a, b) => (a as number) + (b as number), 0) as number;
-    const percentage = (total / (subjects.length * 100)) * 100;
-    
-    let grade = 'F';
-    if (percentage >= 90) grade = 'A+';
-    else if (percentage >= 80) grade = 'A';
-    else if (percentage >= 70) grade = 'B';
-    else if (percentage >= 60) grade = 'C';
-    else if (percentage >= 50) grade = 'D';
-
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFillColor(79, 70, 229); // Indigo-600
-    doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.text('EDUMANAGE PRO', 105, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text('ACADEMIC PROGRESS REPORT', 105, 30, { align: 'center' });
-
-    // Student Info Section
-    doc.setTextColor(51, 51, 51);
-    doc.setFontSize(10);
-    doc.setFillColor(248, 250, 252); // Slate-50
-    doc.rect(15, 45, 180, 40, 'F');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text('STUDENT INFORMATION', 20, 55);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Name: ${student.name} S/O ${student.parentName}`, 20, 65);
-    doc.text(`Roll No: ${student.rollNumber}`, 20, 75);
-    doc.text(`Class: ${student.class} - ${student.section}`, 120, 65);
-    doc.text(`Term: ${selectedTerm}`, 120, 75);
-
-    // Exam Info
-    doc.setFont('helvetica', 'bold');
-    doc.text(`EXAMINATION: ${examType.toUpperCase()}`, 105, 95, { align: 'center' });
-
-    // Table Header
-    doc.setFillColor(241, 245, 249); // Slate-100
-    doc.rect(15, 105, 180, 10, 'F');
-    doc.text('SUBJECT', 20, 112);
-    doc.text('MAX MARKS', 100, 112);
-    doc.text('OBTAINED', 160, 112);
-
-    // Table Content
-    let y = 125;
-    subjects.forEach((sub, index) => {
-      if (index % 2 === 0) {
-        doc.setFillColor(252, 252, 252);
-        doc.rect(15, y - 7, 180, 10, 'F');
+  const generateReportCard = async (student: Student) => {
+    setSelectedStudentForReport(student);
+    setTimeout(async () => {
+      if (reportCardRef.current) {
+        const canvas = await html2canvas(reportCardRef.current, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`${student.name}_Report.pdf`);
+        setSelectedStudentForReport(null);
       }
-      doc.text(sub, 20, y);
-      doc.text('100', 100, y);
-      doc.text(studentMarks[sub].toString(), 160, y);
-      y += 10;
-    });
-
-    // Summary Section
-    doc.line(15, y, 195, y);
-    y += 15;
-    
-    doc.setFillColor(79, 70, 229);
-    doc.rect(15, y, 180, 30, 'F');
-    doc.setTextColor(255, 255, 255);
-    
-    doc.setFontSize(14);
-    doc.text(`TOTAL MARKS: ${total} / ${subjects.length * 100}`, 25, y + 12);
-    doc.text(`PERCENTAGE: ${percentage.toFixed(2)}%`, 25, y + 22);
-    
-    doc.setFontSize(24);
-    doc.text(`GRADE: ${grade}`, 140, y + 20);
-
-    // Footer
-    doc.setTextColor(150, 150, 150);
-    doc.setFontSize(8);
-    doc.text(`Generated on ${new Date().toLocaleDateString()} | EduManage Pro School Management System`, 105, 285, { align: 'center' });
-
-    doc.save(`${student.name}_S_O_${student.parentName}_${selectedTerm}_Report.pdf`);
+    }, 500);
   };
 
   return (
@@ -851,6 +787,20 @@ export default function Academic({ profile }: AcademicProps) {
           </div>
         )}
       </div>
+      
+      {/* Hidden Report Card for PDF generation */}
+      {selectedStudentForReport && (
+        <div className="hidden">
+          <div ref={reportCardRef}>
+            <ReportCard 
+              student={selectedStudentForReport} 
+              marks={marks[selectedStudentForReport.id!]} 
+              term={selectedTerm} 
+              examType={examType} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -29,7 +29,7 @@ import { cn } from '../lib/utils';
 interface CommunicationProps { profile: UserProfile | null; }
 
 export default function Communication({ profile }: CommunicationProps) {
-  const [activeTab, setActiveTab] = useState<'notices' | 'bulk'>('notices');
+  const [activeTab, setActiveTab] = useState<'notices' | 'bulk' | 'directory'>('notices');
   const [notices, setNotices] = useState<Notice[]>([]);
   const [bulkMessages, setBulkMessages] = useState<BulkMessage[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -301,19 +301,67 @@ export default function Communication({ profile }: CommunicationProps) {
           Notice Board
         </button>
         {profile?.role === 'admin' && (
-          <button
-            onClick={() => setActiveTab('bulk')}
-            className={cn(
-              "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
-              activeTab === 'bulk' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-            )}
-          >
-            Bulk Messaging
-          </button>
+          <>
+            <button
+              onClick={() => setActiveTab('bulk')}
+              className={cn(
+                "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                activeTab === 'bulk' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              Bulk Messaging
+            </button>
+            <button
+              onClick={() => setActiveTab('directory')}
+              className={cn(
+                "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                activeTab === 'directory' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              Student Directory
+            </button>
+          </>
         )}
       </div>
 
-      {activeTab === 'notices' ? (
+      {activeTab === 'directory' ? (
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-600 rounded-lg">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900">Student Directory</h2>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Name</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Parent/Guardian</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Email</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Phone</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">WhatsApp</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Other</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {students.map((student) => (
+                  <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-900">{student.name}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.parentName}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.email}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.phone}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.whatsapp}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.otherContact}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : activeTab === 'notices' ? (
         <>
           {/* Notice Board Section */}
           <section className="space-y-6">

@@ -46,7 +46,10 @@ export default function StaffManagement({ profile }: StaffProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [sortBy, setSortBy] = useState<'name' | 'staffId' | 'joiningDate'>('name');
+  const [joiningDateStart, setJoiningDateStart] = useState('');
+  const [joiningDateEnd, setJoiningDateEnd] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'staffId' | 'joiningDate' | 'status' | 'role'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
   const [viewingSalaryHistory, setViewingSalaryHistory] = useState<Staff | null>(null);
   const [viewingAttendanceHistory, setViewingAttendanceHistory] = useState<Staff | null>(null);
@@ -295,11 +298,17 @@ export default function StaffManagement({ profile }: StaffProps) {
     const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.staffId.includes(searchQuery);
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
     const matchesRole = roleFilter === 'all' || s.role === roleFilter;
-    return matchesSearch && matchesStatus && matchesRole;
+    const matchesDate = (!joiningDateStart || s.joiningDate >= joiningDateStart) && (!joiningDateEnd || s.joiningDate <= joiningDateEnd);
+    return matchesSearch && matchesStatus && matchesRole && matchesDate;
   }).sort((a, b) => {
-    if (sortBy === 'name') return a.name.localeCompare(b.name);
-    if (sortBy === 'staffId') return a.staffId.localeCompare(b.staffId);
-    return new Date(a.joiningDate).getTime() - new Date(b.joiningDate).getTime();
+    let comparison = 0;
+    if (sortBy === 'name') comparison = a.name.localeCompare(b.name);
+    else if (sortBy === 'staffId') comparison = a.staffId.localeCompare(b.staffId);
+    else if (sortBy === 'joiningDate') comparison = new Date(a.joiningDate).getTime() - new Date(b.joiningDate).getTime();
+    else if (sortBy === 'status') comparison = a.status.localeCompare(b.status);
+    else if (sortBy === 'role') comparison = a.role.localeCompare(b.role);
+    
+    return sortOrder === 'asc' ? comparison : -comparison;
   });
 
   const roles = ['all', ...new Set(staffList.map(s => s.role))];
@@ -394,15 +403,8 @@ export default function StaffManagement({ profile }: StaffProps) {
               />
             </div>
             <div className="flex gap-2 w-full md:w-auto">
-              <select 
-                className="input-field py-2 text-sm w-full md:w-40"
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as any)}
-              >
-                <option value="name">Sort by Name</option>
-                <option value="staffId">Sort by ID</option>
-                <option value="joiningDate">Sort by Date</option>
-              </select>
+              <input type="date" value={joiningDateStart} onChange={e => setJoiningDateStart(e.target.value)} className="input-field py-2 text-sm w-full md:w-32" title="Start Date" />
+              <input type="date" value={joiningDateEnd} onChange={e => setJoiningDateEnd(e.target.value)} className="input-field py-2 text-sm w-full md:w-32" title="End Date" />
               <select 
                 className="input-field py-2 text-sm w-full md:w-40"
                 value={roleFilter}
@@ -429,158 +431,165 @@ export default function StaffManagement({ profile }: StaffProps) {
             </div>
           </div>
 
-          {/* Staff Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {loading ? (
-              <div className="col-span-full py-12 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-              </div>
-            ) : filteredStaff.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-slate-500 bg-white rounded-[32px] border border-slate-100">
-                No staff members found matching your criteria.
-              </div>
-            ) : (
-              filteredStaff.map((staff) => (
-                <motion.div
-                  layout
-                  key={staff.id}
-                  className="card p-7 group relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-bl-[100px] -mr-16 -mt-16 transition-transform group-hover:scale-110" />
-                  
-                  <div className="flex items-start justify-between mb-6 relative">
-                    <div className="flex gap-4">
-                      <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-100 overflow-hidden relative">
-                        {staff.name[0]}
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-black text-slate-900 tracking-tight">{staff.name}</h3>
-                        <div className="flex items-center gap-2 mt-1">
+          {/* Staff Table */}
+          <div className="card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 cursor-pointer hover:text-indigo-600" onClick={() => { setSortBy('name'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>
+                      Staff Member {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 cursor-pointer hover:text-indigo-600" onClick={() => { setSortBy('role'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>
+                      Role {sortBy === 'role' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Contact</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 cursor-pointer hover:text-indigo-600" onClick={() => { setSortBy('joiningDate'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>
+                      Joining Date {sortBy === 'joiningDate' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Salary & Dues</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 cursor-pointer hover:text-indigo-600" onClick={() => { setSortBy('status'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}>
+                      Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                      </td>
+                    </tr>
+                  ) : filteredStaff.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                        No staff members found matching your criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStaff.map((staff) => (
+                      <tr key={staff.id} className="hover:bg-slate-50 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold relative group-hover:shadow-md transition-shadow">
+                              {staff.name[0]}
+                              <div className="absolute -bottom-1 -right-1 p-0.5 bg-white rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                                <QRCodeSVG value={staff.staffId} size={16} />
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">{staff.name}</p>
+                              <p className="text-xs text-slate-500">ID: {staff.staffId}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-bold capitalize w-fit">
+                              {staff.role}
+                            </span>
+                            {staff.classIncharge && (
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Incharge: {staff.classIncharge}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm text-slate-600 flex items-center gap-2"><Phone className="w-3 h-3" /> {staff.contact}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-600">
+                          {staff.joiningDate}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-bold text-slate-900">${staff.salary.toLocaleString()}/mo</span>
+                            <div className="flex gap-2 text-[10px] font-bold uppercase tracking-widest">
+                              <span className="text-emerald-600">Paid: ${(staff.totalSalaryReceived || 0).toLocaleString()}</span>
+                              <span className="text-rose-600">Due: ${(staff.remainingDues || 0).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
                           <button
                             onClick={() => updateStaffStatus(staff)}
                             className={cn(
-                              "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-colors",
-                              staff.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100"
+                              "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border transition-colors",
+                              staff.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-200" : "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-200"
                             )}
                           >
                             {staff.status}
                           </button>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ID: {staff.staffId}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity mb-1">
-                        <button
-                          onClick={() => handleEdit(staff)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        {profile?.role === 'admin' && (
-                          <button
-                            onClick={() => handleDelete(staff.id!)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="p-1.5 bg-white border border-slate-100 rounded-xl shadow-sm">
-                        <QRCodeSVG value={staff.staffId} size={48} />
-                      </div>
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Scan ID</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-6 relative">
-                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Role</p>
-                      <p className="text-sm font-bold text-slate-900">{staff.role}</p>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Incharge</p>
-                      <p className="text-sm font-bold text-slate-900">{staff.classIncharge || 'None'}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 mb-6 relative">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2 text-slate-500 font-bold">
-                        <Phone className="w-4 h-4" />
-                        <span>{staff.contact}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-500 font-bold">
-                        <Calendar className="w-4 h-4" />
-                        <span>Joined {staff.joiningDate}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-6 border-t border-slate-100 relative">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monthly Salary</p>
-                        <p className="text-lg font-black text-slate-900">${staff.salary.toLocaleString()}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => {
-                            setViewingSalaryHistory(staff);
-                            fetchPayrollHistory(staff.id!);
-                          }}
-                          className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                          title="Salary History"
-                        >
-                          <History className="w-5 h-5" />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setViewingAttendanceHistory(staff);
-                            fetchAttendanceHistory(staff.staffId);
-                          }}
-                          className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                          title="Attendance History"
-                        >
-                          <UserCheck className="w-5 h-5" />
-                        </button>
-                        <button 
-                          onClick={() => handleQuickPay(staff)}
-                          className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                          title="Pay Salary"
-                        >
-                          <Wallet className="w-5 h-5" />
-                        </button>
-                        {profile?.role === 'admin' && (
-                          <button 
-                            onClick={() => {
-                              setSelectedStaffForCreds(staff);
-                              setCredFormData({ username: staff.staffId, password: '' });
-                              setIsCredentialModalOpen(true);
-                            }}
-                            className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all shadow-sm"
-                            title="Generate Login Credentials"
-                          >
-                            <Key className="w-5 h-5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Received</p>
-                        <p className="text-sm font-bold text-emerald-600">${(staff.totalSalaryReceived || 0).toLocaleString()}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pending Dues</p>
-                        <p className="text-sm font-bold text-rose-600">${(staff.remainingDues || 0).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))
-            )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => {
+                                setViewingSalaryHistory(staff);
+                                fetchPayrollHistory(staff.id!);
+                              }}
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                              title="Salary History"
+                            >
+                              <History className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setViewingAttendanceHistory(staff);
+                                fetchAttendanceHistory(staff.staffId);
+                              }}
+                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Attendance History"
+                            >
+                              <UserCheck className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleQuickPay(staff)}
+                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Pay Salary"
+                            >
+                              <Wallet className="w-4 h-4" />
+                            </button>
+                            {profile?.role === 'admin' && (
+                              <button 
+                                onClick={() => {
+                                  setSelectedStaffForCreds(staff);
+                                  setCredFormData({ username: staff.staffId, password: '' });
+                                  setIsCredentialModalOpen(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                title="Generate Credentials"
+                              >
+                                <Key className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleEdit(staff)}
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            {profile?.role === 'admin' && (
+                              <button
+                                onClick={() => handleDelete(staff.id!)}
+                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -657,6 +666,15 @@ export default function StaffManagement({ profile }: StaffProps) {
                 </button>
               </div>
               <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="mb-6 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-black text-emerald-600 uppercase tracking-widest">Total Present</p>
+                    <p className="text-2xl font-black text-emerald-900">{attendanceHistory.length} Days</p>
+                  </div>
+                  <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                    <UserCheck className="w-6 h-6" />
+                  </div>
+                </div>
                 <div className="space-y-4">
                   {attendanceHistory.length === 0 ? (
                     <div className="text-center py-12 text-slate-500">No attendance records found.</div>
@@ -712,19 +730,23 @@ export default function StaffManagement({ profile }: StaffProps) {
                     <tr className="bg-slate-50 border-b border-slate-100">
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Month</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment Date</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Gross Salary</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Deductions</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Pay</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {payrollHistory.length === 0 ? (
-                      <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-500">No payroll history found.</td></tr>
+                      <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500">No payroll history found.</td></tr>
                     ) : (
                       payrollHistory.map((p) => (
                         <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4 text-sm font-medium text-slate-900">{p.month}</td>
                           <td className="px-6 py-4 text-sm text-slate-600">{p.paymentDate}</td>
-                          <td className="px-6 py-4 text-sm font-bold text-slate-900">${p.amount.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-sm font-bold text-slate-900">${(p.amount || 0).toLocaleString()}</td>
+                          <td className="px-6 py-4 text-sm font-bold text-rose-600">-${(p.deductions || 0).toLocaleString()}</td>
+                          <td className="px-6 py-4 text-sm font-bold text-emerald-600">${(p.netPay || p.amount || 0).toLocaleString()}</td>
                           <td className="px-6 py-4 text-sm">
                             <span className={cn(
                               "px-2.5 py-1 rounded-full text-xs font-semibold",
@@ -791,7 +813,10 @@ export default function StaffManagement({ profile }: StaffProps) {
                       className="input-field"
                       value={formData.staffId}
                       onChange={e => setFormData({...formData, staffId: e.target.value})}
-                      placeholder="STF-001"
+                      placeholder="STF001"
+                      pattern="[a-zA-Z0-9]+"
+                      minLength={5}
+                      title="Staff ID must be at least 5 characters long and contain only alphanumeric characters."
                     />
                   </div>
                   <div className="space-y-2">
