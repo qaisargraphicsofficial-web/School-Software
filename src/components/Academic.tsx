@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, query, where, orderBy, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Student, Attendance, ExamResult, UserProfile } from '../types';
+import { Student, Attendance, ExamResult, UserProfile, Staff } from '../types';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -22,7 +22,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { jsPDF } from 'jspdf';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { QRCodeSVG } from 'qrcode.react';
 import Papa from 'papaparse';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface AcademicProps {
   profile: UserProfile | null;
@@ -31,6 +33,8 @@ interface AcademicProps {
 export default function Academic({ profile }: AcademicProps) {
   const [activeTab, setActiveTab] = useState<'attendance' | 'exams' | 'qr-scan' | 'stats'>('attendance');
   const [students, setStudents] = useState<Student[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [isPrintingIDCards, setIsPrintingIDCards] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent' | 'late'>>({});
   const [selectedClass, setSelectedClass] = useState('10th');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -42,31 +46,62 @@ export default function Academic({ profile }: AcademicProps) {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const subjects = ['Mathematics', 'Science', 'English', 'History', 'Geography'];
 
   useEffect(() => {
-    if (activeTab === 'qr-scan') {
+    if (activeTab === 'qr-scan' || (activeTab === 'attendance' && showScanner)) {
       const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
       scanner.render(onScanSuccess, onScanError);
-      return () => scanner.clear();
+      return () => {
+        scanner.clear().catch(error => console.error("Failed to clear scanner", error));
+      };
     }
-  }, [activeTab]);
+  }, [activeTab, showScanner]);
 
   const onScanSuccess = async (decodedText: string) => {
     try {
-      // Assuming decodedText is studentId
       const date = new Date().toISOString().split('T')[0];
-      await addDoc(collection(db, 'attendance'), {
-        date,
-        targetId: decodedText,
-        targetType: 'student',
-        status: 'present',
-        method: 'qr',
-        campusId: profile?.campusId || 'main',
-      });
-      setScanResult(`Marked Present: ${decodedText}`);
+      let targetType: 'student' | 'staff' = 'student';
+      let targetName = '';
+      
+      // Check if student
+      const student = students.find(s => s.id === decodedText || s.rollNumber === decodedText);
+      if (student) {
+        setAttendance(prev => ({ ...prev, [student.id!]: 'present' }));
+        targetName = student.name;
+        targetType = 'student';
+      } else {
+        // Check if staff
+        const staff = staffList.find(s => s.staffId === decodedText);
+        if (staff) {
+          targetName = staff.name;
+          targetType = 'staff';
+        }
+      }
+
+      if (targetName) {
+        setScanResult(`Marked Present: ${targetName} (${targetType})`);
+        
+        try {
+          await addDoc(collection(db, 'attendance'), {
+            date,
+            targetId: decodedText,
+            targetType,
+            status: 'present',
+            method: 'qr',
+            campusId: profile?.campusId || 'main',
+            timestamp: new Date().toISOString()
+          });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.CREATE, 'attendance');
+        }
+      } else {
+        setScanResult(`Scanned: ${decodedText} (Not found in Students or Staff)`);
+      }
+      
       setTimeout(() => setScanResult(null), 3000);
     } catch (error) {
       console.error("QR Scan Error:", error);
@@ -80,8 +115,19 @@ export default function Academic({ profile }: AcademicProps) {
   useEffect(() => {
     if (profile) {
       fetchStudents();
+      fetchStaff();
     }
   }, [selectedClass, profile]);
+
+  const fetchStaff = async () => {
+    try {
+      const q = query(collection(db, 'staff'));
+      const snap = await getDocs(q);
+      setStaffList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+    }
+  };
 
   useEffect(() => {
     if (students.length > 0) {
@@ -373,7 +419,10 @@ export default function Academic({ profile }: AcademicProps) {
       {/* Tabs */}
       <div className="flex p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/50 shadow-inner">
         <button
-          onClick={() => setActiveTab('attendance')}
+          onClick={() => {
+            setActiveTab('attendance');
+            setShowScanner(false);
+          }}
           className={cn(
             "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300",
             activeTab === 'attendance' ? "bg-white text-indigo-600 shadow-md" : "text-slate-500 hover:text-slate-700"
@@ -382,7 +431,10 @@ export default function Academic({ profile }: AcademicProps) {
           Daily Attendance
         </button>
         <button
-          onClick={() => setActiveTab('qr-scan')}
+          onClick={() => {
+            setActiveTab('qr-scan');
+            setShowScanner(true);
+          }}
           className={cn(
             "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2",
             activeTab === 'qr-scan' ? "bg-white text-indigo-600 shadow-md" : "text-slate-500 hover:text-slate-700"
@@ -458,7 +510,93 @@ export default function Academic({ profile }: AcademicProps) {
             />
           </div>
         )}
+        {activeTab === 'attendance' && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsPrintingIDCards(true)}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2"
+            >
+              <QrCode className="w-4 h-4" />
+              Print ID Cards
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* ID Cards Modal */}
+      <AnimatePresence>
+        {isPrintingIDCards && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setIsPrintingIDCards(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-5xl overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+                <div className="flex items-center gap-3">
+                  <QrCode className="w-6 h-6" />
+                  <h2 className="text-2xl font-black tracking-tight">Student ID Cards: Class {selectedClass}</h2>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => window.print()}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-colors"
+                  >
+                    Print All
+                  </button>
+                  <button onClick={() => setIsPrintingIDCards(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                    <XCircle className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar bg-slate-50">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:grid-cols-2">
+                  {students.map((student) => (
+                    <div key={student.id} className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-sm print:shadow-none print:border-slate-300">
+                      <div className="bg-indigo-600 p-4 text-white text-center">
+                        <h3 className="font-black text-sm uppercase tracking-widest">Student ID Card</h3>
+                      </div>
+                      <div className="p-6 flex flex-col items-center text-center">
+                        <div className="w-20 h-20 bg-slate-100 rounded-full mb-4 flex items-center justify-center text-slate-400">
+                          <Users className="w-10 h-10" />
+                        </div>
+                        <h4 className="text-lg font-black text-slate-900 mb-1">{student.name}</h4>
+                        <p className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">Roll No: {student.rollNumber}</p>
+                        
+                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 mb-4">
+                          <QRCodeSVG value={student.id || student.rollNumber} size={100} />
+                        </div>
+                        
+                        <div className="w-full grid grid-cols-2 gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          <div className="text-left">
+                            <p>Class</p>
+                            <p className="text-slate-900">{student.class}</p>
+                          </div>
+                          <div className="text-right">
+                            <p>Section</p>
+                            <p className="text-slate-900">{student.section}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 p-3 border-t border-slate-100 text-center">
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">EduManage Pro School System</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Content Area */}
       <div className="card">
@@ -549,6 +687,16 @@ export default function Academic({ profile }: AcademicProps) {
                 </button>
               </div>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowScanner(!showScanner)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm",
+                    showScanner ? "bg-indigo-600 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  )}
+                >
+                  <Scan className="w-3.5 h-3.5" />
+                  {showScanner ? "Hide Scanner" : "Scan QR"}
+                </button>
                 <input 
                   type="file" 
                   ref={fileInputRef} 
@@ -566,6 +714,32 @@ export default function Academic({ profile }: AcademicProps) {
                 </button>
               </div>
             </div>
+
+            {showScanner && (
+              <div className="p-8 bg-slate-50 border-b border-slate-100 flex flex-col items-center justify-center space-y-6">
+                <div className="w-full max-w-md bg-white p-4 rounded-3xl shadow-sm border border-slate-200">
+                  <div id="reader" className="overflow-hidden rounded-2xl"></div>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-sm font-bold text-slate-900">Scan Student QR Code</h3>
+                  <p className="text-slate-500 text-[10px] uppercase tracking-widest font-bold mt-1">Marking attendance for {selectedDate}</p>
+                </div>
+                <AnimatePresence>
+                  {scanResult && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className="bg-emerald-100 text-emerald-700 px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {scanResult}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>

@@ -48,6 +48,15 @@ export interface Student {
   admissionDate: string;
   status: 'active' | 'inactive';
   campusId: string;
+  // New fields
+  contactPerson?: string;
+  emergencyContact?: string;
+  previousSchool?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
+  bloodGroup?: string;
+  whatsappNumber?: string;
+  caste?: string;
 }
 
 export interface Staff {
@@ -117,6 +126,7 @@ export interface FeeRecord {
   dueDate: string;
   status: 'paid' | 'pending' | 'overdue' | 'partial';
   paidAmount: number;
+  discountAmount?: number;
   termOrYear: string;
   campusId: string;
 }
@@ -239,6 +249,19 @@ export interface ExamPaper {
     answer?: string;
     type: 'mcq' | 'descriptive';
   }[];
+  campusId: string;
+}
+
+export interface ExamSchedule {
+  id?: string;
+  examTypeId: string;
+  class: string;
+  subject: string;
+  date: string;
+  time: string;
+  duration: number; // in minutes
+  invigilatorIds: string[]; // staffIds
+  roomNumber?: string;
   campusId: string;
 }
 

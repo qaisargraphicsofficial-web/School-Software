@@ -102,6 +102,11 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    match /staff_credentials/{staffId} {
+      allow read, write: if isAdmin();
+      allow read: if isAuthenticated() && request.auth.uid == staffId;
+    }
+
     match /syllabus/{id} {
       allow read: if isAuthenticated();
       allow write: if isStaff();

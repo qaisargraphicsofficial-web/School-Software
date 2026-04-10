@@ -3,6 +3,8 @@ import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, set
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { Student, UserProfile, Attendance, ExamResult } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import { handleStorageError, StorageOperationType } from '../lib/storage-errors';
 import { 
   Plus, 
   Search, 
@@ -28,13 +30,14 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   XCircle,
-  FileText
+  FileText,
+  Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { cn } from '../lib/utils';
-import { QRCodeCanvas } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import Papa from 'papaparse';
 
 interface StudentsProps {
@@ -46,6 +49,7 @@ export default function Students({ profile }: StudentsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isIdCardModalOpen, setIsIdCardModalOpen] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'academic' | 'attendance'>('info');
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
   const [studentAttendance, setStudentAttendance] = useState<Attendance[]>([]);
@@ -56,6 +60,7 @@ export default function Students({ profile }: StudentsProps) {
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -78,6 +83,14 @@ export default function Students({ profile }: StudentsProps) {
     admissionDate: new Date().toISOString().split('T')[0],
     status: 'active',
     campusId: profile?.campusId || 'main',
+    contactPerson: '',
+    emergencyContact: '',
+    previousSchool: '',
+    dateOfBirth: '',
+    gender: 'male',
+    bloodGroup: '',
+    whatsappNumber: '',
+    caste: '',
   });
 
   useEffect(() => {
@@ -103,18 +116,52 @@ export default function Students({ profile }: StudentsProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setUploading(true);
+    setError(null);
     try {
       let photoUrl = formData.photoUrl || '';
       if (photoFile) {
-        const photoRef = ref(storage, `students/${Date.now()}_${photoFile.name}`);
-        const snapshot = await uploadBytes(photoRef, photoFile);
-        photoUrl = await getDownloadURL(snapshot.ref);
+        // Validate file size (e.g., 2MB limit)
+        if (photoFile.size > 2 * 1024 * 1024) {
+          setError('File is too large. Maximum size is 2MB.');
+          setUploading(false);
+          return;
+        }
+
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(photoFile.type)) {
+          setError('Invalid file type. Please upload a JPEG, PNG, or WebP image.');
+          setUploading(false);
+          return;
+        }
+
+        try {
+          const photoRef = ref(storage, `students/${Date.now()}_${photoFile.name}`);
+          const snapshot = await uploadBytes(photoRef, photoFile);
+          photoUrl = await getDownloadURL(snapshot.ref);
+        } catch (storageErr) {
+          const msg = handleStorageError(storageErr, StorageOperationType.UPLOAD, `students/${photoFile.name}`);
+          setError(msg);
+          setUploading(false);
+          return;
+        }
       }
 
-      if (isEditMode && viewingStudent?.id) {
-        await setDoc(doc(db, 'students', viewingStudent.id), { ...formData, photoUrl }, { merge: true });
-      } else {
-        await addDoc(collection(db, 'students'), { ...formData, photoUrl });
+      try {
+        if (isEditMode && viewingStudent?.id) {
+          await setDoc(doc(db, 'students', viewingStudent.id), { ...formData, photoUrl }, { merge: true });
+        } else {
+          await addDoc(collection(db, 'students'), { ...formData, photoUrl });
+        }
+      } catch (firestoreErr: any) {
+        try {
+          handleFirestoreError(firestoreErr, isEditMode ? OperationType.UPDATE : OperationType.CREATE, 'students');
+        } catch (e: any) {
+          const errData = JSON.parse(e.message);
+          setError(`Database Error: ${errData.error}`);
+          setUploading(false);
+          return;
+        }
       }
 
       setIsModalOpen(false);
@@ -131,6 +178,12 @@ export default function Students({ profile }: StudentsProps) {
         address: '',
         admissionDate: new Date().toISOString().split('T')[0],
         status: 'active',
+        contactPerson: '',
+        emergencyContact: '',
+        previousSchool: '',
+        dateOfBirth: '',
+        gender: 'male',
+        bloodGroup: '',
       });
       fetchStudents();
     } catch (error) {
@@ -158,6 +211,41 @@ export default function Students({ profile }: StudentsProps) {
     }
   };
   
+  const handlePrintIdCard = () => {
+    const printContent = document.getElementById('printable-id-card');
+    if (!printContent) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Student ID Card - ${viewingStudent?.name}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @media print {
+              body { margin: 0; padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body class="flex items-center justify-center min-h-screen bg-slate-100">
+          <div class="bg-white p-8">
+            ${printContent.innerHTML}
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const handleViewDetails = async (student: Student) => {
     setViewingStudent(student);
     setIsDetailModalOpen(true);
@@ -203,7 +291,7 @@ export default function Students({ profile }: StudentsProps) {
 
   const exportToCSV = () => {
     try {
-      const headers = ['Name', 'Roll Number', 'Class', 'Section', 'Parent Name', 'Contact', 'Email', 'Address', 'Admission Date', 'Status'];
+      const headers = ['Name', 'Roll Number', 'Class', 'Section', 'Parent Name', 'Contact', 'Email', 'Address', 'Admission Date', 'Status', 'Contact Person', 'Emergency Contact', 'Previous School', 'DOB', 'Gender', 'Blood Group'];
       const data = filteredStudents.map(s => [
         s.name,
         s.rollNumber,
@@ -214,7 +302,13 @@ export default function Students({ profile }: StudentsProps) {
         s.email,
         s.address,
         s.admissionDate,
-        s.status
+        s.status,
+        s.contactPerson || '',
+        s.emergencyContact || '',
+        s.previousSchool || '',
+        s.dateOfBirth || '',
+        s.gender || '',
+        s.bloodGroup || ''
       ]);
 
       const csvContent = [
@@ -251,7 +345,10 @@ export default function Students({ profile }: StudentsProps) {
           setCsvData(results.data);
           
           const initialMapping: Record<string, string> = {};
-          const studentFields = ['name', 'parentName', 'rollNumber', 'class', 'section', 'contact', 'email', 'address', 'admissionDate', 'status'];
+          const studentFields = [
+            'name', 'parentName', 'rollNumber', 'class', 'section', 'contact', 'email', 'address', 'admissionDate', 'status',
+            'contactPerson', 'emergencyContact', 'previousSchool', 'dateOfBirth', 'gender', 'bloodGroup'
+          ];
           
           studentFields.forEach(field => {
             const match = results.meta.fields?.find(h => h.toLowerCase().replace(/\s+/g, '') === field.toLowerCase());
@@ -293,6 +390,12 @@ export default function Students({ profile }: StudentsProps) {
           admissionDate: row[columnMapping['admissionDate']] || new Date().toISOString().split('T')[0],
           status: (row[columnMapping['status']] || 'active').toLowerCase() as 'active' | 'inactive',
           campusId: profile?.campusId || 'main',
+          contactPerson: row[columnMapping['contactPerson']] || '',
+          emergencyContact: row[columnMapping['emergencyContact']] || '',
+          previousSchool: row[columnMapping['previousSchool']] || '',
+          dateOfBirth: row[columnMapping['dateOfBirth']] || '',
+          gender: (row[columnMapping['gender']] || 'male').toLowerCase() as 'male' | 'female' | 'other',
+          bloodGroup: row[columnMapping['bloodGroup']] || '',
         };
         return addDoc(collection(db, 'students'), studentData);
       });
@@ -330,7 +433,7 @@ export default function Students({ profile }: StudentsProps) {
   const classes = Array.from(new Set(students.map(s => s.class))).sort();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 no-print">
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
@@ -537,7 +640,8 @@ export default function Students({ profile }: StudentsProps) {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            generateIDCard(student);
+                            setViewingStudent(student);
+                            setIsIdCardModalOpen(true);
                           }}
                           className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                           title="Generate ID Card"
@@ -569,7 +673,7 @@ export default function Students({ profile }: StudentsProps) {
       {/* Student Detail Modal */}
       <AnimatePresence>
         {isDetailModalOpen && viewingStudent && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 no-print">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -607,7 +711,7 @@ export default function Students({ profile }: StudentsProps) {
                       </div>
                     )}
                   </div>
-                  <div className="text-center md:text-left">
+                  <div className="text-center md:text-left flex-1">
                     <h2 className="text-3xl font-black tracking-tight mb-2">{viewingStudent.name} S/O {viewingStudent.parentName}</h2>
                     <div className="flex flex-wrap justify-center md:justify-start gap-3">
                       <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest border border-white/20">
@@ -623,6 +727,15 @@ export default function Students({ profile }: StudentsProps) {
                         {viewingStudent.status}
                       </span>
                     </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setIsIdCardModalOpen(true)}
+                      className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-xl text-white text-xs font-bold uppercase tracking-widest border border-white/20 flex items-center gap-2 transition-all"
+                    >
+                      <IdCard className="w-4 h-4" />
+                      ID Card
+                    </button>
                   </div>
                 </div>
               </div>
@@ -669,6 +782,26 @@ export default function Students({ profile }: StudentsProps) {
                           <p className="font-bold text-slate-900">{viewingStudent.parentName}</p>
                         </div>
                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Date of Birth</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.dateOfBirth || 'N/A'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gender</p>
+                          <p className="font-bold text-slate-900 capitalize">{viewingStudent.gender || 'N/A'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Blood Group</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.bloodGroup || 'N/A'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Caste</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.caste || 'N/A'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Previous School</p>
+                          <p className="font-bold text-slate-900">{viewingStudent.previousSchool || 'N/A'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Admission Date</p>
                           <p className="font-bold text-slate-900">{viewingStudent.admissionDate}</p>
                         </div>
@@ -691,6 +824,15 @@ export default function Students({ profile }: StudentsProps) {
                         </div>
                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
                           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <Phone className="w-5 h-5 text-emerald-500" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">WhatsApp Number</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.whatsappNumber || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
                             <Mail className="w-5 h-5 text-slate-400" />
                           </div>
                           <div>
@@ -705,6 +847,24 @@ export default function Students({ profile }: StudentsProps) {
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Residential Address</p>
                             <p className="font-bold text-slate-900">{viewingStudent.address}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <User className="w-5 h-5 text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Contact Person</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.contactPerson || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <Phone className="w-5 h-5 text-rose-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 text-rose-500">Emergency Contact</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.emergencyContact || 'N/A'}</p>
                           </div>
                         </div>
                       </div>
@@ -821,7 +981,7 @@ export default function Students({ profile }: StudentsProps) {
       {/* Admission Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 no-print">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -837,11 +997,17 @@ export default function Students({ profile }: StudentsProps) {
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
                 <h2 className="text-xl font-bold">{isEditMode ? 'Edit Student Profile' : 'Digital Admission Form'}</h2>
-                <button onClick={() => { setIsModalOpen(false); setIsEditMode(false); }} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                <button onClick={() => { setIsModalOpen(false); setIsEditMode(false); setError(null); }} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
                   <X className="w-6 h-6" />
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                {error && (
+                  <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm animate-shake">
+                    <XCircle className="w-5 h-5 flex-shrink-0" />
+                    <p className="font-medium">{error}</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Full Name</label>
@@ -911,6 +1077,82 @@ export default function Students({ profile }: StudentsProps) {
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       value={formData.email}
                       onChange={e => setFormData({...formData, email: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Date of Birth</label>
+                    <input
+                      type="date"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.dateOfBirth}
+                      onChange={e => setFormData({...formData, dateOfBirth: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Gender</label>
+                    <select
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.gender}
+                      onChange={e => setFormData({...formData, gender: e.target.value as any})}
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Blood Group</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. A+"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.bloodGroup}
+                      onChange={e => setFormData({...formData, bloodGroup: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Contact Person (Other than Parent)</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.contactPerson}
+                      onChange={e => setFormData({...formData, contactPerson: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Emergency Contact</label>
+                    <input
+                      type="tel"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.emergencyContact}
+                      onChange={e => setFormData({...formData, emergencyContact: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Previous School</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.previousSchool}
+                      onChange={e => setFormData({...formData, previousSchool: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">WhatsApp Contact Number</label>
+                    <input
+                      type="tel"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.whatsappNumber}
+                      onChange={e => setFormData({...formData, whatsappNumber: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Caste</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      value={formData.caste}
+                      onChange={e => setFormData({...formData, caste: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1067,6 +1309,111 @@ export default function Students({ profile }: StudentsProps) {
         )}
       </AnimatePresence>
 
+      {/* ID Card Modal */}
+      <AnimatePresence>
+        {isIdCardModalOpen && viewingStudent && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm no-print"
+              onClick={() => setIsIdCardModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden print-container"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between no-print">
+                <h2 className="text-xl font-bold text-slate-900">Student ID Card</h2>
+                <button onClick={() => setIsIdCardModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+              
+              <div className="p-8 flex flex-col items-center gap-8">
+                <div id="printable-id-card" className="w-[350px] h-[220px] bg-white border-2 border-indigo-600 rounded-2xl overflow-hidden flex flex-col shadow-xl">
+                  <div className="bg-indigo-600 p-4 flex items-center gap-3">
+                    <School className="w-8 h-8 text-white" />
+                    <div>
+                      <h3 className="text-white font-bold text-lg leading-tight">EduManage Pro</h3>
+                      <p className="text-indigo-100 text-[10px] uppercase tracking-wider font-semibold">Student Identity Card</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 p-4 flex gap-4">
+                    <div className="w-24 h-24 bg-slate-100 rounded-xl border-2 border-slate-200 flex items-center justify-center overflow-hidden">
+                      {viewingStudent.photoUrl ? (
+                        <img 
+                          src={viewingStudent.photoUrl} 
+                          alt={viewingStudent.name} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <Camera className="w-8 h-8 text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <h4 className="text-xl font-black text-slate-900 tracking-tight">{viewingStudent.name}</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-0.5">
+                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Roll Number</p>
+                          <p className="text-xs font-bold text-slate-700">{viewingStudent.rollNumber}</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Class</p>
+                          <p className="text-xs font-bold text-slate-700">{viewingStudent.class}</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Section</p>
+                          <p className="text-xs font-bold text-slate-700">{viewingStudent.section}</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Campus</p>
+                          <p className="text-xs font-bold text-slate-700">{viewingStudent.campusId || 'Main'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center">
+                      <QRCodeSVG 
+                        value={viewingStudent.id!} 
+                        size={64}
+                        level="H"
+                        includeMargin={false}
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex justify-between items-center">
+                    <p className="text-[10px] text-slate-400 font-medium">Valid for Academic Year 2026-27</p>
+                    <div className="w-12 h-6 bg-slate-200 rounded"></div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 w-full no-print">
+                  <button 
+                    onClick={handlePrintIdCard}
+                    className="flex-1 btn-primary py-3 flex items-center justify-center gap-2"
+                  >
+                    <Printer className="w-5 h-5" />
+                    Print ID Card
+                  </button>
+                  <button 
+                    onClick={() => generateIDCard(viewingStudent)}
+                    className="flex-1 btn-secondary py-3 flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-5 h-5" />
+                    Download PDF
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Hidden ID Card Template for Generation */}
       <div className="fixed -left-[9999px] top-0">
         <div 
@@ -1117,7 +1464,7 @@ export default function Students({ profile }: StudentsProps) {
             </div>
             <div className="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center">
               {selectedStudent?.id && (
-                <QRCodeCanvas 
+                <QRCodeSVG 
                   value={selectedStudent.id} 
                   size={64}
                   level="H"

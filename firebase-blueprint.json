@@ -27,7 +27,13 @@
         "address": { "type": "string" },
         "admissionDate": { "type": "string", "format": "date" },
         "status": { "type": "string", "enum": ["active", "inactive"] },
-        "campusId": { "type": "string" }
+        "campusId": { "type": "string" },
+        "contactPerson": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "previousSchool": { "type": "string" },
+        "dateOfBirth": { "type": "string", "format": "date" },
+        "gender": { "type": "string", "enum": ["male", "female", "other"] },
+        "bloodGroup": { "type": "string" }
       },
       "required": ["name", "rollNumber", "class", "campusId"]
     },

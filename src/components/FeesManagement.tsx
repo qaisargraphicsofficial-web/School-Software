@@ -8,7 +8,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 
 interface FeesManagementProps { profile: UserProfile | null; }
 
-const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#6366f1'];
+const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b'];
 
 export default function FeesManagement({ profile }: FeesManagementProps) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'feeTypes' | 'studentFees' | 'generate'>('dashboard');
@@ -39,6 +39,11 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   const [generateForm, setGenerateForm] = useState({ feeTypeId: '', termOrYear: '', dueDate: '', targetClass: 'All' });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
+
+  const [isWaiverModalOpen, setIsWaiverModalOpen] = useState(false);
+  const [waiverForm, setWaiverForm] = useState({ amount: 0, reason: '' });
+  const [selectedRecordForWaiver, setSelectedRecordForWaiver] = useState<FeeRecord | null>(null);
+  const [isApplyingWaiver, setIsApplyingWaiver] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -167,8 +172,10 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       }
 
       const newPaidAmount = selectedFeeRecord.paidAmount + Number(paymentForm.amount);
+      const totalPayable = selectedFeeRecord.amount - (selectedFeeRecord.discountAmount || 0);
+      
       let newStatus = selectedFeeRecord.status;
-      if (newPaidAmount >= selectedFeeRecord.amount) {
+      if (newPaidAmount >= totalPayable) {
         newStatus = 'paid';
       } else if (newPaidAmount > 0) {
         newStatus = 'partial';
@@ -199,6 +206,47 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       alert("Failed to process payment.");
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  // --- Apply Waiver ---
+  const handleApplyWaiver = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !selectedRecordForWaiver || waiverForm.amount < 0) return;
+
+    setIsApplyingWaiver(true);
+    try {
+      const currentDiscount = selectedRecordForWaiver.discountAmount || 0;
+      const newDiscount = Number(waiverForm.amount);
+      const totalPaid = selectedRecordForWaiver.paidAmount;
+      const totalAmount = selectedRecordForWaiver.amount;
+      
+      const remainingBalance = totalAmount - totalPaid - newDiscount;
+      
+      let newStatus = selectedRecordForWaiver.status;
+      if (remainingBalance <= 0) {
+        newStatus = 'paid';
+      } else if (totalPaid > 0) {
+        newStatus = 'partial';
+      } else {
+        newStatus = 'pending';
+      }
+
+      await updateDoc(doc(db, 'fee_records', selectedRecordForWaiver.id!), {
+        discountAmount: newDiscount,
+        status: newStatus
+      });
+
+      alert("Waiver applied successfully!");
+      setIsWaiverModalOpen(false);
+      setSelectedRecordForWaiver(null);
+      setWaiverForm({ amount: 0, reason: '' });
+      fetchData();
+    } catch (error) {
+      console.error("Error applying waiver:", error);
+      alert("Failed to apply waiver.");
+    } finally {
+      setIsApplyingWaiver(false);
     }
   };
 
@@ -283,9 +331,10 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     const monthlyCollection: Record<string, number> = {};
 
     feeRecords.forEach(record => {
+      const discount = record.discountAmount || 0;
       totalExpected += record.amount;
       totalCollected += record.paidAmount;
-      const outstanding = record.amount - record.paidAmount;
+      const outstanding = Math.max(0, record.amount - record.paidAmount - discount);
       totalOutstanding += outstanding;
 
       const student = students.find(s => s.id === record.studentId);
@@ -325,12 +374,13 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   );
 
   const studentFeeSummary = useMemo(() => {
-    if (!selectedStudent) return { totalDue: 0, totalPaid: 0, outstanding: 0 };
+    if (!selectedStudent) return { totalDue: 0, totalPaid: 0, totalDiscount: 0, outstanding: 0 };
     const studentFees = feeRecords.filter(f => f.studentId === selectedStudent.id);
     const totalDue = studentFees.reduce((sum, f) => sum + f.amount, 0);
     const totalPaid = studentFees.reduce((sum, f) => sum + f.paidAmount, 0);
-    const outstanding = totalDue - totalPaid;
-    return { totalDue, totalPaid, outstanding };
+    const totalDiscount = studentFees.reduce((sum, f) => sum + (f.discountAmount || 0), 0);
+    const outstanding = Math.max(0, totalDue - totalPaid - totalDiscount);
+    return { totalDue, totalPaid, totalDiscount, outstanding };
   }, [selectedStudent, feeRecords]);
 
   const filteredStudentFeeRecords = useMemo(() => {
@@ -408,73 +458,156 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         <>
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">TOTAL EXPECTED</p>
-                  <h3 className="text-2xl font-bold text-slate-900">${dashboardStats.totalExpected.toLocaleString()}</h3>
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-indigo-200 transition-colors">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL EXPECTED</p>
+                  <h3 className="text-3xl font-black text-slate-900 tracking-tight">${dashboardStats.totalExpected.toLocaleString()}</h3>
+                  <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500" style={{ width: '100%' }} />
+                  </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">TOTAL COLLECTED</p>
-                  <h3 className="text-2xl font-bold text-emerald-600">${dashboardStats.totalCollected.toLocaleString()}</h3>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-emerald-200 transition-colors">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL COLLECTED</p>
+                  <h3 className="text-3xl font-black text-emerald-600 tracking-tight">${dashboardStats.totalCollected.toLocaleString()}</h3>
+                  <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500" 
+                      style={{ width: `${(dashboardStats.totalCollected / (dashboardStats.totalExpected || 1)) * 100}%` }} 
+                    />
+                  </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">TOTAL OUTSTANDING</p>
-                  <h3 className="text-2xl font-bold text-rose-600">${dashboardStats.totalOutstanding.toLocaleString()}</h3>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-rose-200 transition-colors">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL OUTSTANDING</p>
+                  <h3 className="text-3xl font-black text-rose-600 tracking-tight">${dashboardStats.totalOutstanding.toLocaleString()}</h3>
+                  <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-rose-500" 
+                      style={{ width: `${(dashboardStats.totalOutstanding / (dashboardStats.totalExpected || 1)) * 100}%` }} 
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">Collection Progress</h3>
-                  <div className="h-64">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight">Collection Progress</h3>
+                      <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-widest">Paid vs Outstanding</p>
+                    </div>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                      <PieChart className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={dashboardStats.pieData}
                           cx="50%"
                           cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
+                          innerRadius={70}
+                          outerRadius={90}
+                          paddingAngle={8}
                           dataKey="value"
+                          stroke="none"
                         >
                           {dashboardStats.pieData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
-                        <Legend />
+                        <RechartsTooltip 
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          formatter={(value: number) => [`$${value.toLocaleString()}`, 'Amount']} 
+                        />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">Outstanding by Class</h3>
-                  <div className="h-64">
+                <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight">Outstanding by Class</h3>
+                      <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-widest">Revenue at Risk</p>
+                    </div>
+                    <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+                      <AlertCircle className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={dashboardStats.classChartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
-                        <Bar dataKey="amount" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                          tickFormatter={(value) => `$${value}`}
+                        />
+                        <RechartsTooltip 
+                          cursor={{ fill: '#f8fafc' }}
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          formatter={(value: number) => [`$${value.toLocaleString()}`, 'Outstanding']} 
+                        />
+                        <Bar dataKey="amount" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={32} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 lg:col-span-2">
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">Payment Trends</h3>
-                  <div className="h-64">
+                <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 lg:col-span-2">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight">Monthly Collection Trends</h3>
+                      <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-widest">Cash Flow Analysis</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                      <BarChart3 className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={dashboardStats.trendChartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
-                        <Line type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        <defs>
+                          <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="month" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                          tickFormatter={(value) => `$${value}`}
+                        />
+                        <RechartsTooltip 
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          formatter={(value: number) => [`$${value.toLocaleString()}`, 'Collected']} 
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="amount" 
+                          stroke="#10b981" 
+                          strokeWidth={4} 
+                          dot={{ r: 6, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} 
+                          activeDot={{ r: 8, strokeWidth: 0 }} 
+                        />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -556,20 +689,24 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                       <h2 className="text-xl font-bold text-slate-900">{selectedStudent.name} S/O {selectedStudent.parentName}</h2>
                       <p className="text-slate-500">{selectedStudent.class} | Roll: {selectedStudent.rollNumber}</p>
                     </div>
-                    <div className="flex gap-4 text-right">
-                      <div>
-                        <p className="text-xs font-bold text-slate-400 uppercase">Total Due</p>
-                        <p className="text-lg font-bold text-slate-900">${studentFeeSummary.totalDue.toLocaleString()}</p>
+                      <div className="flex gap-4 text-right">
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase">Total Due</p>
+                          <p className="text-lg font-bold text-slate-900">${studentFeeSummary.totalDue.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase">Discount</p>
+                          <p className="text-lg font-bold text-indigo-600">${studentFeeSummary.totalDiscount.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase">Paid</p>
+                          <p className="text-lg font-bold text-emerald-600">${studentFeeSummary.totalPaid.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase">Outstanding</p>
+                          <p className="text-lg font-bold text-rose-600">${studentFeeSummary.outstanding.toLocaleString()}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-400 uppercase">Paid</p>
-                        <p className="text-lg font-bold text-emerald-600">${studentFeeSummary.totalPaid.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-400 uppercase">Outstanding</p>
-                        <p className="text-lg font-bold text-rose-600">${studentFeeSummary.outstanding.toLocaleString()}</p>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -607,6 +744,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Term/Year</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Due Date</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Amount</th>
+                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Discount</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Paid</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Status</th>
                             <th className="p-4 text-xs font-semibold text-slate-500 uppercase text-right">Action</th>
@@ -621,6 +759,9 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                                 <td className="p-4 text-sm text-slate-700">{record.termOrYear}</td>
                                 <td className="p-4 text-sm text-slate-700">{record.dueDate}</td>
                                 <td className="p-4 text-sm font-medium text-slate-900">${record.amount.toLocaleString()}</td>
+                                <td className="p-4 text-sm font-medium text-indigo-600">
+                                  {record.discountAmount ? `$${record.discountAmount.toLocaleString()}` : '-'}
+                                </td>
                                 <td className="p-4 text-sm font-medium text-emerald-600">${record.paidAmount.toLocaleString()}</td>
                                 <td className="p-4">
                                   <span className={cn(
@@ -634,18 +775,33 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                                   </span>
                                 </td>
                                 <td className="p-4 text-right">
-                                  {record.status !== 'paid' && (
-                                    <button 
-                                      onClick={() => {
-                                        setSelectedFeeRecord(record);
-                                        setPaymentForm({ feeRecordId: record.id!, amount: record.amount - record.paidAmount, method: 'online' });
-                                        setIsPaymentModalOpen(true);
-                                      }}
-                                      className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors"
-                                    >
-                                      Pay Now
-                                    </button>
-                                  )}
+                                  <div className="flex justify-end gap-2">
+                                    {record.status !== 'paid' && (
+                                      <>
+                                        <button 
+                                          onClick={() => {
+                                            setSelectedRecordForWaiver(record);
+                                            setWaiverForm({ amount: record.discountAmount || 0, reason: '' });
+                                            setIsWaiverModalOpen(true);
+                                          }}
+                                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                          title="Apply Waiver/Discount"
+                                        >
+                                          <Settings className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => {
+                                            setSelectedFeeRecord(record);
+                                            setPaymentForm({ feeRecordId: record.id!, amount: Math.max(0, record.amount - record.paidAmount - (record.discountAmount || 0)), method: 'online' });
+                                            setIsPaymentModalOpen(true);
+                                          }}
+                                          className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors"
+                                        >
+                                          Pay Now
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -872,6 +1028,76 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                 </button>
                 <button type="submit" className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors">
                   Save Fee Type
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Waiver Modal */}
+      {isWaiverModalOpen && selectedRecordForWaiver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white">
+              <h2 className="text-xl font-bold">Apply Fee Waiver</h2>
+              <button onClick={() => setIsWaiverModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleApplyWaiver} className="p-6 space-y-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-slate-500">Original Amount:</span>
+                  <span className="font-bold text-slate-900">${selectedRecordForWaiver.amount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-slate-500">Paid to Date:</span>
+                  <span className="font-bold text-emerald-600">${selectedRecordForWaiver.paidAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-slate-200 mt-2">
+                  <span className="text-slate-700 font-bold">Current Balance:</span>
+                  <span className="font-bold text-rose-600">${(selectedRecordForWaiver.amount - selectedRecordForWaiver.paidAmount - (selectedRecordForWaiver.discountAmount || 0)).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Waiver/Discount Amount ($)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  max={selectedRecordForWaiver.amount - selectedRecordForWaiver.paidAmount}
+                  value={waiverForm.amount}
+                  onChange={(e) => setWaiverForm({...waiverForm, amount: Number(e.target.value)})}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Reason for Waiver</label>
+                <textarea
+                  placeholder="e.g. Merit scholarship, sibling discount, etc."
+                  value={waiverForm.reason}
+                  onChange={(e) => setWaiverForm({...waiverForm, reason: e.target.value})}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm h-24 resize-none"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setIsWaiverModalOpen(false)} className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors">
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isApplyingWaiver}
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex justify-center items-center"
+                >
+                  {isApplyingWaiver ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    "Apply Waiver"
+                  )}
                 </button>
               </div>
             </form>

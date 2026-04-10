@@ -32,6 +32,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface StaffProps {
   profile: UserProfile | null;
@@ -48,7 +49,9 @@ export default function StaffManagement({ profile }: StaffProps) {
   const [sortBy, setSortBy] = useState<'name' | 'staffId' | 'joiningDate'>('name');
   const [loading, setLoading] = useState(true);
   const [viewingSalaryHistory, setViewingSalaryHistory] = useState<Staff | null>(null);
+  const [viewingAttendanceHistory, setViewingAttendanceHistory] = useState<Staff | null>(null);
   const [payrollHistory, setPayrollHistory] = useState<Payroll[]>([]);
+  const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
@@ -66,18 +69,22 @@ export default function StaffManagement({ profile }: StaffProps) {
     try {
       // Store credentials in a separate collection
       // In a real app, password should be hashed
-      await setDoc(doc(db, 'staff_credentials', selectedStaffForCreds.staffId), {
-        username: credFormData.username,
-        password: credFormData.password,
-        staffId: selectedStaffForCreds.staffId,
-        campusId: profile?.campusId || 'main',
-        role: selectedStaffForCreds.role,
-        name: selectedStaffForCreds.name
-      });
-      
-      alert('Credentials generated successfully!');
-      setIsCredentialModalOpen(false);
-      setCredFormData({ username: '', password: '' });
+      try {
+        await setDoc(doc(db, 'staff_credentials', selectedStaffForCreds.staffId), {
+          username: credFormData.username,
+          password: credFormData.password,
+          staffId: selectedStaffForCreds.staffId,
+          campusId: profile?.campusId || 'main',
+          role: selectedStaffForCreds.role,
+          name: selectedStaffForCreds.name
+        });
+        
+        alert('Credentials generated successfully!');
+        setIsCredentialModalOpen(false);
+        setCredFormData({ username: '', password: '' });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `staff_credentials/${selectedStaffForCreds.staffId}`);
+      }
     } catch (error) {
       console.error("Error generating credentials:", error);
       alert('Failed to generate credentials.');
@@ -92,6 +99,22 @@ export default function StaffManagement({ profile }: StaffProps) {
       setPayrollHistory(data);
     } catch (error) {
       console.error("Error fetching payroll history:", error);
+    }
+  };
+
+  const fetchAttendanceHistory = async (staffId: string) => {
+    try {
+      const q = query(
+        collection(db, 'attendance'), 
+        where('targetId', '==', staffId),
+        where('targetType', '==', 'staff'),
+        orderBy('date', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAttendanceHistory(data);
+    } catch (error) {
+      console.error("Error fetching attendance history:", error);
     }
   };
 
@@ -427,11 +450,8 @@ export default function StaffManagement({ profile }: StaffProps) {
                   
                   <div className="flex items-start justify-between mb-6 relative">
                     <div className="flex gap-4">
-                      <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-100 overflow-hidden relative group/qr">
-                        <span className="group-hover/qr:opacity-0 transition-opacity">{staff.name[0]}</span>
-                        <div className="absolute inset-0 bg-white p-1 opacity-0 group-hover/qr:opacity-100 transition-opacity flex items-center justify-center">
-                          <QRCodeSVG value={staff.staffId} size={56} />
-                        </div>
+                      <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-100 overflow-hidden relative">
+                        {staff.name[0]}
                       </div>
                       <div>
                         <h3 className="text-xl font-black text-slate-900 tracking-tight">{staff.name}</h3>
@@ -449,21 +469,27 @@ export default function StaffManagement({ profile }: StaffProps) {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleEdit(staff)}
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      {profile?.role === 'admin' && (
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity mb-1">
                         <button
-                          onClick={() => handleDelete(staff.id!)}
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                          onClick={() => handleEdit(staff)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                      )}
+                        {profile?.role === 'admin' && (
+                          <button
+                            onClick={() => handleDelete(staff.id!)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="p-1.5 bg-white border border-slate-100 rounded-xl shadow-sm">
+                        <QRCodeSVG value={staff.staffId} size={48} />
+                      </div>
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Scan ID</span>
                     </div>
                   </div>
 
@@ -507,6 +533,16 @@ export default function StaffManagement({ profile }: StaffProps) {
                           title="Salary History"
                         >
                           <History className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setViewingAttendanceHistory(staff);
+                            fetchAttendanceHistory(staff.staffId);
+                          }}
+                          className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                          title="Attendance History"
+                        >
+                          <UserCheck className="w-5 h-5" />
                         </button>
                         <button 
                           onClick={() => handleQuickPay(staff)}
@@ -593,6 +629,56 @@ export default function StaffManagement({ profile }: StaffProps) {
           </div>
         </div>
       </div>
+
+      {/* Attendance History Modal */}
+      <AnimatePresence>
+        {viewingAttendanceHistory && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setViewingAttendanceHistory(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-2xl overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-emerald-600 text-white">
+                <div className="flex items-center gap-3">
+                  <UserCheck className="w-6 h-6" />
+                  <h2 className="text-2xl font-black tracking-tight">Attendance History: {viewingAttendanceHistory.name}</h2>
+                </div>
+                <button onClick={() => setViewingAttendanceHistory(null)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="space-y-4">
+                  {attendanceHistory.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">No attendance records found.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {attendanceHistory.map((record) => (
+                        <div key={record.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{record.date}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{record.method === 'qr' ? 'QR Scan' : 'Manual'}</p>
+                          </div>
+                          <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold uppercase">Present</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Salary History Modal */}
       <AnimatePresence>

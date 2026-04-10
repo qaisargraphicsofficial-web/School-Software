@@ -191,6 +191,7 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Classes', icon: BookOpen, path: '/classes', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Attendance', icon: Calendar, path: '/attendance', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
     { name: 'Results', icon: GraduationCap, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
+    { name: 'Exams', icon: FileText, path: '/exams', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Fees', icon: Wallet, path: '/fees', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Payroll', icon: CreditCard, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Expenses', icon: FileText, path: '/expenses', roles: ['admin', 'staff'], category: 'FINANCE' },
@@ -238,7 +239,7 @@ export default function Layout({ profile }: LayoutProps) {
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar for Desktop */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-0",
+        "fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-0 no-print",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="h-full flex flex-col">
@@ -314,7 +315,7 @@ export default function Layout({ profile }: LayoutProps) {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-40">
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-40 no-print">
           <div className="flex items-center gap-8 flex-1">
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -515,7 +516,9 @@ export default function Layout({ profile }: LayoutProps) {
       )}
 
       {/* AI Assistant */}
-      <AIAssistant profile={profile} />
+      <div className="no-print">
+        <AIAssistant profile={profile} />
+      </div>
     </div>
   );
 }
