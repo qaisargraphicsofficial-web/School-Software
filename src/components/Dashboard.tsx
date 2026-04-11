@@ -256,7 +256,7 @@ export default function Dashboard({ profile }: DashboardProps) {
                 <FileText className="w-6 h-6" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Notice</span>
               </Link>
-              <Link to="/finance" className="flex flex-col items-center gap-3 p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+              <Link to="/fees" className="flex flex-col items-center gap-3 p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
                 <Wallet className="w-6 h-6" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Fees</span>
               </Link>

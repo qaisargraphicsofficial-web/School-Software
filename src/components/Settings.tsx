@@ -837,6 +837,15 @@ export default function Settings({ profile }: SettingsProps) {
                         <p className="text-[10px] text-slate-500 font-medium">Download a full snapshot of your school database in JSON format.</p>
                         <button
                           type="button"
+                          onClick={() => {
+                            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(settings, null, 2));
+                            const downloadAnchorNode = document.createElement('a');
+                            downloadAnchorNode.setAttribute("href", dataStr);
+                            downloadAnchorNode.setAttribute("download", `school_settings_backup_${new Date().toISOString().split('T')[0]}.json`);
+                            document.body.appendChild(downloadAnchorNode);
+                            downloadAnchorNode.click();
+                            downloadAnchorNode.remove();
+                          }}
                           className="w-full px-6 py-3 bg-white border border-slate-200 text-slate-900 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-all shadow-sm"
                         >
                           Generate Backup

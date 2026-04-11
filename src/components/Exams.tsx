@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, query, where, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { ExamPaper, UserProfile, ExamType, Student, ExamResult, ExamSchedule, Staff } from '../types';
-import { FileText, Plus, Search, Calendar, Clock, ChevronRight, FilePlus, Sparkles, Loader2, Printer, Settings, X, Trash2, Award, Download, Users, MapPin } from 'lucide-react';
+import { FileText, Plus, Search, Calendar, Clock, ChevronRight, FilePlus, Sparkles, Loader2, Printer, Settings, X, Trash2, Award, Download, Users, MapPin, GraduationCap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
@@ -56,9 +56,13 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     subject: '',
     topic: '',
     duration: 60,
-    numQuestions: 10,
-    difficulty: 'Medium',
-    examTypeId: ''
+    examTypeId: '',
+    easyCount: 4,
+    mediumCount: 4,
+    hardCount: 2,
+    mcqCount: 5,
+    shortCount: 3,
+    longCount: 2
   });
 
   useEffect(() => {
@@ -260,24 +264,40 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     setIsModalOpen(true);
   };
 
-  const handleGenerateAIPaper = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateAIPaper = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setGenerating(true);
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
+      const examTypeName = examTypes.find(t => t.id === aiPrompt.examTypeId)?.name || 'General';
+      const totalQuestions = aiPrompt.easyCount + aiPrompt.mediumCount + aiPrompt.hardCount;
+      const totalByType = aiPrompt.mcqCount + aiPrompt.shortCount + aiPrompt.longCount;
+
       const prompt = `You are an expert educator. Generate a high-quality, comprehensive exam paper for Class ${aiPrompt.class} on the subject of ${aiPrompt.subject}.
       
       SPECIFICATIONS:
+      - Exam Type: ${examTypeName}
       - Topic/Syllabus: ${aiPrompt.topic}
-      - Difficulty Level: ${aiPrompt.difficulty}
-      - Number of Questions: ${aiPrompt.numQuestions}
       - Duration: ${aiPrompt.duration} minutes
       
-      QUESTION TYPES TO INCLUDE:
-      - A mix of multiple choice, short answer, and long answer questions.
+      QUESTION DISTRIBUTION BY DIFFICULTY:
+      - Easy: ${aiPrompt.easyCount} questions
+      - Medium: ${aiPrompt.mediumCount} questions
+      - Hard: ${aiPrompt.hardCount} questions
+      
+      QUESTION DISTRIBUTION BY TYPE:
+      - Multiple Choice (MCQ): ${aiPrompt.mcqCount} questions
+      - Short Answer: ${aiPrompt.shortCount} questions
+      - Long Answer: ${aiPrompt.longCount} questions
+      
+      Total Questions to generate: ${totalQuestions}
+      
+      INSTRUCTIONS:
+      - Ensure the difficulty levels are accurately reflected in the questions.
       - Questions should be challenging and test conceptual understanding.
+      - If there's a slight mismatch between total by difficulty and total by type, prioritize the total count of ${totalQuestions} and try to satisfy both distributions as closely as possible.
       
       OUTPUT FORMAT:
       Return the output as a JSON array of question objects. Each object MUST have:
@@ -286,8 +306,8 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       - "type": One of "multiple_choice", "short_answer", or "long_answer".
       - "options": An array of 4 strings if type is "multiple_choice", otherwise an empty array [].
       - "answer": The correct answer or detailed key points expected for grading.
+      - "difficulty": The difficulty level assigned to this question ("Easy", "Medium", or "Hard").
       
-      Ensure the total questions exactly match ${aiPrompt.numQuestions}. 
       Return ONLY the raw JSON array. Do not include any markdown formatting or explanations.`;
 
       const response = await ai.models.generateContent({
@@ -305,18 +325,20 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
         
         // Create the paper with generated questions
         const generatedPaper = {
-          title: `${aiPrompt.subject} - ${aiPrompt.topic} (${aiPrompt.difficulty})`,
+          title: `${aiPrompt.subject} - ${aiPrompt.topic} (${examTypeName})`,
           class: aiPrompt.class,
           subject: aiPrompt.subject,
           date: new Date().toISOString().split('T')[0],
           duration: aiPrompt.duration,
           examTypeId: aiPrompt.examTypeId,
           questions: questions,
+          originalQuestions: JSON.parse(JSON.stringify(questions)), // Deep copy for reference
           campusId: profile?.campusId || 'main',
         };
 
         setGeneratedPaperData(generatedPaper);
         setReviewMode(true);
+        setShowCriteriaInReview(false);
       }
     } catch (error) {
       console.error("Error generating AI paper:", error);
@@ -326,23 +348,39 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     }
   };
 
+  const [showCriteriaInReview, setShowCriteriaInReview] = useState(false);
+
   const handleSaveGeneratedPaper = async () => {
     if (!generatedPaperData) return;
     setGenerating(true);
     try {
-      await addDoc(collection(db, 'exam_papers'), generatedPaperData);
+      // Save the final paper
+      const finalPaper = {
+        ...generatedPaperData,
+        isAIGenerated: true,
+        savedAt: new Date().toISOString(),
+        // We can store the original draft as a field for reference
+        originalDraft: generatedPaperData.originalQuestions || generatedPaperData.questions 
+      };
+      
+      await addDoc(collection(db, 'exam_papers'), finalPaper);
       
       setIsAIGenModalOpen(false);
       setReviewMode(false);
       setGeneratedPaperData(null);
+      setShowCriteriaInReview(false);
       setAiPrompt({
         class: '',
         subject: '',
         topic: '',
         duration: 60,
-        numQuestions: 10,
-        difficulty: 'Medium',
-        examTypeId: ''
+        examTypeId: '',
+        easyCount: 4,
+        mediumCount: 4,
+        hardCount: 2,
+        mcqCount: 5,
+        shortCount: 3,
+        longCount: 2
       });
       fetchExamPapers();
     } catch (error) {
@@ -356,6 +394,24 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   const handleQuestionEdit = (index: number, field: string, value: any) => {
     const updatedQuestions = [...generatedPaperData.questions];
     updatedQuestions[index] = { ...updatedQuestions[index], [field]: value };
+    setGeneratedPaperData({ ...generatedPaperData, questions: updatedQuestions });
+  };
+
+  const handleAddQuestionToGenerated = () => {
+    const updatedQuestions = [...generatedPaperData.questions];
+    updatedQuestions.push({
+      question: '',
+      marks: 5,
+      type: 'short_answer',
+      options: [],
+      answer: ''
+    });
+    setGeneratedPaperData({ ...generatedPaperData, questions: updatedQuestions });
+  };
+
+  const handleRemoveQuestionFromGenerated = (index: number) => {
+    const updatedQuestions = [...generatedPaperData.questions];
+    updatedQuestions.splice(index, 1);
     setGeneratedPaperData({ ...generatedPaperData, questions: updatedQuestions });
   };
 
@@ -401,15 +457,8 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       const imgProps = pdf.getImageProperties(imgData);
       const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      // Header
-      const schoolName = 'EduManage'; // Fallback
-      pdf.setFontSize(18);
-      pdf.text(schoolName, pdfWidth / 2, 15, { align: 'center' });
-      pdf.setFontSize(10);
-      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, pdfWidth / 2, 22, { align: 'center' });
-
       // Content
-      pdf.addImage(imgData, 'PNG', 0, 30, pdfWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, imgHeight);
 
       // Footer
       pdf.setFontSize(8);
@@ -426,8 +475,8 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     <div className="space-y-6 print:space-y-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Online Exams & Results</h1>
-          <p className="text-slate-500 text-sm">Manage exam papers and student results</p>
+          <h1 className="text-2xl font-bold text-slate-900">Paper Generator</h1>
+          <p className="text-slate-500 text-sm">Create and manage exam papers with AI</p>
         </div>
         {(profile?.role === 'admin' || profile?.role === 'staff') && (
           <div className="flex flex-wrap gap-3">
@@ -441,13 +490,22 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               </button>
             )}
             {activeTab === 'papers' ? (
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
-              >
-                <FilePlus className="w-5 h-5" />
-                Create Paper
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsAIGenModalOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-white text-indigo-600 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors shadow-sm font-bold"
+                >
+                  <Sparkles className="w-5 h-5" />
+                  AI Generate
+                </button>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                  <FilePlus className="w-5 h-5" />
+                  Create Paper
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => {
@@ -1002,6 +1060,82 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                   onChange={e => setAiPrompt({...aiPrompt, topic: e.target.value})}
                 />
               </div>
+              
+              <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Question Distribution</h3>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Easy</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={aiPrompt.easyCount}
+                      onChange={e => setAiPrompt({...aiPrompt, easyCount: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Medium</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={aiPrompt.mediumCount}
+                      onChange={e => setAiPrompt({...aiPrompt, mediumCount: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Hard</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={aiPrompt.hardCount}
+                      onChange={e => setAiPrompt({...aiPrompt, hardCount: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">MCQs</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={aiPrompt.mcqCount}
+                      onChange={e => setAiPrompt({...aiPrompt, mcqCount: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Short</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={aiPrompt.shortCount}
+                      onChange={e => setAiPrompt({...aiPrompt, shortCount: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Long</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={aiPrompt.longCount}
+                      onChange={e => setAiPrompt({...aiPrompt, longCount: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Questions</span>
+                  <span className="text-sm font-black text-indigo-600">{aiPrompt.easyCount + aiPrompt.mediumCount + aiPrompt.hardCount}</span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Duration (Min)</label>
@@ -1014,30 +1148,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                     onChange={e => setAiPrompt({...aiPrompt, duration: parseInt(e.target.value)})}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Questions</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    max="50"
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={aiPrompt.numQuestions}
-                    onChange={e => setAiPrompt({...aiPrompt, numQuestions: parseInt(e.target.value)})}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Difficulty</label>
-                <select
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={aiPrompt.difficulty}
-                  onChange={e => setAiPrompt({...aiPrompt, difficulty: e.target.value})}
-                >
-                  <option value="Easy">Easy</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Hard">Hard</option>
-                </select>
               </div>
               <div className="flex gap-3 pt-2">
                 <button
@@ -1085,9 +1195,28 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               </div>
               <div className="flex gap-3">
                 <button
+                  onClick={() => setShowCriteriaInReview(!showCriteriaInReview)}
+                  className={cn(
+                    "px-4 py-2 border rounded-xl transition-colors flex items-center gap-2 font-medium",
+                    showCriteriaInReview ? "bg-indigo-600 text-white border-indigo-600" : "border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                  )}
+                >
+                  <Settings className="w-4 h-4" />
+                  {showCriteriaInReview ? "Hide Criteria" : "Update Criteria"}
+                </button>
+                <button
+                  onClick={() => handleGenerateAIPaper()}
+                  disabled={generating}
+                  className="px-4 py-2 border border-indigo-200 text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                >
+                  {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  Regenerate
+                </button>
+                <button
                   onClick={() => {
                     setReviewMode(false);
                     setGeneratedPaperData(null);
+                    setShowCriteriaInReview(false);
                   }}
                   className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
                 >
@@ -1099,12 +1228,79 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                   className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2"
                 >
                   {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />}
-                  Save Paper
+                  Save Final Paper
                 </button>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+              {showCriteriaInReview && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 mb-6"
+                >
+                  <h4 className="text-sm font-bold text-indigo-900 uppercase tracking-widest mb-4">Update Generation Criteria</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Class</label>
+                      <input 
+                        type="text" 
+                        value={aiPrompt.class}
+                        onChange={(e) => setAiPrompt({...aiPrompt, class: e.target.value})}
+                        className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Subject</label>
+                      <input 
+                        type="text" 
+                        value={aiPrompt.subject}
+                        onChange={(e) => setAiPrompt({...aiPrompt, subject: e.target.value})}
+                        className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Topic</label>
+                      <input 
+                        type="text" 
+                        value={aiPrompt.topic}
+                        onChange={(e) => setAiPrompt({...aiPrompt, topic: e.target.value})}
+                        className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-3 grid grid-cols-3 gap-4 p-3 bg-white/50 rounded-xl border border-indigo-100">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Easy / Med / Hard</label>
+                        <div className="flex gap-1">
+                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.easyCount} onChange={e => setAiPrompt({...aiPrompt, easyCount: parseInt(e.target.value) || 0})} />
+                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.mediumCount} onChange={e => setAiPrompt({...aiPrompt, mediumCount: parseInt(e.target.value) || 0})} />
+                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.hardCount} onChange={e => setAiPrompt({...aiPrompt, hardCount: parseInt(e.target.value) || 0})} />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">MCQ / Short / Long</label>
+                        <div className="flex gap-1">
+                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.mcqCount} onChange={e => setAiPrompt({...aiPrompt, mcqCount: parseInt(e.target.value) || 0})} />
+                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.shortCount} onChange={e => setAiPrompt({...aiPrompt, shortCount: parseInt(e.target.value) || 0})} />
+                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.longCount} onChange={e => setAiPrompt({...aiPrompt, longCount: parseInt(e.target.value) || 0})} />
+                        </div>
+                      </div>
+                      <div className="flex items-end">
+                        <button
+                          onClick={() => handleGenerateAIPaper()}
+                          disabled={generating}
+                          className="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 text-sm font-bold"
+                        >
+                          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                          Regenerate
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-xs text-slate-500 block mb-1">Title</span>
@@ -1145,29 +1341,68 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900">Questions ({generatedPaperData.questions.length})</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-900">Questions ({generatedPaperData.questions.length})</h3>
+                  <button
+                    onClick={handleAddQuestionToGenerated}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Question
+                  </button>
+                </div>
                 {generatedPaperData.questions.map((q: any, index: number) => (
-                  <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group">
+                    <button
+                      onClick={() => handleRemoveQuestionFromGenerated(index)}
+                      className="absolute top-4 right-4 text-rose-500 hover:text-rose-700 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                     <div className="flex items-start gap-4">
                       <div className="w-8 h-8 shrink-0 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold">
                         {index + 1}
                       </div>
                       <div className="flex-1 space-y-3">
                         <div className="flex items-start justify-between gap-4">
-                          <textarea
-                            value={q.question}
-                            onChange={(e) => handleQuestionEdit(index, 'question', e.target.value)}
-                            className="w-full text-slate-900 font-medium bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[80px]"
-                            placeholder="Question text"
-                          />
-                          <div className="shrink-0 w-24">
-                            <label className="text-xs text-slate-500 block mb-1">Marks</label>
-                            <input
-                              type="number"
-                              value={q.marks}
-                              onChange={(e) => handleQuestionEdit(index, 'marks', parseInt(e.target.value))}
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-center font-bold text-indigo-600"
+                          <div className="flex-1 space-y-3">
+                            <textarea
+                              value={q.question}
+                              onChange={(e) => handleQuestionEdit(index, 'question', e.target.value)}
+                              className="w-full text-slate-900 font-medium bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[80px]"
+                              placeholder="Question text"
                             />
+                            <div className="flex items-center gap-4">
+                              <div className="flex-1">
+                                <label className="text-xs text-slate-500 block mb-1">Question Type</label>
+                                <select
+                                  value={q.type}
+                                  onChange={(e) => {
+                                    const type = e.target.value;
+                                    const updates: any = { type };
+                                    if (type === 'multiple_choice' && (!q.options || q.options.length === 0)) {
+                                      updates.options = ['', '', '', ''];
+                                    }
+                                    handleQuestionEdit(index, 'type', type);
+                                    if (updates.options) handleQuestionEdit(index, 'options', updates.options);
+                                  }}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                >
+                                  <option value="multiple_choice">Multiple Choice</option>
+                                  <option value="short_answer">Short Answer</option>
+                                  <option value="long_answer">Long Answer</option>
+                                </select>
+                              </div>
+                              <div className="w-24">
+                                <label className="text-xs text-slate-500 block mb-1">Marks</label>
+                                <input
+                                  type="number"
+                                  value={q.marks}
+                                  onChange={(e) => handleQuestionEdit(index, 'marks', parseInt(e.target.value))}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-center font-bold text-indigo-600"
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
 
@@ -1358,58 +1593,69 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       <div className="fixed -left-[9999px] top-0">
         <div 
           ref={dateSheetRef}
-          className="w-[800px] bg-white p-12 border-[12px] border-double border-indigo-600"
+          className="w-[1000px] bg-white p-8"
         >
-          <div className="text-center mb-10 pb-8 border-b-2 border-slate-200">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase mb-2">Examination Date Sheet</h1>
-            <p className="text-indigo-600 font-bold tracking-widest uppercase text-sm">Academic Session 2026 - 2027</p>
-            {filterClass !== 'All' && (
-              <p className="text-slate-500 font-bold mt-2 uppercase tracking-widest">Class: {filterClass}</p>
-            )}
-            {filterSubject !== 'All' && (
-              <p className="text-slate-500 font-bold mt-2 uppercase tracking-widest">Subject: {filterSubject}</p>
-            )}
+          {/* Header */}
+          <div className="flex items-center justify-center gap-6 mb-6">
+            <div className="w-20 h-20 flex items-center justify-center">
+              <GraduationCap className="w-16 h-16 text-[#1e3a8a]" />
+            </div>
+            <div className="text-center">
+              <h1 className="text-4xl font-normal text-slate-900 tracking-tight mb-1">Chenab College Shorkot</h1>
+              <p className="text-slate-900 border-b border-slate-900 inline-block pb-0.5 text-lg">Date Sheet for Final Term Exam Feb. 2026</p>
+            </div>
           </div>
 
-          <table className="w-full border-collapse">
+          {/* Table */}
+          <table className="w-full border-collapse border border-slate-800 text-center">
             <thead>
-              <tr className="bg-slate-900 text-white">
-                <th className="p-4 text-left text-xs font-bold uppercase tracking-widest border border-slate-800">Date</th>
-                <th className="p-4 text-left text-xs font-bold uppercase tracking-widest border border-slate-800">Subject</th>
-                <th className="p-4 text-left text-xs font-bold uppercase tracking-widest border border-slate-800">Class</th>
-                <th className="p-4 text-center text-xs font-bold uppercase tracking-widest border border-slate-800 w-32">Time</th>
-                <th className="p-4 text-center text-xs font-bold uppercase tracking-widest border border-slate-800 w-32">Room</th>
+              <tr className="bg-[#4a6b8c] text-white">
+                <th className="p-2 border border-slate-800 font-normal">Date:</th>
+                <th className="p-2 border border-slate-800 font-normal">Day:</th>
+                {Array.from(new Set(schedules.filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject)).map(s => s.class))).sort().map(c => (
+                  <th key={c} className="p-2 border border-slate-800 font-normal">{c}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {schedules
-                .filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject))
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .map((s, idx) => (
-                  <tr key={idx} className="border-b border-slate-200">
-                    <td className="p-4 font-bold text-slate-900 border-x border-slate-200">{s.date}</td>
-                    <td className="p-4 font-black text-indigo-600 border-r border-slate-200">{s.subject}</td>
-                    <td className="p-4 font-bold text-slate-700 border-r border-slate-200">{s.class}</td>
-                    <td className="p-4 text-center font-bold text-slate-600 border-r border-slate-200">{s.time}</td>
-                    <td className="p-4 text-center font-bold text-slate-600 border-r border-slate-200">{s.roomNumber || 'TBD'}</td>
+              {Array.from(new Set(schedules.filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject)).map(s => s.date))).sort((a, b) => new Date(a as string).getTime() - new Date(b as string).getTime()).map(date => {
+                const dateObj = new Date(date as string);
+                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+                const formattedDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+                const filteredSchedules = schedules.filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject));
+                const uniqueClasses = Array.from(new Set(filteredSchedules.map(s => s.class))).sort();
+                
+                return (
+                  <tr key={date}>
+                    <td className="p-2 border border-slate-800 font-bold bg-slate-200/50">{formattedDate}</td>
+                    <td className="p-2 border border-slate-800">{dayName}</td>
+                    {uniqueClasses.map(c => {
+                      const schedule = filteredSchedules.find(s => s.date === date && s.class === c);
+                      return (
+                        <td key={c} className="p-2 border border-slate-800">
+                          {schedule ? schedule.subject : '---'}
+                        </td>
+                      );
+                    })}
                   </tr>
-                ))}
+                );
+              })}
             </tbody>
           </table>
 
-          <div className="mt-20 flex justify-between px-4">
-            <div className="text-center w-48">
-              <div className="border-b-2 border-slate-900 mb-2"></div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Controller Exams</p>
-            </div>
-            <div className="text-center w-48">
-              <div className="border-b-2 border-slate-900 mb-2"></div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Principal</p>
-            </div>
-          </div>
-
-          <div className="mt-16 text-center">
-            <p className="text-[10px] text-slate-300 font-medium uppercase tracking-[0.3em]">Generated on {new Date().toLocaleDateString()}</p>
+          {/* Footer Notes */}
+          <div className="mt-4 text-left">
+            <p className="font-bold text-lg mb-2">NOTES:-</p>
+            <ul className="space-y-1 pl-4">
+              <li className="flex items-start gap-2">
+                <span className="mt-1">➤</span>
+                <span>Fee defaulters will not be allowed to sit in the examination.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1">➤</span>
+                <span>Parents / Teacher meeting will be held on <span className="bg-black text-white px-1">Wednesday the 11th of March 2026</span>.</span>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

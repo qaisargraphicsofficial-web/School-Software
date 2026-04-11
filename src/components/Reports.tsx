@@ -84,6 +84,7 @@ export default function Reports({ profile }: ReportsProps) {
         <thead>
           <tr className="bg-slate-50 border-b border-slate-200">
             <th className="p-4 font-semibold text-slate-600">Name</th>
+            <th className="p-4 font-semibold text-slate-600">Parent/Guardian</th>
             <th className="p-4 font-semibold text-slate-600">Roll Number</th>
             <th className="p-4 font-semibold text-slate-600">Class</th>
             <th className="p-4 font-semibold text-slate-600">Status</th>
@@ -92,7 +93,8 @@ export default function Reports({ profile }: ReportsProps) {
         <tbody>
           {reportData.map((student: any) => (
             <tr key={student.id} className="border-b border-slate-100">
-              <td className="p-4">{student.name} S/O {student.parentName}</td>
+              <td className="p-4">{student.name}</td>
+              <td className="p-4">{student.parentName || '-'}</td>
               <td className="p-4">{student.rollNumber}</td>
               <td className="p-4">{student.class} - {student.section}</td>
               <td className="p-4">

@@ -666,6 +666,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
                           <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Student</th>
+                          <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Parent/Guardian</th>
                           <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Class</th>
                           <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Total Due</th>
                           <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Paid</th>
@@ -683,9 +684,10 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                           return (
                             <tr key={student.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedStudent(student)}>
                               <td className="p-4">
-                                <div className="font-medium text-slate-900">{student.name} S/O {student.parentName}</div>
+                                <div className="font-medium text-slate-900">{student.name}</div>
                                 <div className="text-xs text-slate-500">{student.rollNumber}</div>
                               </td>
+                              <td className="p-4 text-sm text-slate-700">{student.parentName || '-'}</td>
                               <td className="p-4 text-sm text-slate-700">{student.class}</td>
                               <td className="p-4 text-sm font-medium text-slate-900">${totalDue.toLocaleString()}</td>
                               <td className="p-4 text-sm font-medium text-emerald-600">${totalPaid.toLocaleString()}</td>

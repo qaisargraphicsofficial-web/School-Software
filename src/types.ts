@@ -95,11 +95,15 @@ export interface ExamResult {
   examType: string;
   term: string; // e.g., 'First Term', 'Mid Term', 'Final Term'
   marks: Record<string, number>;
+  submittedPapers?: Record<string, string>; // Subject -> File URL
+  examPaperIds?: Record<string, string>; // Subject -> ExamPaper ID
   totalMarks: number;
   percentage: number;
   grade: string;
   position: number;
+  weightage?: number;
   campusId: string;
+  updatedAt?: string;
 }
 
 export interface Fee {

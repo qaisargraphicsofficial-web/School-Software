@@ -14,6 +14,16 @@ export const ReportCard: React.FC<ReportCardProps> = ({ student, marks, term, ex
   const obtainedMarks: number = (Object.values(marks) as number[]).reduce((a, b) => a + b, 0);
   const percentage: number = (obtainedMarks / totalMarks) * 100;
   
+  const EXAM_WEIGHTS: Record<string, number> = {
+    'Monthly Test': 10,
+    'Mid Term': 30,
+    'Final Term': 60,
+    'First Term': 40,
+    'Second Term': 60,
+    'Class Test': 5
+  };
+
+  const weightage = EXAM_WEIGHTS[examType] || 100;
   let grade = 'F';
   if (percentage >= 90) grade = 'A+';
   else if (percentage >= 80) grade = 'A';
@@ -92,7 +102,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ student, marks, term, ex
             <td className="border border-slate-400 p-2 text-center">{totalMarks}</td>
             <td className="border border-slate-400 p-2 text-center">{obtainedMarks}</td>
             <td className="border border-slate-400 p-2 text-center">{percentage.toFixed(2)}</td>
-            <td className="border border-slate-400 p-2 text-center">40%</td>
+            <td className="border border-slate-400 p-2 text-center">{weightage}%</td>
           </tr>
         </tbody>
       </table>

@@ -37,6 +37,7 @@ function getTwilioClient() {
 }
 
 const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+const twilioWhatsApp = process.env.TWILIO_WHATSAPP_NUMBER;
 
 async function startServer() {
   const app = express();
@@ -46,6 +47,45 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
+  app.post("/api/send-bulk-whatsapp", async (req, res) => {
+    const { content, recipients } = req.body; // recipients is array of phone numbers
+    const twilioClient = getTwilioClient();
+
+    if (!twilioClient || !twilioWhatsApp) {
+      console.warn("Twilio WhatsApp configuration missing. Simulating WhatsApp send.");
+      return res.json({ 
+        success: true, 
+        message: "WhatsApp sending simulated (Twilio config missing)",
+        count: recipients.length 
+      });
+    }
+
+    try {
+      const results = await Promise.all(recipients.map(async (to: string) => {
+        try {
+          // Format number for WhatsApp if not already
+          const formattedTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+          const formattedFrom = twilioWhatsApp.startsWith('whatsapp:') ? twilioWhatsApp : `whatsapp:${twilioWhatsApp}`;
+
+          const message = await twilioClient.messages.create({
+            body: content,
+            from: formattedFrom,
+            to: formattedTo
+          });
+          return { to, sid: message.sid, success: true };
+        } catch (err) {
+          return { to, error: err instanceof Error ? err.message : String(err), success: false };
+        }
+      }));
+
+      const successCount = results.filter(r => r.success).length;
+      res.json({ success: true, results, count: successCount });
+    } catch (error) {
+      console.error("Error sending bulk WhatsApp:", error);
+      res.status(500).json({ success: false, error: "Internal server error" });
+    }
+  });
+
   app.post("/api/send-bulk-email", async (req, res) => {
     const { subject, content, recipients } = req.body;
     const resend = getResendClient();

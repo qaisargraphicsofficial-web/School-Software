@@ -1,28 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, getDocs, query, where, orderBy, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, orderBy, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Student, Attendance, ExamResult, UserProfile, Staff } from '../types';
+import { Student, Attendance, UserProfile, Staff } from '../types';
 import { 
   CheckCircle2, 
   XCircle, 
   Clock, 
   Search, 
-  FileText, 
-  Download, 
-  GraduationCap,
-  ChevronRight,
   Save,
   QrCode,
   Scan,
   Upload,
   Loader2,
-  Users
+  Users,
+  Plus,
+  FileText,
+  Edit2,
+  Trash2,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
-import { ReportCard } from './ReportCard';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { QRCodeSVG } from 'qrcode.react';
 import Papa from 'papaparse';
@@ -33,27 +31,32 @@ interface AcademicProps {
 }
 
 export default function Academic({ profile }: AcademicProps) {
-  const [activeTab, setActiveTab] = useState<'attendance' | 'exams' | 'qr-scan' | 'stats'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'qr-scan' | 'stats' | 'subjects'>('attendance');
   const [students, setStudents] = useState<Student[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [subjectsList, setSubjectsList] = useState<any[]>([]);
   const [isPrintingIDCards, setIsPrintingIDCards] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent' | 'late'>>({});
   const [selectedClass, setSelectedClass] = useState('10th');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0, late: 0, total: 0 });
-  const [selectedTerm, setSelectedTerm] = useState('First Term');
-  const [examType, setExamType] = useState('Monthly Test - April');
-  const [marks, setMarks] = useState<Record<string, Record<string, number>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
-  const [selectedStudentForReport, setSelectedStudentForReport] = useState<Student | null>(null);
-  const reportCardRef = useRef<HTMLDivElement>(null);
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<any>(null);
+  const [subjectForm, setSubjectForm] = useState({
+    name: '',
+    code: '',
+    class: '',
+    teacherId: '',
+    teacherName: ''
+  });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const subjects = ['Mathematics', 'Science', 'English', 'History', 'Geography'];
+  const defaultSubjects = ['Mathematics', 'Science', 'English', 'History', 'Geography'];
 
   useEffect(() => {
     if (activeTab === 'qr-scan' || (activeTab === 'attendance' && showScanner)) {
@@ -120,8 +123,53 @@ export default function Academic({ profile }: AcademicProps) {
     if (profile) {
       fetchStudents();
       fetchStaff();
+      fetchSubjects();
     }
   }, [selectedClass, profile]);
+
+  const fetchSubjects = async () => {
+    try {
+      const q = query(collection(db, 'subjects'), where('campusId', '==', profile?.campusId || 'main'));
+      const snap = await getDocs(q);
+      setSubjectsList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
+    }
+  };
+
+  const handleSubjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const data = {
+        ...subjectForm,
+        campusId: profile?.campusId || 'main',
+        updatedAt: new Date().toISOString()
+      };
+
+      if (editingSubject) {
+        await setDoc(doc(db, 'subjects', editingSubject.id), data);
+      } else {
+        await addDoc(collection(db, 'subjects'), data);
+      }
+
+      setIsSubjectModalOpen(false);
+      setEditingSubject(null);
+      setSubjectForm({ name: '', code: '', class: '', teacherId: '', teacherName: '' });
+      fetchSubjects();
+    } catch (error) {
+      console.error("Error saving subject:", error);
+    }
+  };
+
+  const deleteSubject = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this subject?')) return;
+    try {
+      await deleteDoc(doc(db, 'subjects', id));
+      fetchSubjects();
+    } catch (error) {
+      console.error("Error deleting subject:", error);
+    }
+  };
 
   const fetchStaff = async () => {
     try {
@@ -132,12 +180,6 @@ export default function Academic({ profile }: AcademicProps) {
       console.error("Error fetching staff:", error);
     }
   };
-
-  useEffect(() => {
-    if (students.length > 0) {
-      fetchExistingResults();
-    }
-  }, [students, selectedTerm, examType]);
 
   useEffect(() => {
     if (activeTab === 'stats') {
@@ -202,35 +244,6 @@ export default function Academic({ profile }: AcademicProps) {
       console.error("Error fetching students:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchExistingResults = async () => {
-    try {
-      const q = query(
-        collection(db, 'results'), 
-        where('term', '==', selectedTerm),
-        where('examType', '==', examType)
-      );
-      const snap = await getDocs(q);
-      const existingMarks: Record<string, Record<string, number>> = {};
-      
-      // Initialize with 0s first
-      students.forEach(s => {
-        existingMarks[s.id!] = subjects.reduce((acc, sub) => ({ ...acc, [sub]: 0 }), {});
-      });
-
-      // Overlay existing data
-      snap.docs.forEach(doc => {
-        const data = doc.data();
-        if (existingMarks[data.studentId]) {
-          existingMarks[data.studentId] = data.marks;
-        }
-      });
-      
-      setMarks(existingMarks);
-    } catch (error) {
-      console.error("Error fetching existing results:", error);
     }
   };
 
@@ -301,55 +314,6 @@ export default function Academic({ profile }: AcademicProps) {
     });
   };
 
-  const saveResults = async () => {
-    try {
-      const promises = Object.entries(marks).map(([studentId, studentMarks]) => {
-        const total = Object.values(studentMarks).reduce((a, b) => (a as number) + (b as number), 0) as number;
-        const percentage = (total / (subjects.length * 100)) * 100;
-        let grade = 'F';
-        if (percentage >= 90) grade = 'A+';
-        else if (percentage >= 80) grade = 'A';
-        else if (percentage >= 70) grade = 'B';
-        else if (percentage >= 60) grade = 'C';
-        else if (percentage >= 50) grade = 'D';
-
-        // Use a deterministic ID to prevent duplicates and allow updates
-        const resultId = `${studentId}_${selectedTerm}_${examType.replace(/\s+/g, '_')}`;
-        return setDoc(doc(db, 'results', resultId), {
-          studentId,
-          examType,
-          term: selectedTerm,
-          marks: studentMarks,
-          totalMarks: total,
-          percentage: parseFloat(percentage.toFixed(2)),
-          grade,
-          position: 0,
-          updatedAt: new Date().toISOString()
-        });
-      });
-      await Promise.all(promises);
-      alert('Results saved/updated successfully!');
-    } catch (error) {
-      console.error("Error saving results:", error);
-    }
-  };
-
-  const generateReportCard = async (student: Student) => {
-    setSelectedStudentForReport(student);
-    setTimeout(async () => {
-      if (reportCardRef.current) {
-        const canvas = await html2canvas(reportCardRef.current, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`${student.name}_Report.pdf`);
-        setSelectedStudentForReport(null);
-      }
-    }, 500);
-  };
-
   return (
     <div className="space-y-6">
       {/* Tabs */}
@@ -389,13 +353,13 @@ export default function Academic({ profile }: AcademicProps) {
           Attendance Stats
         </button>
         <button
-          onClick={() => setActiveTab('exams')}
+          onClick={() => setActiveTab('subjects')}
           className={cn(
             "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300",
-            activeTab === 'exams' ? "bg-white text-indigo-600 shadow-md" : "text-slate-500 hover:text-slate-700"
+            activeTab === 'subjects' ? "bg-white text-indigo-600 shadow-md" : "text-slate-500 hover:text-slate-700"
           )}
         >
-          Examination Portal
+          Subjects
         </button>
       </div>
 
@@ -423,30 +387,182 @@ export default function Academic({ profile }: AcademicProps) {
             className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
           />
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Term</span>
-          <select 
-            value={selectedTerm}
-            onChange={(e) => setSelectedTerm(e.target.value)}
-            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-          >
-            <option>First Term</option>
-            <option>Mid Term</option>
-            <option>Final Term</option>
-          </select>
-        </div>
-        {activeTab === 'exams' && (
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Exam</span>
-            <input 
-              type="text"
-              value={examType}
-              onChange={(e) => setExamType(e.target.value)}
-              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-            />
+        {activeTab === 'subjects' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Subject Management</h2>
+              <p className="text-xs text-slate-500 font-medium mt-1">Add, edit, and assign subjects to classes and teachers.</p>
+            </div>
+            <button 
+              onClick={() => {
+                setEditingSubject(null);
+                setSubjectForm({ name: '', code: '', class: '', teacherId: '', teacherName: '' });
+                setIsSubjectModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-bold text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Subject
+            </button>
           </div>
-        )}
-        {activeTab === 'attendance' && (
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {subjectsList.map((subject) => (
+              <motion.div
+                key={subject.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => {
+                        setEditingSubject(subject);
+                        setSubjectForm({
+                          name: subject.name,
+                          code: subject.code,
+                          class: subject.class,
+                          teacherId: subject.teacherId,
+                          teacherName: subject.teacherName
+                        });
+                        setIsSubjectModalOpen(true);
+                      }}
+                      className="p-2 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => deleteSubject(subject.id)}
+                      className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">{subject.name}</h3>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Code: {subject.code}</p>
+                
+                <div className="mt-6 pt-6 border-t border-slate-50 space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500 font-medium">Class</span>
+                    <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">{subject.class}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500 font-medium">Teacher</span>
+                    <span className="font-bold text-indigo-600">{subject.teacherName || 'Not Assigned'}</span>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+            {subjectsList.length === 0 && (
+              <div className="col-span-full py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                <p className="text-slate-500 font-medium">No subjects added yet. Click "Add Subject" to get started.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Subject Modal */}
+          <AnimatePresence>
+            {isSubjectModalOpen && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
+                >
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+                    <h3 className="text-xl font-black tracking-tight">{editingSubject ? 'Edit Subject' : 'Add New Subject'}</h3>
+                    <button onClick={() => setIsSubjectModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                  <form onSubmit={handleSubjectSubmit} className="p-8 space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Subject Name</label>
+                      <input
+                        required
+                        type="text"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={subjectForm.name}
+                        onChange={e => setSubjectForm({...subjectForm, name: e.target.value})}
+                        placeholder="e.g. Mathematics"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Subject Code</label>
+                      <input
+                        required
+                        type="text"
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={subjectForm.code}
+                        onChange={e => setSubjectForm({...subjectForm, code: e.target.value})}
+                        placeholder="e.g. MATH101"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Assigned Class</label>
+                      <select
+                        required
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={subjectForm.class}
+                        onChange={e => setSubjectForm({...subjectForm, class: e.target.value})}
+                      >
+                        <option value="">Select Class</option>
+                        {['Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Responsible Teacher</label>
+                      <select
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={subjectForm.teacherId}
+                        onChange={e => {
+                          const t = staffList.find(s => s.id === e.target.value);
+                          setSubjectForm({
+                            ...subjectForm,
+                            teacherId: e.target.value,
+                            teacherName: t ? t.name : ''
+                          });
+                        }}
+                      >
+                        <option value="">Select Teacher</option>
+                        {staffList.map(s => (
+                          <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-4 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setIsSubjectModalOpen(false)}
+                        className="flex-1 px-6 py-3 text-slate-600 font-black uppercase tracking-widest hover:bg-slate-50 rounded-xl"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 px-6 py-3 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100"
+                      >
+                        {editingSubject ? 'Update' : 'Save'}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {activeTab === 'attendance' && (
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsPrintingIDCards(true)}
@@ -537,49 +653,6 @@ export default function Academic({ profile }: AcademicProps) {
       {/* Content Area */}
       <div className="card">
         {activeTab === 'stats' ? (
-          <div className="p-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                <p className="text-slate-500 text-sm font-medium mb-1">Total Students</p>
-                <h4 className="text-2xl font-bold text-slate-900">{attendanceStats.total}</h4>
-              </div>
-              <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
-                <div className="flex items-center gap-2 text-emerald-600 mb-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <p className="text-sm font-medium">Present</p>
-                </div>
-                <h4 className="text-2xl font-bold text-emerald-700">{attendanceStats.present}</h4>
-              </div>
-              <div className="bg-rose-50 p-6 rounded-2xl border border-rose-100">
-                <div className="flex items-center gap-2 text-rose-600 mb-1">
-                  <XCircle className="w-4 h-4" />
-                  <p className="text-sm font-medium">Absent</p>
-                </div>
-                <h4 className="text-2xl font-bold text-rose-700">{attendanceStats.absent}</h4>
-              </div>
-              <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100">
-                <div className="flex items-center gap-2 text-amber-600 mb-1">
-                  <Clock className="w-4 h-4" />
-                  <p className="text-sm font-medium">Late</p>
-                </div>
-                <h4 className="text-2xl font-bold text-amber-700">{attendanceStats.late}</h4>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
-                <GraduationCap className="w-8 h-8 text-indigo-600" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Attendance Summary for {selectedClass}</h3>
-              <p className="text-slate-500 max-w-md">
-                Showing statistics for {new Date(selectedDate).toLocaleDateString(undefined, { dateStyle: 'long' })}. 
-                {attendanceStats.total > 0 
-                  ? ` Attendance rate is ${((attendanceStats.present / attendanceStats.total) * 100).toFixed(1)}%.`
-                  : " No attendance records found for this selection."}
-              </p>
-            </div>
-          </div>
-        ) : activeTab === 'qr-scan' ? (
           <div className="p-8 flex flex-col items-center justify-center space-y-6">
             <div className="w-full max-w-md bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-200">
               <div id="reader" className="overflow-hidden rounded-2xl"></div>
@@ -681,16 +754,18 @@ export default function Academic({ profile }: AcademicProps) {
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Parent/Guardian</th>
                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Roll No</th>
                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {loading ? (
-                    <tr><td colSpan={3} className="px-6 py-8 text-center animate-pulse">Loading students...</td></tr>
+                    <tr><td colSpan={4} className="px-6 py-8 text-center animate-pulse">Loading students...</td></tr>
                   ) : students.map((student) => (
                     <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-900">{student.name} S/O {student.parentName}</td>
+                      <td className="px-6 py-4 font-medium text-slate-900">{student.name}</td>
+                      <td className="px-6 py-4 text-sm text-slate-700">{student.parentName || '-'}</td>
                       <td className="px-6 py-4 text-sm text-slate-600">{student.rollNumber}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
@@ -729,78 +804,8 @@ export default function Academic({ profile }: AcademicProps) {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
-                  {subjects.map(sub => (
-                    <th key={sub} className="px-6 py-4 text-sm font-semibold text-slate-600">{sub}</th>
-                  ))}
-                  <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {loading ? (
-                  <tr><td colSpan={subjects.length + 2} className="px-6 py-8 text-center animate-pulse">Loading students...</td></tr>
-                ) : students.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{student.name} S/O {student.parentName}</td>
-                    {subjects.map(sub => (
-                      <td key={sub} className="px-6 py-4">
-                        <input
-                          type="number"
-                          max={100}
-                          min={0}
-                          className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                          value={marks[student.id!]?.[sub] || 0}
-                          onChange={(e) => setMarks({
-                            ...marks,
-                            [student.id!]: { ...marks[student.id!], [sub]: Number(e.target.value) }
-                          })}
-                        />
-                      </td>
-                    ))}
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => generateReportCard(student)}
-                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="Download Report Card"
-                      >
-                        <Download className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="p-6 border-t border-slate-100 flex justify-end">
-              <button 
-                onClick={saveResults}
-                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-sm"
-              >
-                <Save className="w-5 h-5" />
-                Submit All Results
-              </button>
-            </div>
-          </div>
-        )}
+        ) : null}
       </div>
-      
-      {/* Hidden Report Card for PDF generation */}
-      {selectedStudentForReport && (
-        <div className="hidden">
-          <div ref={reportCardRef}>
-            <ReportCard 
-              student={selectedStudentForReport} 
-              marks={marks[selectedStudentForReport.id!]} 
-              term={selectedTerm} 
-              examType={examType} 
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

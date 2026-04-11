@@ -97,6 +97,7 @@ export default function Library({ profile }: { profile: UserProfile | null }) {
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Book Title</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">Parent/Guardian</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Loan Date</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Due Date</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Status</th>
@@ -115,6 +116,7 @@ export default function Library({ profile }: { profile: UserProfile | null }) {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">{getStudentName(loan.studentId)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{students.find(s => s.id === loan.studentId)?.parentName || '-'}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{loan.loanDate}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{loan.dueDate}</td>
                   <td className="px-6 py-4">

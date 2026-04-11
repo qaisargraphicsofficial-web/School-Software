@@ -67,7 +67,23 @@ export default function Communication({ profile }: CommunicationProps) {
     { id: 'fee', name: 'Fee Reminder', content: 'Dear Parent, this is a reminder regarding the outstanding fees for your child. Please ensure payment is made by the due date to avoid any inconvenience.' },
     { id: 'attendance', name: 'Attendance Alert', content: 'Dear Parent, your child was marked absent today. Please provide a justification or contact the school office if this is an error.' },
     { id: 'exam', name: 'Exam Result', content: 'Dear Parent, the exam results for the recent term have been published. You can view your child\'s performance on the school portal.' },
+    { id: 'emergency', name: 'Emergency: School Closed', content: 'URGENT: Dear Parent, please be informed that the school will remain closed tomorrow [DATE] due to [REASON]. We apologize for the short notice.' },
+    { id: 'weather', name: 'Weather Advisory', content: 'Dear Parent, due to extreme weather conditions, school timings have been adjusted. Please check the portal for revised timings.' },
   ];
+
+  const handleQuickBroadcast = (templateId: string, type: 'email' | 'whatsapp' | 'sms') => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setBulkFormData({
+        subject: template.name,
+        content: template.content,
+        type: type,
+        targetClass: 'All'
+      });
+      setIsBulkModalOpen(true);
+      setSelectedTemplate(templateId);
+    }
+  };
 
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
@@ -219,14 +235,26 @@ export default function Communication({ profile }: CommunicationProps) {
           throw new Error(result.error || "Failed to send SMS");
         }
       } else if (bulkFormData.type === 'whatsapp') {
-        // WhatsApp bulk simulation: Open first recipient as demo
-        const first = recipients[0];
-        const text = encodeURIComponent(`${bulkFormData.content}`);
-        const phoneNumber = first.contact.replace(/\D/g, '');
-        
-        // In a real scenario, we might use a WhatsApp API service.
-        // For demonstration, we open the WhatsApp Web link for the first parent.
-        window.open(`https://wa.me/${phoneNumber}?text=${text}`, '_blank');
+        const phoneNumbers = recipients.map(s => s.whatsappNumber || s.contact).filter(Boolean) as string[];
+        if (phoneNumbers.length === 0) {
+          setSendingProgress(null);
+          alert("No parent WhatsApp numbers found for the selected students.");
+          return;
+        }
+
+        const response = await fetch('/api/send-bulk-whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: bulkFormData.content,
+            recipients: phoneNumbers
+          })
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || "Failed to send WhatsApp messages");
+        }
       }
 
       await addDoc(collection(db, 'bulk_messages'), {
@@ -240,7 +268,7 @@ export default function Communication({ profile }: CommunicationProps) {
       setIsBulkModalOpen(false);
       setBulkFormData({ subject: '', content: '', type: 'email', targetClass: 'All' });
       fetchBulkMessages();
-      alert(`Bulk ${bulkFormData.type} sent to ${recipients.length} parents! (WhatsApp demo opened for ${recipients[0].name}'s parent)`);
+      alert(`Bulk ${bulkFormData.type} sent successfully to ${recipients.length} parents!`);
     } catch (error) {
       setSendingProgress(null);
       console.error("Error sending bulk message:", error);
@@ -326,12 +354,15 @@ export default function Communication({ profile }: CommunicationProps) {
 
       {activeTab === 'directory' ? (
         <section className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-indigo-600 rounded-lg">
                 <Users className="w-6 h-6 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-slate-900">Student Directory</h2>
+              <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-bold">
+                {students.length} Students
+              </span>
             </div>
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -351,10 +382,10 @@ export default function Communication({ profile }: CommunicationProps) {
                   <tr key={student.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-900">{student.name}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{student.parentName}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.email}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.phone}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.whatsapp}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.otherContact}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.email || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.contact || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.whatsappNumber || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{student.emergencyContact || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -632,12 +663,70 @@ export default function Communication({ profile }: CommunicationProps) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <History className="w-5 h-5 text-slate-400" />
-                Message History
-              </h3>
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="lg:col-span-2 space-y-8">
+              {/* Quick Broadcast Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Megaphone className="w-5 h-5 text-indigo-600" />
+                  Quick Broadcast (One-Click)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
+                        <AlertCircle className="w-5 h-5" />
+                      </div>
+                      <h4 className="font-bold text-slate-900">Emergency Closure</h4>
+                    </div>
+                    <p className="text-xs text-slate-500">Send an urgent notice about school closure to all parents immediately.</p>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleQuickBroadcast('emergency', 'whatsapp')}
+                        className="flex-1 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <MessageSquare className="w-3 h-3" /> WhatsApp
+                      </button>
+                      <button 
+                        onClick={() => handleQuickBroadcast('emergency', 'email')}
+                        className="flex-1 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <Mail className="w-3 h-3" /> Email
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <h4 className="font-bold text-slate-900">Fee Reminder</h4>
+                    </div>
+                    <p className="text-xs text-slate-500">Send a gentle reminder to all parents regarding outstanding fee payments.</p>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleQuickBroadcast('fee', 'whatsapp')}
+                        className="flex-1 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <MessageSquare className="w-3 h-3" /> WhatsApp
+                      </button>
+                      <button 
+                        onClick={() => handleQuickBroadcast('fee', 'email')}
+                        className="flex-1 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <Mail className="w-3 h-3" /> Email
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <History className="w-5 h-5 text-slate-400" />
+                  Message History
+                </h3>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -679,9 +768,10 @@ export default function Communication({ profile }: CommunicationProps) {
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-slate-900">Quick Stats</h3>
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-slate-900">Quick Stats</h3>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

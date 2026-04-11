@@ -555,6 +555,7 @@ export default function Students({ profile }: StudentsProps) {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">Parent/Guardian</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Roll No</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Class</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Admission Date</th>
@@ -565,13 +566,13 @@ export default function Students({ profile }: StudentsProps) {
             <tbody className="divide-y divide-slate-50">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
                   </td>
                 </tr>
               ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                     No students found.
                   </td>
                 </tr>
@@ -597,10 +598,13 @@ export default function Students({ profile }: StudentsProps) {
                           </div>
                         )}
                         <div>
-                          <p className="font-bold text-slate-900 tracking-tight">{student.name} S/O {student.parentName}</p>
+                          <p className="font-bold text-slate-900 tracking-tight">{student.name}</p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{student.rollNumber}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-5 font-medium text-slate-700">
+                      {student.parentName || '-'}
                     </td>
                     <td className="px-6 py-5">
                       <span className="font-mono text-sm font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
