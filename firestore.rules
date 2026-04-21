@@ -73,9 +73,19 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
-    match /fees/{id} {
-      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+    match /fee_types/{id} {
+      allow read: if isAuthenticated();
       allow write: if isAdmin();
+    }
+
+    match /fee_records/{id} {
+      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isAdmin() || isStaff();
+    }
+
+    match /payment_history/{id} {
+      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isAdmin() || isStaff();
     }
 
     match /expenses/{id} {
@@ -164,6 +174,23 @@ service cloud.firestore {
 
     match /subjects/{id} {
       allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /classes/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /leave_requests/{id} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update: if isAdmin() || (isStaff() && resource.data.staffId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /leave_balances/{id} {
+      allow read: if isStaff();
       allow write: if isAdmin();
     }
 

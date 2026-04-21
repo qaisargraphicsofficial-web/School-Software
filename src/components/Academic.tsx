@@ -24,14 +24,28 @@ import { cn } from '../lib/utils';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { QRCodeSVG } from 'qrcode.react';
 import Papa from 'papaparse';
+import { 
+  PieChart as RePieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip as ReTooltip, 
+  Legend as ReLegend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid
+} from 'recharts';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import { onSnapshot, collection as firestoreCollection } from 'firebase/firestore';
 
 interface AcademicProps {
   profile: UserProfile | null;
 }
 
 export default function Academic({ profile }: AcademicProps) {
-  const [activeTab, setActiveTab] = useState<'attendance' | 'qr-scan' | 'stats' | 'subjects'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'qr-scan' | 'stats'>('attendance');
   const [students, setStudents] = useState<Student[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [subjectsList, setSubjectsList] = useState<any[]>([]);
@@ -182,48 +196,54 @@ export default function Academic({ profile }: AcademicProps) {
   };
 
   useEffect(() => {
+    let unsubscribe: () => void;
     if (activeTab === 'stats') {
-      fetchAttendanceStats();
-    }
-  }, [activeTab, selectedClass, selectedDate]);
-
-  const fetchAttendanceStats = async () => {
-    setLoading(true);
-    try {
-      // First get students of the selected class to filter attendance by their IDs
-      const sQuery = query(collection(db, 'students'), where('class', '==', selectedClass));
-      const sSnap = await getDocs(sQuery);
-      const classStudentIds = sSnap.docs.map(doc => doc.id);
-
-      if (classStudentIds.length === 0) {
-        setAttendanceStats({ present: 0, absent: 0, late: 0, total: 0 });
-        return;
-      }
-
+      const campusId = profile?.campusId || 'main';
+      
+      // Real-time listener for attendance
       const aQuery = query(
         collection(db, 'attendance'),
-        where('date', '==', selectedDate)
+        where('date', '==', selectedDate),
+        where('campusId', '==', campusId)
       );
-      const aSnap = await getDocs(aQuery);
-      
-      const stats = { present: 0, absent: 0, late: 0, total: 0 };
-      
-      aSnap.docs.forEach(doc => {
-        const data = doc.data();
-        if (classStudentIds.includes(data.targetId)) {
-          stats.total++;
-          if (data.status === 'present') stats.present++;
-          else if (data.status === 'absent') stats.absent++;
-          else if (data.status === 'late') stats.late++;
+
+      unsubscribe = onSnapshot(aQuery, async (aSnap) => {
+        try {
+          // Fetch students of the selected class
+          const sQuery = query(collection(db, 'students'), where('class', '==', selectedClass), where('campusId', '==', campusId));
+          const sSnap = await getDocs(sQuery);
+          const classStudentIds = sSnap.docs.map(doc => doc.id);
+
+          if (classStudentIds.length === 0) {
+            setAttendanceStats({ present: 0, absent: 0, late: 0, total: 0 });
+            return;
+          }
+
+          const stats = { present: 0, absent: 0, late: 0, total: 0 };
+          
+          aSnap.docs.forEach(doc => {
+            const data = doc.data();
+            if (classStudentIds.includes(data.targetId)) {
+              stats.total++;
+              if (data.status === 'present') stats.present++;
+              else if (data.status === 'absent') stats.absent++;
+              else if (data.status === 'late') stats.late++;
+            }
+          });
+
+          setAttendanceStats(stats);
+        } catch (error) {
+          console.error("Error processing real-time stats:", error);
         }
       });
-
-      setAttendanceStats(stats);
-    } catch (error) {
-      console.error("Error fetching attendance stats:", error);
-    } finally {
-      setLoading(false);
     }
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [activeTab, selectedClass, selectedDate, profile]);
+
+  const fetchAttendanceStats = async () => {
+    // This is now handled by the useEffect onSnapshot for real-time updates
   };
 
   const fetchStudents = async () => {
@@ -352,15 +372,6 @@ export default function Academic({ profile }: AcademicProps) {
         >
           Attendance Stats
         </button>
-        <button
-          onClick={() => setActiveTab('subjects')}
-          className={cn(
-            "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300",
-            activeTab === 'subjects' ? "bg-white text-indigo-600 shadow-md" : "text-slate-500 hover:text-slate-700"
-          )}
-        >
-          Subjects
-        </button>
       </div>
 
       {/* Filters */}
@@ -387,182 +398,7 @@ export default function Academic({ profile }: AcademicProps) {
             className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
           />
         </div>
-        {activeTab === 'subjects' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Subject Management</h2>
-              <p className="text-xs text-slate-500 font-medium mt-1">Add, edit, and assign subjects to classes and teachers.</p>
-            </div>
-            <button 
-              onClick={() => {
-                setEditingSubject(null);
-                setSubjectForm({ name: '', code: '', class: '', teacherId: '', teacherName: '' });
-                setIsSubjectModalOpen(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-bold text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add Subject
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subjectsList.map((subject) => (
-              <motion.div
-                key={subject.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => {
-                        setEditingSubject(subject);
-                        setSubjectForm({
-                          name: subject.name,
-                          code: subject.code,
-                          class: subject.class,
-                          teacherId: subject.teacherId,
-                          teacherName: subject.teacherName
-                        });
-                        setIsSubjectModalOpen(true);
-                      }}
-                      className="p-2 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => deleteSubject(subject.id)}
-                      className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">{subject.name}</h3>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Code: {subject.code}</p>
-                
-                <div className="mt-6 pt-6 border-t border-slate-50 space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500 font-medium">Class</span>
-                    <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">{subject.class}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500 font-medium">Teacher</span>
-                    <span className="font-bold text-indigo-600">{subject.teacherName || 'Not Assigned'}</span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-            {subjectsList.length === 0 && (
-              <div className="col-span-full py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-                <p className="text-slate-500 font-medium">No subjects added yet. Click "Add Subject" to get started.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Subject Modal */}
-          <AnimatePresence>
-            {isSubjectModalOpen && (
-              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
-                >
-                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
-                    <h3 className="text-xl font-black tracking-tight">{editingSubject ? 'Edit Subject' : 'Add New Subject'}</h3>
-                    <button onClick={() => setIsSubjectModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl">
-                      <X className="w-6 h-6" />
-                    </button>
-                  </div>
-                  <form onSubmit={handleSubjectSubmit} className="p-8 space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Subject Name</label>
-                      <input
-                        required
-                        type="text"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={subjectForm.name}
-                        onChange={e => setSubjectForm({...subjectForm, name: e.target.value})}
-                        placeholder="e.g. Mathematics"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Subject Code</label>
-                      <input
-                        required
-                        type="text"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={subjectForm.code}
-                        onChange={e => setSubjectForm({...subjectForm, code: e.target.value})}
-                        placeholder="e.g. MATH101"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Assigned Class</label>
-                      <select
-                        required
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={subjectForm.class}
-                        onChange={e => setSubjectForm({...subjectForm, class: e.target.value})}
-                      >
-                        <option value="">Select Class</option>
-                        {['Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'].map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Responsible Teacher</label>
-                      <select
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={subjectForm.teacherId}
-                        onChange={e => {
-                          const t = staffList.find(s => s.id === e.target.value);
-                          setSubjectForm({
-                            ...subjectForm,
-                            teacherId: e.target.value,
-                            teacherName: t ? t.name : ''
-                          });
-                        }}
-                      >
-                        <option value="">Select Teacher</option>
-                        {staffList.map(s => (
-                          <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex gap-4 pt-4">
-                      <button
-                        type="button"
-                        onClick={() => setIsSubjectModalOpen(false)}
-                        className="flex-1 px-6 py-3 text-slate-600 font-black uppercase tracking-widest hover:bg-slate-50 rounded-xl"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="flex-1 px-6 py-3 bg-indigo-600 text-white font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100"
-                      >
-                        {editingSubject ? 'Update' : 'Save'}
-                      </button>
-                    </div>
-                  </form>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {activeTab === 'attendance' && (
+        {activeTab === 'attendance' && (
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsPrintingIDCards(true)}
@@ -651,29 +487,95 @@ export default function Academic({ profile }: AcademicProps) {
       </AnimatePresence>
 
       {/* Content Area */}
-      <div className="card">
+      <div className="card min-h-[400px]">
         {activeTab === 'stats' ? (
-          <div className="p-8 flex flex-col items-center justify-center space-y-6">
-            <div className="w-full max-w-md bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-200">
-              <div id="reader" className="overflow-hidden rounded-2xl"></div>
+          <div className="p-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Students</p>
+                <p className="text-3xl font-black text-slate-900">{attendanceStats.total}</p>
+              </div>
+              <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 shadow-sm">
+                <p className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-1">Present</p>
+                <p className="text-3xl font-black text-emerald-700">{attendanceStats.present}</p>
+              </div>
+              <div className="bg-rose-50 p-6 rounded-3xl border border-rose-100 shadow-sm">
+                <p className="text-xs font-black text-rose-600 uppercase tracking-widest mb-1">Absent</p>
+                <p className="text-3xl font-black text-rose-700">{attendanceStats.absent}</p>
+              </div>
+              <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 shadow-sm">
+                <p className="text-xs font-black text-amber-600 uppercase tracking-widest mb-1">Late</p>
+                <p className="text-3xl font-black text-amber-700">{attendanceStats.late}</p>
+              </div>
             </div>
-            <div className="text-center">
-              <h3 className="text-lg font-bold text-slate-900">Scan Student QR Code</h3>
-              <p className="text-slate-500 text-sm">Position the QR code within the frame to mark attendance</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Pie Chart */}
+              <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
+                <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Distribution</h4>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RePieChart>
+                      <Pie
+                        data={[
+                          { name: 'Present', value: attendanceStats.present },
+                          { name: 'Absent', value: attendanceStats.absent },
+                          { name: 'Late', value: attendanceStats.late },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        <Cell fill="#10b981" />
+                        <Cell fill="#f43f5e" />
+                        <Cell fill="#f59e0b" />
+                      </Pie>
+                      <ReTooltip 
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                      />
+                      <ReLegend verticalAlign="bottom" height={36}/>
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Bar Chart */}
+              <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
+                <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Comparison</h4>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: 'Present', count: attendanceStats.present, fill: '#10b981' },
+                        { name: 'Absent', count: attendanceStats.absent, fill: '#f43f5e' },
+                        { name: 'Late', count: attendanceStats.late, fill: '#f59e0b' },
+                      ]}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 12, fontWeight: 700, fill: '#64748b' }}
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 12, fontWeight: 700, fill: '#64748b' }}
+                      />
+                      <ReTooltip 
+                        cursor={{ fill: '#f8fafc' }}
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                      />
+                      <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={40} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
-            <AnimatePresence>
-              {scanResult && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-emerald-100 text-emerald-700 px-6 py-3 rounded-xl font-bold flex items-center gap-2"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  {scanResult}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         ) : activeTab === 'attendance' ? (
           <div className="flex flex-col">
@@ -803,6 +705,29 @@ export default function Academic({ profile }: AcademicProps) {
                 </button>
               </div>
             </div>
+          </div>
+        ) : activeTab === 'qr-scan' ? (
+          <div className="p-8 flex flex-col items-center justify-center space-y-6">
+            <div className="w-full max-w-md bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-200">
+              <div id="reader" className="overflow-hidden rounded-2xl"></div>
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-slate-900">Scan Student QR Code</h3>
+              <p className="text-slate-500 text-sm">Position the QR code within the frame to mark attendance</p>
+            </div>
+            <AnimatePresence>
+              {scanResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="bg-emerald-100 text-emerald-700 px-6 py-3 rounded-xl font-bold flex items-center gap-2"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                  {scanResult}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         ) : null}
       </div>

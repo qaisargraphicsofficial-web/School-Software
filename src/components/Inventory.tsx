@@ -70,7 +70,7 @@ export default function Inventory({ profile }: InventoryProps) {
     }
   };
 
-  const filteredItems = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredItems = items.filter(i => (i.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
 
   const getCategoryIcon = (category: string) => {
     switch (category) {

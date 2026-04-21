@@ -95,6 +95,7 @@ export default function Students({ profile }: StudentsProps) {
     busNumber: '',
     route: '',
     pickupPoint: '',
+    useTransport: false,
   });
 
   useEffect(() => {
@@ -151,11 +152,19 @@ export default function Students({ profile }: StudentsProps) {
         }
       }
 
+      const studentToSave = {
+        ...formData,
+        photoUrl,
+        busNumber: formData.useTransport ? formData.busNumber : '',
+        route: formData.useTransport ? formData.route : '',
+        pickupPoint: formData.useTransport ? formData.pickupPoint : '',
+      };
+
       try {
         if (isEditMode && viewingStudent?.id) {
-          await setDoc(doc(db, 'students', viewingStudent.id), { ...formData, photoUrl }, { merge: true });
+          await setDoc(doc(db, 'students', viewingStudent.id), studentToSave, { merge: true });
         } else {
-          await addDoc(collection(db, 'students'), { ...formData, photoUrl });
+          await addDoc(collection(db, 'students'), studentToSave);
         }
       } catch (firestoreErr: any) {
         try {
@@ -191,6 +200,7 @@ export default function Students({ profile }: StudentsProps) {
         busNumber: '',
         route: '',
         pickupPoint: '',
+        useTransport: false,
       });
       fetchStudents();
     } catch (error) {
@@ -298,7 +308,7 @@ export default function Students({ profile }: StudentsProps) {
 
   const exportToCSV = () => {
     try {
-      const headers = ['Name', 'Roll Number', 'Class', 'Section', 'Parent Name', 'Contact', 'Email', 'Address', 'Admission Date', 'Status', 'Contact Person', 'Emergency Contact', 'Previous School', 'DOB', 'Gender', 'Blood Group'];
+      const headers = ['Name', 'Roll Number', 'Class', 'Section', 'Parent Name', 'Contact', 'Email', 'Address', 'Admission Date', 'Status', 'Contact Person', 'Emergency Contact', 'Previous School', 'DOB', 'Gender', 'Blood Group', 'Use Transport', 'Bus Number', 'Route', 'Pickup Point'];
       const data = filteredStudents.map(s => [
         s.name,
         s.rollNumber,
@@ -315,7 +325,11 @@ export default function Students({ profile }: StudentsProps) {
         s.previousSchool || '',
         s.dateOfBirth || '',
         s.gender || '',
-        s.bloodGroup || ''
+        s.bloodGroup || '',
+        s.useTransport ? 'Yes' : 'No',
+        s.busNumber || '',
+        s.route || '',
+        s.pickupPoint || ''
       ]);
 
       const csvContent = [
@@ -354,7 +368,7 @@ export default function Students({ profile }: StudentsProps) {
           const initialMapping: Record<string, string> = {};
           const studentFields = [
             'name', 'parentName', 'rollNumber', 'class', 'section', 'contact', 'email', 'address', 'admissionDate', 'status',
-            'contactPerson', 'emergencyContact', 'previousSchool', 'dateOfBirth', 'gender', 'bloodGroup'
+            'contactPerson', 'emergencyContact', 'previousSchool', 'dateOfBirth', 'gender', 'bloodGroup', 'useTransport', 'busNumber', 'route', 'pickupPoint'
           ];
           
           studentFields.forEach(field => {
@@ -403,6 +417,10 @@ export default function Students({ profile }: StudentsProps) {
           dateOfBirth: row[columnMapping['dateOfBirth']] || '',
           gender: (row[columnMapping['gender']] || 'male').toLowerCase() as 'male' | 'female' | 'other',
           bloodGroup: row[columnMapping['bloodGroup']] || '',
+          useTransport: (row[columnMapping['useTransport']] || '').toLowerCase() === 'yes' || (row[columnMapping['useTransport']] || '').toLowerCase() === 'true',
+          busNumber: row[columnMapping['busNumber']] || '',
+          route: row[columnMapping['route']] || '',
+          pickupPoint: row[columnMapping['pickupPoint']] || '',
         };
         return addDoc(collection(db, 'students'), studentData);
       });
@@ -823,20 +841,27 @@ export default function Students({ profile }: StudentsProps) {
                         <Bus className="w-5 h-5 text-indigo-600" />
                         Transport Details
                       </h3>
-                      <div className="grid grid-cols-1 gap-4">
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Bus Number</p>
-                          <p className="font-bold text-slate-900">{viewingStudent.busNumber || 'N/A'}</p>
+                      {viewingStudent.useTransport ? (
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Bus Number</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.busNumber || 'N/A'}</p>
+                          </div>
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Route</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.route || 'N/A'}</p>
+                          </div>
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pickup Point</p>
+                            <p className="font-bold text-slate-900">{viewingStudent.pickupPoint || 'N/A'}</p>
+                          </div>
                         </div>
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Route</p>
-                          <p className="font-bold text-slate-900">{viewingStudent.route || 'N/A'}</p>
+                      ) : (
+                        <div className="p-6 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200 text-center">
+                          <Bus className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-slate-500 font-bold text-sm">No transport service assigned.</p>
                         </div>
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pickup Point</p>
-                          <p className="font-bold text-slate-900">{viewingStudent.pickupPoint || 'N/A'}</p>
-                        </div>
-                      </div>
+                      )}
                     </div>
                     <div className="space-y-6">
                       <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -1213,33 +1238,60 @@ export default function Students({ profile }: StudentsProps) {
                       onChange={e => setFormData({...formData, caste: e.target.value})}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">Bus Number</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                      value={formData.busNumber}
-                      onChange={e => setFormData({...formData, busNumber: e.target.value})}
-                    />
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="flex items-center gap-3 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                      <Bus className="w-5 h-5 text-indigo-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-indigo-900">School Transport Service</p>
+                        <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Enable if student uses school bus</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({...formData, useTransport: !formData.useTransport})}
+                        className={cn(
+                          "w-12 h-6 rounded-full transition-all relative",
+                          formData.useTransport ? "bg-indigo-600" : "bg-slate-300"
+                        )}
+                      >
+                        <div className={cn(
+                          "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                          formData.useTransport ? "left-7" : "left-1"
+                        )} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">Route</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                      value={formData.route}
-                      onChange={e => setFormData({...formData, route: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">Pickup Point</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                      value={formData.pickupPoint}
-                      onChange={e => setFormData({...formData, pickupPoint: e.target.value})}
-                    />
-                  </div>
+
+                  {formData.useTransport && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Bus Number</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          value={formData.busNumber}
+                          onChange={e => setFormData({...formData, busNumber: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Route</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          value={formData.route}
+                          onChange={e => setFormData({...formData, route: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Pickup Point</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          value={formData.pickupPoint}
+                          onChange={e => setFormData({...formData, pickupPoint: e.target.value})}
+                        />
+                      </div>
+                    </>
+                  )}
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Student Photo</label>
                     <div className="flex items-center gap-4">
@@ -1328,6 +1380,7 @@ export default function Students({ profile }: StudentsProps) {
                     { key: 'address', label: 'Address', required: false },
                     { key: 'admissionDate', label: 'Admission Date', required: false },
                     { key: 'status', label: 'Status (active/inactive)', required: false },
+                    { key: 'useTransport', label: 'Use Transport (Yes/No)', required: false },
                     { key: 'busNumber', label: 'Bus Number', required: false },
                     { key: 'route', label: 'Route', required: false },
                     { key: 'pickupPoint', label: 'Pickup Point', required: false },

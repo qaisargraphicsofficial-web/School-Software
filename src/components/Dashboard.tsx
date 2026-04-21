@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserProfile, Task } from '../types';
+import { UserProfile, Task, Subject } from '../types';
 import { 
   Users, 
   GraduationCap, 
@@ -15,7 +15,8 @@ import {
   CheckSquare,
   FileText,
   Clock,
-  ChevronRight
+  ChevronRight,
+  BookOpen
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -44,6 +45,7 @@ export default function Dashboard({ profile }: DashboardProps) {
     attendanceRate: 0,
   });
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
+  const [mySubjects, setMySubjects] = useState<Subject[]>([]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -52,7 +54,7 @@ export default function Dashboard({ profile }: DashboardProps) {
       try {
         const studentsSnap = await getDocs(collection(db, 'students'));
         const staffSnap = await getDocs(collection(db, 'staff'));
-        const feesSnap = await getDocs(collection(db, 'fees'));
+        const feesSnap = await getDocs(collection(db, 'fee_records'));
         
         let totalFees = 0;
         feesSnap.forEach(doc => {
@@ -93,7 +95,25 @@ export default function Dashboard({ profile }: DashboardProps) {
       }
     });
 
+    const fetchMySubjects = async () => {
+      if (profile?.role === 'staff' && profile.staffId) {
+        try {
+          const staffQ = query(collection(db, 'staff'), where('staffId', '==', profile.staffId));
+          const staffSnap = await getDocs(staffQ);
+          if (!staffSnap.empty) {
+            const staffDocId = staffSnap.docs[0].id;
+            const subjectsQ = query(collection(db, 'subjects'), where('teacherId', '==', staffDocId));
+            const subjectsSnap = await getDocs(subjectsQ);
+            setMySubjects(subjectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+          }
+        } catch (error) {
+          console.error("Error fetching my subjects:", error);
+        }
+      }
+    };
+
     fetchStats();
+    fetchMySubjects();
     return () => unsubscribeTasks();
   }, [profile]);
 
@@ -296,6 +316,40 @@ export default function Dashboard({ profile }: DashboardProps) {
               )}
             </div>
           </div>
+
+          {/* My Subjects (Staff Only) */}
+          {profile?.role === 'staff' && (
+            <div className="card p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">My Subjects</h3>
+                <Link to="/subjects" className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">View All</Link>
+              </div>
+              <div className="space-y-4">
+                {mySubjects.length === 0 ? (
+                  <div className="text-center py-10">
+                    <BookOpen className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-slate-400">No subjects assigned</p>
+                  </div>
+                ) : (
+                  mySubjects.map(subject => (
+                    <div key={subject.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-indigo-200 transition-all">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm group-hover:scale-110 transition-transform">
+                        <BookOpen className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{subject.name}</p>
+                        <div className="flex gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          <span>{subject.code}</span>
+                          <span>•</span>
+                          <span>Class {subject.class}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

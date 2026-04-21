@@ -111,7 +111,18 @@ export default function Layout({ profile }: LayoutProps) {
     // Page access control
     if (!profile || profile.role === 'admin') return;
     
-    const currentItem = navItems.find(item => item.path === location.pathname);
+    const findNavItem = (items: any[], path: string): any => {
+      for (const item of items) {
+        if (item.path === path) return item;
+        if (item.children) {
+          const found = findNavItem(item.children, path);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const currentItem = findNavItem(navItems, location.pathname);
     if (currentItem) {
       if (profile.role === 'staff') {
         // Wait for staffRole to be loaded if it's staff
@@ -198,10 +209,18 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Fees', icon: Wallet, path: '/fees', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Payroll', icon: CreditCard, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Expenses', icon: FileText, path: '/expenses', roles: ['admin', 'staff'], category: 'FINANCE' },
-    { name: 'Teachers', icon: UserSquare2, path: '/teachers', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
-    { name: 'Schedule', icon: Calendar, path: '/schedule', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
-    { name: 'Leave', icon: FileText, path: '/leave', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
-    { name: 'Tasks', icon: CheckSquare, path: '/tasks', roles: ['admin', 'staff', 'student', 'parent'], category: 'STAFF & OPS' },
+    { 
+      name: 'Teachers', 
+      icon: UserSquare2, 
+      path: '/teachers', 
+      roles: ['admin', 'staff'], 
+      category: 'STAFF & OPS',
+      children: [
+        { name: 'Schedule', icon: Calendar, path: '/schedule', roles: ['admin', 'staff'] },
+        { name: 'Leave', icon: FileText, path: '/leave', roles: ['admin', 'staff'] },
+        { name: 'Tasks', icon: CheckSquare, path: '/tasks', roles: ['admin', 'staff', 'student', 'parent'] },
+      ]
+    },
     { name: 'Communication', icon: MessageSquare, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION' },
     { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS' },
     { name: 'Settings', icon: Settings, path: '/settings', roles: ['admin'], category: 'AI & SETTINGS' },
@@ -240,14 +259,14 @@ export default function Layout({ profile }: LayoutProps) {
   const categoryOrder = ['OVERVIEW', 'ACADEMICS', 'EXAMINATIONS', 'FINANCE', 'STAFF & OPS', 'COMMUNICATION', 'AI & SETTINGS', 'OTHER'];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="h-screen bg-slate-50 flex overflow-hidden">
       {/* Sidebar for Desktop */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-0 no-print",
+        "h-screen overflow-y-auto fixed left-0 z-50 w-72 bg-white border-r border-slate-200 transition-transform duration-300 lg:translate-x-0 lg:static no-print",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="h-full flex flex-col">
-          <div className="p-8 flex items-center gap-4 border-b border-slate-100">
+        <div className="min-h-full flex flex-col">
+          <div className="p-8 flex items-center gap-4 border-b border-slate-100 shrink-0">
             <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-200 overflow-hidden flex items-center justify-center w-12 h-12">
               {logoUrl ? (
                 <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -261,7 +280,7 @@ export default function Layout({ profile }: LayoutProps) {
             </div>
           </div>
 
-          <nav className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar">
+          <nav className="flex-1 p-4 space-y-6">
             {categoryOrder.map(category => {
               const items = groupedNavItems[category];
               if (!items || items.length === 0) return null;
@@ -271,23 +290,44 @@ export default function Layout({ profile }: LayoutProps) {
                   <h3 className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{category}</h3>
                   <div className="space-y-1">
                     {items.map((item) => (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        onClick={() => setIsSidebarOpen(false)}
-                        className={cn(
-                          "flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-300 group border-2",
-                          location.pathname === item.path
-                            ? "bg-[#fdf6ea] text-amber-700 border-slate-900 shadow-sm"
-                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent"
+                      <React.Fragment key={item.path}>
+                        <Link
+                          to={item.path}
+                          onClick={() => setIsSidebarOpen(false)}
+                          className={cn(
+                            "flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-300 group border-2",
+                            location.pathname === item.path
+                              ? "bg-[#fdf6ea] text-amber-700 border-slate-900 shadow-sm"
+                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent"
+                          )}
+                        >
+                          <item.icon className={cn(
+                            "w-5 h-5 transition-transform duration-300 group-hover:scale-110",
+                            location.pathname === item.path ? "text-amber-600" : "text-slate-400 group-hover:text-slate-600"
+                          )} />
+                          <span className="font-bold text-sm tracking-tight">{item.name}</span>
+                        </Link>
+                        {item.children && (
+                          <div className="pl-10 space-y-1">
+                            {item.children.map((child: any) => (
+                              <Link
+                                key={child.path}
+                                to={child.path}
+                                onClick={() => setIsSidebarOpen(false)}
+                                className={cn(
+                                  "flex items-center gap-3.5 px-4 py-2 rounded-xl transition-all duration-300 group",
+                                  location.pathname === child.path
+                                    ? "text-amber-700 font-bold"
+                                    : "text-slate-500 hover:text-slate-900"
+                                )}
+                              >
+                                <child.icon className="w-4 h-4" />
+                                <span className="text-sm">{child.name}</span>
+                              </Link>
+                            ))}
+                          </div>
                         )}
-                      >
-                        <item.icon className={cn(
-                          "w-5 h-5 transition-transform duration-300 group-hover:scale-110",
-                          location.pathname === item.path ? "text-amber-600" : "text-slate-400 group-hover:text-slate-600"
-                        )} />
-                        <span className="font-bold text-sm tracking-tight">{item.name}</span>
-                      </Link>
+                      </React.Fragment>
                     ))}
                   </div>
                 </div>
@@ -295,7 +335,7 @@ export default function Layout({ profile }: LayoutProps) {
             })}
           </nav>
 
-          <div className="p-6 border-t border-slate-100">
+          <div className="p-6 border-t border-slate-100 shrink-0">
             <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl mb-4 border border-slate-100">
               <div className="w-11 h-11 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md">
                 {profile?.email?.[0].toUpperCase()}
@@ -317,9 +357,9 @@ export default function Layout({ profile }: LayoutProps) {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-40 no-print">
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-40 no-print shrink-0">
           <div className="flex items-center gap-8 flex-1">
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -330,7 +370,19 @@ export default function Layout({ profile }: LayoutProps) {
             
             <div className="hidden lg:block">
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                {navItems.find(item => item.path === location.pathname)?.name || 'Dashboard'}
+                {(() => {
+                  const findNavItem = (items: any[], path: string): any => {
+                    for (const item of items) {
+                      if (item.path === path) return item;
+                      if (item.children) {
+                        const found = findNavItem(item.children, path);
+                        if (found) return found;
+                      }
+                    }
+                    return null;
+                  };
+                  return findNavItem(navItems, location.pathname)?.name || 'Dashboard';
+                })()}
               </h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}

@@ -8,6 +8,7 @@ import { FeeType, FeeRecord, PaymentHistory, Student, UserProfile } from '../typ
 import { Wallet, Receipt, Plus, Printer, Download, CheckCircle2, XCircle, Search, Calendar, CreditCard, BarChart3, Settings, AlertCircle, FileText, Trash2, Edit2, ChevronRight, ArrowLeft, Mail, Bell, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface FeesManagementProps { profile: UserProfile | null; }
 
@@ -27,6 +28,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   const [isFeeTypeModalOpen, setIsFeeTypeModalOpen] = useState(false);
   const [editingFeeType, setEditingFeeType] = useState<FeeType | null>(null);
   const [feeTypeForm, setFeeTypeForm] = useState({ name: '', defaultAmount: 0, defaultDueDate: '' });
+  const [isSavingFeeType, setIsSavingFeeType] = useState(false);
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
@@ -47,6 +49,11 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   const [waiverForm, setWaiverForm] = useState({ amount: 0, reason: '' });
   const [selectedRecordForWaiver, setSelectedRecordForWaiver] = useState<FeeRecord | null>(null);
   const [isApplyingWaiver, setIsApplyingWaiver] = useState(false);
+
+  const [isEditRecordModalOpen, setIsEditRecordModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<FeeRecord | null>(null);
+  const [recordForm, setRecordForm] = useState({ amount: 0, dueDate: '', termOrYear: '', status: '' as FeeRecord['status'] });
+  const [isSavingRecord, setIsSavingRecord] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -81,9 +88,23 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   const handleSaveFeeType = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+    
+    // Basic Validation
+    if (!feeTypeForm.name.trim()) {
+      alert("Please enter a fee type name.");
+      return;
+    }
+    if (feeTypeForm.defaultAmount < 0) {
+      alert("Default amount cannot be negative.");
+      return;
+    }
+
+    setIsSavingFeeType(true);
     try {
       const feeTypeData = {
-        ...feeTypeForm,
+        name: feeTypeForm.name.trim(),
+        defaultAmount: Number(feeTypeForm.defaultAmount),
+        defaultDueDate: feeTypeForm.defaultDueDate,
         campusId: profile.campusId || 'main'
       };
 
@@ -98,7 +119,9 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       fetchData();
     } catch (error) {
       console.error("Error saving fee type:", error);
-      alert("Failed to save fee type.");
+      handleFirestoreError(error, editingFeeType?.id ? OperationType.UPDATE : OperationType.CREATE, 'fee_types');
+    } finally {
+      setIsSavingFeeType(false);
     }
   };
 
@@ -126,6 +149,11 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       let targetStudents = students.filter(s => s.status === 'active');
       if (generateForm.targetClass !== 'All') {
         targetStudents = targetStudents.filter(s => s.class === generateForm.targetClass);
+      }
+
+      // If it's a transport fee, only target students who use transport
+      if (feeType.name.toLowerCase().includes('transport')) {
+        targetStudents = targetStudents.filter(s => s.useTransport);
       }
 
       if (targetStudents.length === 0) {
@@ -275,6 +303,45 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       alert("Failed to apply waiver.");
     } finally {
       setIsApplyingWaiver(false);
+    }
+  };
+
+  const handleSaveRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !editingRecord?.id) return;
+
+    setIsSavingRecord(true);
+    try {
+      const updatedData = {
+        amount: Number(recordForm.amount),
+        dueDate: recordForm.dueDate,
+        termOrYear: recordForm.termOrYear,
+        status: recordForm.status
+      };
+
+      await updateDoc(doc(db, 'fee_records', editingRecord.id), updatedData);
+      
+      alert("Fee record updated successfully!");
+      setIsEditRecordModalOpen(false);
+      setEditingRecord(null);
+      fetchData();
+    } catch (error) {
+      console.error("Error updating fee record:", error);
+      alert("Failed to update fee record.");
+    } finally {
+      setIsSavingRecord(false);
+    }
+  };
+
+  const handleDeleteRecord = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this fee record? This action cannot be undone.")) return;
+    
+    try {
+      await deleteDoc(doc(db, 'fee_records', id));
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting fee record:", error);
+      alert("Failed to delete fee record.");
     }
   };
 
@@ -828,6 +895,29 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                                         </button>
                                         <button 
                                           onClick={() => {
+                                            setEditingRecord(record);
+                                            setRecordForm({
+                                              amount: record.amount,
+                                              dueDate: record.dueDate,
+                                              termOrYear: record.termOrYear,
+                                              status: record.status
+                                            });
+                                            setIsEditRecordModalOpen(true);
+                                          }}
+                                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                          title="Edit Record"
+                                        >
+                                          <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteRecord(record.id!)}
+                                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                          title="Delete Record"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => {
                                             setSelectedFeeRecord(record);
                                             setPaymentForm({ feeRecordId: record.id!, amount: Math.max(0, record.amount - record.paidAmount - (record.waiverAmount || 0)), method: 'online' });
                                             setIsPaymentModalOpen(true);
@@ -1091,8 +1181,16 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                 <button type="button" onClick={() => setIsFeeTypeModalOpen(false)} className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors">
                   Cancel
                 </button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors">
-                  Save Fee Type
+                <button 
+                  type="submit" 
+                  disabled={isSavingFeeType}
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex justify-center items-center"
+                >
+                  {isSavingFeeType ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    editingFeeType ? 'Update Fee Type' : 'Save Fee Type'
+                  )}
                 </button>
               </div>
             </form>
@@ -1162,6 +1260,83 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
                     "Apply Waiver"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Record Modal */}
+      {isEditRecordModalOpen && editingRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white">
+              <h2 className="text-xl font-bold">Edit Fee Record</h2>
+              <button onClick={() => setIsEditRecordModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveRecord} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Amount ($)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={recordForm.amount}
+                  onChange={(e) => setRecordForm({...recordForm, amount: Number(e.target.value)})}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  required
+                  value={recordForm.dueDate}
+                  onChange={(e) => setRecordForm({...recordForm, dueDate: e.target.value})}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Term / Year</label>
+                <input
+                  type="text"
+                  required
+                  value={recordForm.termOrYear}
+                  onChange={(e) => setRecordForm({...recordForm, termOrYear: e.target.value})}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Status</label>
+                <select
+                  required
+                  value={recordForm.status}
+                  onChange={(e) => setRecordForm({...recordForm, status: e.target.value as FeeRecord['status']})}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="partial">Partial</option>
+                  <option value="paid">Paid</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setIsEditRecordModalOpen(false)} className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors">
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSavingRecord}
+                  className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex justify-center items-center"
+                >
+                  {isSavingRecord ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    "Update Record"
                   )}
                 </button>
               </div>

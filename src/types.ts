@@ -60,6 +60,7 @@ export interface Student {
   busNumber?: string;
   route?: string;
   pickupPoint?: string;
+  useTransport?: boolean;
 }
 
 export interface Staff {
@@ -92,16 +93,16 @@ export interface Attendance {
 export interface ExamResult {
   id?: string;
   studentId: string;
-  examType: string;
-  term: string; // e.g., 'First Term', 'Mid Term', 'Final Term'
-  marks: Record<string, number>;
-  submittedPapers?: Record<string, string>; // Subject -> File URL
-  examPaperIds?: Record<string, string>; // Subject -> ExamPaper ID
-  totalMarks: number;
+  examTypeId: string;
+  class: string;
+  section: string;
+  marks: Record<string, { obtained: number; total: number; pass: number }>;
+  totalObtained: number;
+  totalMax: number;
   percentage: number;
   grade: string;
-  position: number;
-  weightage?: number;
+  remarks?: string;
+  position?: number;
   campusId: string;
   updatedAt?: string;
 }
@@ -231,9 +232,15 @@ export interface DailyDiary {
 export interface Certificate {
   id?: string;
   studentId: string;
-  type: 'achievement' | 'completion' | 'participation';
+  studentName: string;
+  parentName?: string;
+  type: 'achievement' | 'completion' | 'participation' | 'excellence' | 'custom';
+  title: string;
+  subTitle: string;
   date: string;
   content: string;
+  signature1Label: string;
+  signature2Label: string;
   campusId: string;
 }
 
@@ -255,9 +262,11 @@ export interface ExamPaper {
   term?: string;
   questions: {
     question: string;
+    marks: number;
     options?: string[];
     answer?: string;
-    type: 'mcq' | 'descriptive';
+    type: 'multiple_choice' | 'short_answer' | 'long_answer';
+    difficulty: 'Easy' | 'Medium' | 'Hard';
   }[];
   campusId: string;
 }
@@ -360,6 +369,19 @@ export interface Subject {
   code: string;
   class: string;
   teacherId?: string;
+  campusId: string;
+}
+
+export interface ClassSection {
+  id: string;
+  name: string;
+  teacherIds: string[];
+}
+
+export interface ClassGroup {
+  id?: string;
+  className: string;
+  sections: ClassSection[];
   campusId: string;
 }
 

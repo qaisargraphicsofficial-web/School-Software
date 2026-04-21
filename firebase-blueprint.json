@@ -325,6 +325,27 @@
         "campusId": { "type": "string" }
       },
       "required": ["name", "code", "class", "campusId"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "Class and section definitions with assigned teachers",
+      "type": "object",
+      "properties": {
+        "className": { "type": "string" },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "teacherIds": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "campusId": { "type": "string" }
+      },
+      "required": ["className", "campusId"]
     }
   },
   "firestore": {
@@ -349,6 +370,7 @@
     "transport_routes": { "schema": "TransportRoute", "description": "Collection of transport routes" },
     "leave_requests": { "schema": "LeaveRequest", "description": "Collection of staff leave requests" },
     "leave_balances": { "schema": "LeaveBalance", "description": "Collection of staff leave balances" },
-    "subjects": { "schema": "Subject", "description": "Collection of subjects" }
+    "subjects": { "schema": "Subject", "description": "Collection of subjects" },
+    "classes": { "schema": "Class", "description": "Collection of class and section definitions" }
   }
 }

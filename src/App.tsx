@@ -128,7 +128,7 @@ export default function App() {
             <Route path="students" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Students profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="classes" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Classes profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="attendance" element={<Academic profile={profile} />} />
-            <Route path="examination-portal" element={profile?.role === 'admin' || profile?.role === 'staff' ? <ExaminationPortal profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="examination-portal" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Exams profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="results" element={<Results profile={profile} />} />
             <Route path="teachers" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Staff profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="schedule" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Schedule profile={profile} /> : <Navigate to="/" replace />} />

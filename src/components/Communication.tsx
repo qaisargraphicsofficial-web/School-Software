@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, query, orderBy, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Notice, UserProfile, Student, ExamResult, Attendance, BulkMessage } from '../types';
+import { Notice, UserProfile, Student, ExamResult, Attendance, BulkMessage, FeeRecord, FeeType } from '../types';
 import { 
   Bell, 
   Plus, 
@@ -33,8 +33,11 @@ export default function Communication({ profile }: CommunicationProps) {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [bulkMessages, setBulkMessages] = useState<BulkMessage[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
+  const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isFeeReminderModalOpen, setIsFeeReminderModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [linkedStudentId, setLinkedStudentId] = useState(profile?.studentId);
   const [linkingRollNumber, setLinkingRollNumber] = useState('');
@@ -72,6 +75,10 @@ export default function Communication({ profile }: CommunicationProps) {
   ];
 
   const handleQuickBroadcast = (templateId: string, type: 'email' | 'whatsapp' | 'sms') => {
+    if (templateId === 'fee_bulk') {
+      setIsFeeReminderModalOpen(true);
+      return;
+    }
     const template = templates.find(t => t.id === templateId);
     if (template) {
       setBulkFormData({
@@ -102,6 +109,7 @@ export default function Communication({ profile }: CommunicationProps) {
     }
     if (profile?.role === 'admin' || profile?.role === 'staff') {
       fetchStudents();
+      fetchFeeData();
     }
     if (profile?.role === 'parent' && linkedStudentId) {
       fetchChildData(linkedStudentId);
@@ -134,6 +142,19 @@ export default function Communication({ profile }: CommunicationProps) {
       setStudents(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student)));
     } catch (error) {
       console.error("Error fetching students:", error);
+    }
+  };
+
+  const fetchFeeData = async () => {
+    try {
+      const [recordsSnap, typesSnap] = await Promise.all([
+        getDocs(collection(db, 'fee_records')),
+        getDocs(collection(db, 'fee_types'))
+      ]);
+      setFeeRecords(recordsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeeRecord)));
+      setFeeTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeeType)));
+    } catch (error) {
+      console.error("Error fetching fee data:", error);
     } finally {
       setLoading(false);
     }
@@ -312,6 +333,80 @@ export default function Communication({ profile }: CommunicationProps) {
       setLinkError("An error occurred while linking. Please try again.");
     } finally {
       setIsLinking(false);
+    }
+  };
+
+  const handleSendBulkFeeReminders = async (type: 'email' | 'sms' | 'whatsapp') => {
+    const pendingRecords = feeRecords.filter(r => r.status === 'pending' || r.status === 'partial' || r.status === 'overdue');
+    if (pendingRecords.length === 0) {
+      alert("No students with pending or overdue fees found.");
+      return;
+    }
+
+    const studentsToNotify = Array.from(new Set(pendingRecords.map(r => r.studentId)))
+      .map(sid => {
+        const student = students.find(s => s.id === sid);
+        const records = pendingRecords.filter(r => r.studentId === sid);
+        if (!student) return null;
+        return { student, records };
+      })
+      .filter(Boolean) as { student: Student; records: FeeRecord[] }[];
+
+    if (studentsToNotify.length === 0) {
+      alert("No valid students found for reminders.");
+      return;
+    }
+
+    if (!window.confirm(`Send bulk ${type} reminders to ${studentsToNotify.length} parents?`)) return;
+
+    setSendingProgress({ current: 0, total: studentsToNotify.length });
+
+    try {
+      for (let i = 0; i < studentsToNotify.length; i++) {
+        const { student, records } = studentsToNotify[i];
+        const feeDetails = records.map(r => {
+          const type = feeTypes.find(t => t.id === r.feeTypeId);
+          return `${type?.name || 'Fee'}: $${(r.amount - r.paidAmount - (r.waiverAmount || 0)).toLocaleString()}`;
+        }).join(', ');
+
+        const content = `Dear Parent, this is a reminder regarding outstanding fees for ${student.name}. Details: ${feeDetails}. Please ensure payment is made at your earliest convenience.`;
+        
+        const recipient = type === 'email' ? student.email : (type === 'whatsapp' ? (student.whatsappNumber || student.contact) : student.contact);
+
+        if (recipient) {
+          const endpoint = type === 'email' ? '/api/send-bulk-email' : (type === 'whatsapp' ? '/api/send-bulk-whatsapp' : '/api/send-bulk-sms');
+          const body = type === 'email' 
+            ? { subject: 'Fee Payment Reminder', content, recipients: [recipient] }
+            : { content, recipients: [recipient] };
+
+          await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+        }
+
+        setSendingProgress(prev => prev ? { ...prev, current: i + 1 } : null);
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      await addDoc(collection(db, 'bulk_messages'), {
+        subject: 'Bulk Fee Reminders',
+        content: 'Personalized fee reminders sent to parents with outstanding balances.',
+        type,
+        date: new Date().toISOString().split('T')[0],
+        recipientsCount: studentsToNotify.length,
+        status: 'sent'
+      });
+
+      alert(`Successfully sent ${type} reminders to ${studentsToNotify.length} parents.`);
+      fetchBulkMessages();
+    } catch (error) {
+      console.error("Error sending bulk fee reminders:", error);
+      alert("Failed to send some reminders. Check console for details.");
+    } finally {
+      setSendingProgress(null);
+      setIsFeeReminderModalOpen(false);
     }
   };
 
@@ -700,7 +795,31 @@ export default function Communication({ profile }: CommunicationProps) {
                       <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
                         <Clock className="w-5 h-5" />
                       </div>
-                      <h4 className="font-bold text-slate-900">Fee Reminder</h4>
+                      <h4 className="font-bold text-slate-900">Bulk Fee Reminders</h4>
+                    </div>
+                    <p className="text-xs text-slate-500">Send personalized reminders to all parents with pending or overdue payments.</p>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleQuickBroadcast('fee_bulk', 'whatsapp')}
+                        className="flex-1 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <MessageSquare className="w-3 h-3" /> WhatsApp
+                      </button>
+                      <button 
+                        onClick={() => handleQuickBroadcast('fee_bulk', 'email')}
+                        className="flex-1 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <Mail className="w-3 h-3" /> Email
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                        <History className="w-5 h-5" />
+                      </div>
+                      <h4 className="font-bold text-slate-900">General Fee Reminder</h4>
                     </div>
                     <p className="text-xs text-slate-500">Send a gentle reminder to all parents regarding outstanding fee payments.</p>
                     <div className="flex gap-2">
@@ -1035,6 +1154,133 @@ export default function Communication({ profile }: CommunicationProps) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
+      {/* Bulk Fee Reminder Modal */}
+      <AnimatePresence>
+        {isFeeReminderModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setIsFeeReminderModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+                <h2 className="text-xl font-bold">Bulk Fee Reminders</h2>
+                <button onClick={() => setIsFeeReminderModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex gap-3 text-amber-800 text-sm">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <div>
+                    <p className="font-bold">Summary of Outstanding Fees</p>
+                    <p className="mt-1">
+                      {(() => {
+                        const pending = feeRecords.filter(r => r.status === 'pending' || r.status === 'partial' || r.status === 'overdue');
+                        const studentCount = new Set(pending.map(r => r.studentId)).size;
+                        const totalAmount = pending.reduce((sum, r) => sum + (r.amount - r.paidAmount - (r.waiverAmount || 0)), 0);
+                        return `${studentCount} students have outstanding fees totaling $${totalAmount.toLocaleString()}.`;
+                      })()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-slate-700">Choose Delivery Method:</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <button
+                      onClick={() => handleSendBulkFeeReminders('email')}
+                      disabled={!!sendingProgress}
+                      className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-600 hover:bg-indigo-50 transition-all group disabled:opacity-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100">
+                          <Mail className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold text-slate-900">Send via Email</p>
+                          <p className="text-xs text-slate-500">Official reminder to parent emails</p>
+                        </div>
+                      </div>
+                      <Send className="w-4 h-4 text-slate-300 group-hover:text-indigo-600" />
+                    </button>
+
+                    <button
+                      onClick={() => handleSendBulkFeeReminders('whatsapp')}
+                      disabled={!!sendingProgress}
+                      className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl hover:border-emerald-600 hover:bg-emerald-50 transition-all group disabled:opacity-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-100">
+                          <MessageSquare className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold text-slate-900">Send via WhatsApp</p>
+                          <p className="text-xs text-slate-500">Direct message to parent numbers</p>
+                        </div>
+                      </div>
+                      <Send className="w-4 h-4 text-slate-300 group-hover:text-emerald-600" />
+                    </button>
+
+                    <button
+                      onClick={() => handleSendBulkFeeReminders('sms')}
+                      disabled={!!sendingProgress}
+                      className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl hover:border-amber-600 hover:bg-amber-50 transition-all group disabled:opacity-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-50 text-amber-600 rounded-lg group-hover:bg-amber-100">
+                          <Bell className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold text-slate-900">Send via SMS</p>
+                          <p className="text-xs text-slate-500">Standard text message reminder</p>
+                        </div>
+                      </div>
+                      <Send className="w-4 h-4 text-slate-300 group-hover:text-amber-600" />
+                    </button>
+                  </div>
+                </div>
+
+                {sendingProgress && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-bold text-indigo-600">
+                      <span>Sending Reminders...</span>
+                      <span>{Math.round((sendingProgress.current / sendingProgress.total) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(sendingProgress.current / sendingProgress.total) * 100}%` }}
+                        className="bg-indigo-600 h-full rounded-full"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 text-center">
+                      Processing {sendingProgress.current} of {sendingProgress.total} recipients
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setIsFeeReminderModalOpen(false)}
+                  disabled={!!sendingProgress}
+                  className="w-full py-3 text-slate-500 font-bold hover:text-slate-700 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

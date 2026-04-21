@@ -38,8 +38,8 @@ export default function PayrollManagement({ profile }: PayrollManagementProps) {
   };
 
   const filteredPayroll = payroll.filter(p => {
-    const staffName = staff.find(s => s.id === p.staffId)?.name.toLowerCase() || '';
-    return staffName.includes(searchQuery.toLowerCase()) || p.month.toLowerCase().includes(searchQuery.toLowerCase());
+    const staffName = (staff.find(s => s.id === p.staffId)?.name || '').toLowerCase();
+    return staffName.includes(searchQuery.toLowerCase()) || (p.month || '').toLowerCase().includes(searchQuery.toLowerCase());
   }).sort((a, b) => {
     let comparison = 0;
     if (sortBy === 'staffName') {

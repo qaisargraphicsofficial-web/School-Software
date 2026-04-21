@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { Calendar, ChevronDown, X, Plus, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '../lib/utils';
 
 interface ScheduleProps {
   profile: UserProfile | null;
@@ -124,6 +125,24 @@ export default function Schedule({ profile }: ScheduleProps) {
     setEditingCell(null);
   };
 
+  const getSubjectColor = (subject: string) => {
+    const colors: Record<string, { bg: string, text: string, border: string, dot: string }> = {
+      'Mathematics': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-100', dot: 'bg-blue-400' },
+      'English': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-100', dot: 'bg-purple-400' },
+      'Science': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-100', dot: 'bg-emerald-400' },
+      'History': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-100', dot: 'bg-amber-400' },
+      'Geography': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-100', dot: 'bg-indigo-400' },
+      'Art': { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-100', dot: 'bg-rose-400' },
+      'Physical Education': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-100', dot: 'bg-orange-400' },
+      'Computer Science': { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-100', dot: 'bg-cyan-400' },
+      'Music': { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-100', dot: 'bg-pink-400' },
+      'Library': { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-100', dot: 'bg-slate-400' },
+      'Drama': { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-100', dot: 'bg-violet-400' },
+      'Club Activity': { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-100', dot: 'bg-teal-400' },
+    };
+    return colors[subject] || { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-100', dot: 'bg-slate-400' };
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -203,19 +222,24 @@ export default function Schedule({ profile }: ScheduleProps) {
                     </td>
                     {days.map((day) => {
                       const assignment = timetableData[day]?.[period.id];
+                      const colors = assignment ? getSubjectColor(assignment.subject) : null;
+                      
                       return (
                         <td 
                           key={`${day}-${period.id}`} 
                           onClick={() => handleEditCell(day, period.id)}
-                          className="px-3 py-3 border-r border-slate-100 last:border-r-0 hover:bg-blue-50/50 transition-colors cursor-pointer relative group/cell"
+                          className={cn(
+                            "px-3 py-3 border-r border-slate-100 last:border-r-0 transition-all cursor-pointer relative group/cell",
+                            assignment ? `${colors?.bg} ${colors?.border}` : "hover:bg-slate-50"
+                          )}
                         >
                           {assignment ? (
                             <div className="space-y-1">
-                              <div className="text-sm font-semibold text-blue-700 leading-tight">
+                              <div className={cn("text-sm font-bold leading-tight", colors?.text)}>
                                 {assignment.subject}
                               </div>
-                              <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                              <div className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
+                                <span className={cn("w-1.5 h-1.5 rounded-full", colors?.dot)}></span>
                                 {assignment.teacher}
                               </div>
                             </div>

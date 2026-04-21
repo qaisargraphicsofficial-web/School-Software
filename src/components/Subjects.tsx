@@ -29,7 +29,19 @@ export default function SubjectsManagement({ profile }: SubjectsProps) {
     try {
       const q = query(collection(db, 'subjects'), where('campusId', '==', profile?.campusId || 'main'));
       const snap = await getDocs(q);
-      setSubjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+      let subjectsData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
+
+      if (profile?.role === 'staff' && profile.staffId) {
+        // Find the staff document ID that corresponds to the user's staffId
+        const staffQ = query(collection(db, 'staff'), where('staffId', '==', profile.staffId));
+        const staffSnap = await getDocs(staffQ);
+        if (!staffSnap.empty) {
+          const staffDocId = staffSnap.docs[0].id;
+          subjectsData = subjectsData.filter(s => s.teacherId === staffDocId);
+        }
+      }
+
+      setSubjects(subjectsData);
     } catch (error) {
       console.error("Error fetching subjects:", error);
     }
@@ -78,10 +90,21 @@ export default function SubjectsManagement({ profile }: SubjectsProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-900">Manage Subjects</h2>
-        <button onClick={() => { setIsModalOpen(true); setEditingSubject(null); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-semibold">
-          <Plus className="w-4 h-4" /> Add Subject
-        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">
+            {profile?.role === 'staff' ? 'My Assigned Subjects' : 'Manage Subjects'}
+          </h2>
+          <p className="text-slate-500 text-sm">
+            {profile?.role === 'staff' 
+              ? 'View the subjects you are currently teaching' 
+              : 'Create and assign teachers to school subjects'}
+          </p>
+        </div>
+        {profile?.role === 'admin' && (
+          <button onClick={() => { setIsModalOpen(true); setEditingSubject(null); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-semibold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+            <Plus className="w-4 h-4" /> Add Subject
+          </button>
+        )}
       </div>
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <table className="w-full text-left border-collapse">
@@ -91,7 +114,7 @@ export default function SubjectsManagement({ profile }: SubjectsProps) {
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Code</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Class</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Assigned Teacher</th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Actions</th>
+              {profile?.role === 'admin' && <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -105,19 +128,26 @@ export default function SubjectsManagement({ profile }: SubjectsProps) {
                   <td className="px-6 py-4 text-sm text-slate-600">
                     {assignedTeacher ? (
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-indigo-500" />
-                        <span className="font-medium text-slate-700">{assignedTeacher.name}</span>
+                        <div className="w-8 h-8 bg-indigo-50 rounded-full flex items-center justify-center">
+                          <User className="w-4 h-4 text-indigo-500" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-700 leading-tight">{assignedTeacher.name}</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">{assignedTeacher.role}</p>
+                        </div>
                       </div>
                     ) : (
                       <span className="text-slate-400 italic">Unassigned</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => { setEditingSubject(s); setFormData({ name: s.name, code: s.code, class: s.class, teacherId: s.teacherId || '' }); setIsModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => { setSubjectToDelete(s.id!); setIsDeleteModalOpen(true); }} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </td>
+                  {profile?.role === 'admin' && (
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => { setEditingSubject(s); setFormData({ name: s.name, code: s.code, class: s.class, teacherId: s.teacherId || '' }); setIsModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => { setSubjectToDelete(s.id!); setIsDeleteModalOpen(true); }} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
