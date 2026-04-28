@@ -595,7 +595,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                       <PieChart className="w-5 h-5" />
                     </div>
                   </div>
-                  <div className="h-72">
+                  <div className="h-72 min-h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -632,7 +632,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                       <AlertCircle className="w-5 h-5" />
                     </div>
                   </div>
-                  <div className="h-72">
+                  <div className="h-72 min-h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={dashboardStats.classChartData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -669,7 +669,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                       <BarChart3 className="w-5 h-5" />
                     </div>
                   </div>
-                  <div className="h-80">
+                  <div className="h-80 min-h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={dashboardStats.trendChartData}>
                         <defs>

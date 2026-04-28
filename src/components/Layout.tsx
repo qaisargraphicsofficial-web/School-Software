@@ -204,7 +204,6 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Attendance', icon: Calendar, path: '/attendance', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
     { name: 'Examination Portal', icon: GraduationCap, path: '/examination-portal', roles: ['admin', 'staff'], category: 'EXAMINATIONS' },
     { name: 'Results', icon: GraduationCap, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'EXAMINATIONS' },
-    { name: 'Paper Generator', icon: FileText, path: '/exams', roles: ['admin', 'staff'], category: 'EXAMINATIONS' },
     { name: 'Subjects', icon: BookOpen, path: '/subjects', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Fees', icon: Wallet, path: '/fees', roles: ['admin', 'staff'], category: 'FINANCE' },
     { name: 'Payroll', icon: CreditCard, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
@@ -214,12 +213,7 @@ export default function Layout({ profile }: LayoutProps) {
       icon: UserSquare2, 
       path: '/teachers', 
       roles: ['admin', 'staff'], 
-      category: 'STAFF & OPS',
-      children: [
-        { name: 'Schedule', icon: Calendar, path: '/schedule', roles: ['admin', 'staff'] },
-        { name: 'Leave', icon: FileText, path: '/leave', roles: ['admin', 'staff'] },
-        { name: 'Tasks', icon: CheckSquare, path: '/tasks', roles: ['admin', 'staff', 'student', 'parent'] },
-      ]
+      category: 'STAFF & OPS'
     },
     { name: 'Communication', icon: MessageSquare, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION' },
     { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS' },
@@ -307,9 +301,9 @@ export default function Layout({ profile }: LayoutProps) {
                           )} />
                           <span className="font-bold text-sm tracking-tight">{item.name}</span>
                         </Link>
-                        {item.children && (
+                        {(item as any).children && (
                           <div className="pl-10 space-y-1">
-                            {item.children.map((child: any) => (
+                            {(item as any).children.map((child: any) => (
                               <Link
                                 key={child.path}
                                 to={child.path}
@@ -460,7 +454,7 @@ export default function Layout({ profile }: LayoutProps) {
                     )}
                   </div>
                   <Link 
-                    to="/tasks" 
+                    to="/teachers/tasks" 
                     onClick={() => setShowNotifications(false)}
                     className="block p-4 text-center text-xs font-black text-indigo-600 hover:bg-indigo-50 transition-colors uppercase tracking-widest border-t border-slate-50"
                   >

@@ -26,7 +26,8 @@ import {
   ShieldCheck,
   QrCode,
   Scan,
-  Loader2
+  Loader2,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -211,7 +212,7 @@ export default function StaffManagement({ profile }: StaffProps) {
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'staff'), orderBy('joiningDate', 'desc'));
+      const q = query(collection(db, 'staff'));
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Staff));
       setStaffList(data);
@@ -219,6 +220,21 @@ export default function StaffManagement({ profile }: StaffProps) {
       console.error("Error fetching staff:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit for base64 storage
+        alert("File is too large. Please choose an image under 1MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, photoUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -472,9 +488,13 @@ export default function StaffManagement({ profile }: StaffProps) {
                       <tr key={staff.id} className="hover:bg-slate-50 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold relative group-hover:shadow-md transition-shadow">
-                              {staff.name[0]}
-                              <div className="absolute -bottom-1 -right-1 p-0.5 bg-white rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold relative group-hover:shadow-md transition-shadow overflow-hidden">
+                              {staff.photoUrl ? (
+                                <img src={staff.photoUrl} alt={staff.name} className="w-full h-full object-cover" />
+                              ) : (
+                                staff.name[0]
+                              )}
+                              <div className="absolute -bottom-1 -right-1 p-0.5 bg-white rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                 <QRCodeSVG value={staff.staffId} size={16} />
                               </div>
                             </div>
@@ -793,6 +813,36 @@ export default function StaffManagement({ profile }: StaffProps) {
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                {/* Profile Picture Upload */}
+                <div className="flex flex-col items-center gap-4 py-4 border-b border-slate-100">
+                  <div className="relative group">
+                    <div className="w-24 h-24 rounded-3xl bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-indigo-300">
+                      {formData.photoUrl ? (
+                        <img 
+                          src={formData.photoUrl} 
+                          alt="Profile Preview" 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Users className="w-10 h-10 text-slate-300 group-hover:text-indigo-300" />
+                      )}
+                    </div>
+                    <label className="absolute -bottom-2 -right-2 p-2 bg-white rounded-xl shadow-lg border border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors group/btn">
+                      <Upload className="w-4 h-4 text-indigo-600 group-hover/btn:scale-110 transition-transform" />
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={handleFileChange}
+                      />
+                    </label>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Profile Picture</p>
+                    <p className="text-[10px] text-slate-400 font-medium italic mt-1">Recommended: Square PNG/JPG under 1MB</p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Full Name</label>

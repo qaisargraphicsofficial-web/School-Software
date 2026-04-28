@@ -313,6 +313,23 @@
       },
       "required": ["staffId", "campusId"]
     },
+    "SchoolApplication": {
+      "title": "SchoolApplication",
+      "description": "New school registration applications",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string" },
+        "adminName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid"] },
+        "plan": { "type": "string", "enum": ["basic", "premium"] }
+      },
+      "required": ["schoolName", "adminName", "email", "status", "createdAt"]
+    },
     "Subject": {
       "title": "Subject",
       "description": "Subjects taught in the school",
@@ -353,7 +370,8 @@
     "students": { "schema": "Student", "description": "Collection of students" },
     "staff": { "schema": "Staff", "description": "Collection of staff members" },
     "attendance": { "schema": "Attendance", "description": "Collection of attendance records" },
-    "results": { "schema": "ExamResult", "description": "Collection of exam results" },
+    "exam_results": { "schema": "ExamResult", "description": "Collection of exam results" },
+    "school_applications": { "schema": "SchoolApplication", "description": "Collection of school registration applications" },
     "fees": { "schema": "Fee", "description": "Collection of fee records" },
     "expenses": { "schema": "Expense", "description": "Collection of school expenses" },
     "payroll": { "schema": "Payroll", "description": "Collection of payroll records" },

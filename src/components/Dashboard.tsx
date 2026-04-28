@@ -268,7 +268,7 @@ export default function Dashboard({ profile }: DashboardProps) {
                 <UserPlus className="w-6 h-6" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Add Student</span>
               </Link>
-              <Link to="/tasks" className="flex flex-col items-center gap-3 p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+              <Link to="/teachers/tasks" className="flex flex-col items-center gap-3 p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
                 <CheckSquare className="w-6 h-6" />
                 <span className="text-[10px] font-black uppercase tracking-widest">New Task</span>
               </Link>
@@ -287,7 +287,7 @@ export default function Dashboard({ profile }: DashboardProps) {
           <div className="card p-8">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-black text-slate-900 tracking-tight">Recent Activity</h3>
-              <Link to="/tasks" className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">View All</Link>
+              <Link to="/teachers/tasks" className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">View All</Link>
             </div>
             <div className="space-y-6">
               {recentTasks.length === 0 ? (

@@ -32,7 +32,8 @@ import {
   CheckCircle2,
   XCircle,
   FileText,
-  Printer
+  Printer,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -107,7 +108,7 @@ export default function Students({ profile }: StudentsProps) {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'students'), orderBy('admissionDate', 'desc'));
+      const q = query(collection(db, 'students'));
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student));
       setStudents(data);
@@ -466,6 +467,13 @@ export default function Students({ profile }: StudentsProps) {
           <p className="text-slate-500 font-medium">Manage and track all student records across campuses.</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <button 
+            onClick={fetchStudents}
+            className="p-3 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+            title="Refresh List"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
           <input
             type="file"
             ref={fileInputRef}

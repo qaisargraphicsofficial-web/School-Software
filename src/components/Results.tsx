@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Student, ExamResult, UserProfile, ExamPaper } from '../types';
-import { Search, FileText, Calendar, Award, Download, Eye, XCircle, Upload, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Student, ExamResult, UserProfile, ExamPaper, ExamType, SchoolSettings } from '../types';
+import { Search, FileText, Calendar, Award, Download, Eye, XCircle, Upload, Check, AlertCircle, Loader2, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { cn } from '../lib/utils';
-import { doc, getDoc, addDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, addDoc, writeBatch, where } from 'firebase/firestore';
 import Papa from 'papaparse';
+import { ReportCard } from './ReportCard';
 
 export default function Results({ profile }: { profile: UserProfile | null }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [results, setResults] = useState<ExamResult[]>([]);
+  const [examTypes, setExamTypes] = useState<ExamType[]>([]);
+  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
   const [examPapers, setExamPapers] = useState<Record<string, ExamPaper>>({});
   const [selectedPaper, setSelectedPaper] = useState<ExamPaper | null>(null);
   const [resultFilters, setResultFilters] = useState({
@@ -23,7 +26,9 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
   });
   const [loading, setLoading] = useState(true);
   const reportCardRef = useRef<HTMLDivElement>(null);
+  const bulkReportRef = useRef<HTMLDivElement>(null);
   const [selectedResult, setSelectedResult] = useState<ExamResult | null>(null);
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
 
   // CSV Upload State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -45,7 +50,33 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
   useEffect(() => {
     fetchStudents();
     fetchResults();
-  }, []);
+    fetchExamTypes();
+    fetchSchoolSettings();
+  }, [profile]);
+
+  const fetchSchoolSettings = async () => {
+    try {
+      const campusId = profile?.campusId || 'main';
+      const docRef = doc(db, 'school_settings', campusId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        setSchoolSettings(snap.data() as SchoolSettings);
+      }
+    } catch (error) {
+      console.error("Error fetching school settings:", error);
+    }
+  };
+
+  const fetchExamTypes = async () => {
+    try {
+      const campusId = profile?.campusId || 'main';
+      const q = query(collection(db, 'exam_types'), where('campusId', '==', campusId));
+      const snap = await getDocs(q);
+      setExamTypes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamType)));
+    } catch (error) {
+      console.error("Error fetching exam types:", error);
+    }
+  };
 
   const fetchStudents = async () => {
     try {
@@ -105,6 +136,45 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
         }
       }
     }, 500);
+  };
+
+  const handleBulkDownload = async () => {
+    if (filteredResults.length === 0) return;
+    setIsBulkGenerating(true);
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      
+      for (let i = 0; i < filteredResults.length; i++) {
+        const result = filteredResults[i];
+        setSelectedResult(result);
+        
+        // Wait for render
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        if (reportCardRef.current) {
+          const canvas = await html2canvas(reportCardRef.current, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff'
+          });
+          const imgData = canvas.toDataURL('image/png');
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          
+          if (i > 0) pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        }
+      }
+      
+      pdf.save(`Bulk_Report_Cards_${resultFilters.examTypeId || 'Results'}.pdf`);
+    } catch (error) {
+      console.error("Bulk generation error:", error);
+      alert("Failed to generate bulk report cards.");
+    } finally {
+      setSelectedResult(null);
+      setIsBulkGenerating(false);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,15 +263,31 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
           <h1 className="text-2xl font-bold text-slate-900">Student Results</h1>
           <p className="text-slate-500 text-sm">View and download student exam results</p>
         </div>
-        {(profile?.role === 'admin' || profile?.role === 'staff') && (
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-sm font-medium"
-          >
-            <Upload className="w-4 h-4" />
-            Upload CSV
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {filteredResults.length > 0 && (
+            <button
+              onClick={handleBulkDownload}
+              disabled={isBulkGenerating}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-sm font-medium disabled:opacity-50"
+            >
+              {isBulkGenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Printer className="w-4 h-4" />
+              )}
+              {isBulkGenerating ? 'Generating...' : 'Bulk Download PDF'}
+            </button>
+          )}
+          {(profile?.role === 'admin' || profile?.role === 'staff') && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-sm font-medium"
+            >
+              <Upload className="w-4 h-4" />
+              Upload CSV
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-4 items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
@@ -493,6 +579,21 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
           </div>
         )}
       </AnimatePresence>
+      {/* Result Card Preview (Hidden for PDF generation) */}
+      <div className="fixed -left-[2000px] top-0 pointer-events-none">
+        <div ref={reportCardRef}>
+          {selectedResult && (
+            <ReportCard 
+              student={students.find(s => s.id === selectedResult.studentId)!}
+              result={selectedResult}
+              allResults={results}
+              examTypes={examTypes}
+              schoolSettings={schoolSettings}
+              selectedExamTypeId={selectedResult.examTypeId}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

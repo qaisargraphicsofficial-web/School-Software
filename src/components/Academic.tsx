@@ -249,7 +249,11 @@ export default function Academic({ profile }: AcademicProps) {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'students'), where('class', '==', selectedClass));
+      const q = query(
+        collection(db, 'students'), 
+        where('class', '==', selectedClass),
+        where('campusId', '==', profile?.campusId || 'main')
+      );
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
       setStudents(data);
@@ -513,7 +517,7 @@ export default function Academic({ profile }: AcademicProps) {
               {/* Pie Chart */}
               <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Distribution</h4>
-                <div className="h-[300px] w-full">
+                <div className="h-[300px] w-full min-w-[200px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                       <Pie
@@ -545,7 +549,7 @@ export default function Academic({ profile }: AcademicProps) {
               {/* Bar Chart */}
               <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Comparison</h4>
-                <div className="h-[300px] w-full">
+                <div className="h-[300px] w-full min-w-[200px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={[

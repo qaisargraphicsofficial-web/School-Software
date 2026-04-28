@@ -18,11 +18,12 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && 
         ( request.auth.token.email == "qaisarabbas6496@gmail.com" || 
-          (userExists() && getUserData().role == 'admin') );
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') );
     }
     
     function isStaff() {
-      return isAuthenticated() && ( isAdmin() || (userExists() && getUserData().role == 'staff') );
+      return isAuthenticated() && ( isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff') );
     }
 
     function isParent() {
@@ -36,9 +37,8 @@ service cloud.firestore {
     // Rules
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && request.auth.uid == userId && 
-        (request.resource.data.role == resource.data.role || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
     match /campuses/{campusId} {
@@ -68,9 +68,14 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
+    match /exam_results/{id} {
+      allow read, write: if isAdmin() || isStaff();
+      allow read: if isAuthenticated() && ( (userExists() && getUserData().studentId == resource.data.studentId) );
+    }
+
     match /results/{id} {
-      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
-      allow write: if isStaff();
+      allow read, write: if isAdmin() || isStaff();
+      allow read: if isAuthenticated() && ( (userExists() && getUserData().studentId == resource.data.studentId) );
     }
 
     match /fee_types/{id} {
@@ -197,6 +202,21 @@ service cloud.firestore {
     match /settings/{id} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
+    }
+
+    match /school_settings/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /school_applications/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

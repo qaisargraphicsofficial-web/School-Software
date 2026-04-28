@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import { seedData } from '../services/seedService';
 import { SchoolSettings, UserProfile, SchoolApplication, UserStatus } from '../types';
 import { 
   Settings as SettingsIcon, 
@@ -108,6 +109,25 @@ export default function Settings({ profile }: SettingsProps) {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [applications, setApplications] = useState<SchoolApplication[]>([]);
+  const [seeding, setSeeding] = useState(false);
+  const [seedStatus, setSeedStatus] = useState<any>(null);
+
+  const handleSeedData = async () => {
+    if (!window.confirm("This will populate your database with dummy data for classes, subjects, students, staff, and operations. Existing data with same IDs might be overwritten. Proceed?")) return;
+    
+    setSeeding(true);
+    setSeedStatus("Seeding data...");
+    try {
+      await seedData(profile?.campusId || 'main');
+      setSeedStatus("Successfully seeded all dummy data!");
+      setTimeout(() => setSeedStatus(null), 5000);
+    } catch (error) {
+      console.error("Seeding failed:", error);
+      setSeedStatus("Seeding failed. Check console for details.");
+    } finally {
+      setSeeding(false);
+    }
+  };
   const [approvingId, setApprovingId] = useState<string | null>(null);
   
   const [newRoleName, setNewRoleName] = useState('');
@@ -214,6 +234,21 @@ export default function Settings({ profile }: SettingsProps) {
       console.error("Error fetching settings:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit for base64 storage
+        alert("File is too large. Please choose an image under 1MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSettings({ ...settings, logoUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -335,15 +370,31 @@ export default function Settings({ profile }: SettingsProps) {
                             <Globe className="w-8 h-8 text-slate-300" />
                           )}
                         </div>
-                        <div className="flex-1 space-y-2">
-                          <input
-                            type="url"
-                            className="input-field"
-                            value={settings.logoUrl}
-                            onChange={e => setSettings({...settings, logoUrl: e.target.value})}
-                            placeholder="https://example.com/logo.png"
-                          />
-                          <p className="text-[10px] text-slate-400 font-medium italic">Provide a direct image URL (PNG or JPG recommended).</p>
+                        <div className="flex-1 space-y-3">
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <input
+                                type="url"
+                                className="input-field"
+                                value={settings.logoUrl}
+                                onChange={e => setSettings({...settings, logoUrl: e.target.value})}
+                                placeholder="https://example.com/logo.png"
+                              />
+                            </div>
+                            <label className="shrink-0 cursor-pointer">
+                              <div className="px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 font-bold text-sm hover:bg-indigo-100 transition-colors flex items-center gap-2">
+                                <Plus className="w-4 h-4" />
+                                Choose File
+                              </div>
+                              <input 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={handleFileChange}
+                              />
+                            </label>
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-medium italic">Provide a direct image URL or upload a local file (PNG or JPG recommended).</p>
                         </div>
                       </div>
                     </div>
@@ -799,6 +850,34 @@ export default function Settings({ profile }: SettingsProps) {
                   </div>
 
                   <div className="space-y-6">
+                    <div className="p-6 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-4">
+                      <Database className="w-6 h-6 text-amber-600 mt-1" />
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-amber-900">Database Seeding</h4>
+                        <p className="text-sm text-amber-700 leading-relaxed">
+                          Populate your application with comprehensive dummy data for stress testing and feature validation.
+                        </p>
+                        <div className="pt-4 flex flex-wrap gap-4">
+                          <button
+                            onClick={handleSeedData}
+                            disabled={seeding}
+                            className="px-6 py-3 bg-white border border-amber-200 text-amber-700 rounded-xl font-bold text-sm hover:bg-amber-100 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+                          >
+                            {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                            Seed Dummy Data
+                          </button>
+                        </div>
+                        {seedStatus && (
+                          <p className={cn(
+                            "text-xs font-bold mt-2",
+                            seedStatus.includes("failed") ? "text-red-600" : "text-emerald-600"
+                          )}>
+                            {seedStatus}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="flex items-center justify-between p-6 bg-rose-50/50 rounded-3xl border border-rose-100">
                       <div className="flex gap-4">
                         <AlertTriangle className="w-10 h-10 text-rose-600 shrink-0" />

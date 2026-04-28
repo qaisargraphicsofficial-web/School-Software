@@ -62,8 +62,10 @@ export default function Reports({ profile }: ReportsProps) {
   const exportToPDF = async () => {
     if (!reportRef.current) return;
     setGeneratingPDF(true);
+    // Add small delay to ensure DOM is fully rendered
+    await new Promise(resolve => setTimeout(resolve, 500));
     try {
-      const canvas = await html2canvas(reportRef.current, { scale: 2 });
+      const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();

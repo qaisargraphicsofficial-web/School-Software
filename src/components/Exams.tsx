@@ -10,6 +10,8 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { cn } from '../lib/utils';
 
+import { ReportCard } from './ReportCard';
+
 export default function Exams({ profile }: { profile: UserProfile | null }) {
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
   const [examPapers, setExamPapers] = useState<ExamPaper[]>([]);
@@ -18,8 +20,44 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>([]);
-  const [activeTab, setActiveTab] = useState<'papers' | 'schedule' | 'results'>('results');
-  const [examResults, setExamResults] = useState<ExamResult[]>([]);
+  const [previewMode, setPreviewMode] = useState<'edit' | 'preview'>('edit');
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState<number | null>(null);
+
+  const addOption = (questionIndex: number, isGenerated: boolean = false) => {
+    if (isGenerated) {
+      if (!generatedPaperData) return;
+      const updatedQuestions = [...generatedPaperData.questions];
+      updatedQuestions[questionIndex] = { ...updatedQuestions[questionIndex] };
+      if (!updatedQuestions[questionIndex].options) updatedQuestions[questionIndex].options = [];
+      if (updatedQuestions[questionIndex].options.length < 5) {
+        updatedQuestions[questionIndex].options = [...updatedQuestions[questionIndex].options, ""];
+        setGeneratedPaperData({ ...generatedPaperData, questions: updatedQuestions });
+      }
+    } else {
+      const updatedQuestions = [...(newPaper.questions || [])];
+      updatedQuestions[questionIndex] = { ...updatedQuestions[questionIndex] };
+      if (!updatedQuestions[questionIndex].options) updatedQuestions[questionIndex].options = [];
+      if (updatedQuestions[questionIndex].options.length < 5) {
+        updatedQuestions[questionIndex].options = [...updatedQuestions[questionIndex].options, ""];
+        setNewPaper({ ...newPaper, questions: updatedQuestions });
+      }
+    }
+  };
+
+  const removeOption = (questionIndex: number, optionIndex: number, isGenerated: boolean = false) => {
+    if (isGenerated) {
+      if (!generatedPaperData) return;
+      const updatedQuestions = [...generatedPaperData.questions];
+      updatedQuestions[questionIndex] = { ...updatedQuestions[questionIndex] };
+      updatedQuestions[questionIndex].options = updatedQuestions[questionIndex].options.filter((_, i) => i !== optionIndex);
+      setGeneratedPaperData({ ...generatedPaperData, questions: updatedQuestions });
+    } else {
+      const updatedQuestions = [...(newPaper.questions || [])];
+      updatedQuestions[questionIndex] = { ...updatedQuestions[questionIndex] };
+      updatedQuestions[questionIndex].options = updatedQuestions[questionIndex].options.filter((_, i) => i !== optionIndex);
+      setNewPaper({ ...newPaper, questions: updatedQuestions });
+    }
+  };
   const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
   const [selectedResultClass, setSelectedResultClass] = useState('');
   const [selectedResultSection, setSelectedResultSection] = useState('');
@@ -43,6 +81,11 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   const [reviewMode, setReviewMode] = useState(false);
   const [generatedPaperData, setGeneratedPaperData] = useState<any>(null);
   const [viewingPaper, setViewingPaper] = useState<ExamPaper | null>(null);
+  const [paperToDelete, setPaperToDelete] = useState<string | null>(null);
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
+  const [examTypeToDelete, setExamTypeToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [scheduleView, setScheduleView] = useState<'cards' | 'grid'>('cards');
   
   const [newExamType, setNewExamType] = useState({ name: '', term: '' });
 
@@ -67,6 +110,9 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     questions: [],
   });
 
+  const [activeTab, setActiveTab] = useState<'types' | 'papers' | 'schedules' | 'results'>('types');
+  const [examResults, setExamResults] = useState<ExamResult[]>([]);
+
   const [aiPrompt, setAiPrompt] = useState({
     class: '',
     subject: '',
@@ -78,7 +124,12 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     hardCount: 2,
     mcqCount: 5,
     shortCount: 3,
-    longCount: 2
+    longCount: 2,
+    mcqMarks: 1,
+    shortMarks: 4,
+    longMarks: 10,
+    detailedAnswers: true,
+    language: 'English' as 'English' | 'Urdu' | 'Bilingual'
   });
 
   useEffect(() => {
@@ -347,10 +398,10 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchSubjects = async () => {
     try {
-      const campusId = profile?.campusId || 'main';
-      const q = query(collection(db, 'subjects'), where('campusId', '==', campusId));
+      const q = query(collection(db, 'subjects'));
       const snap = await getDocs(q);
-      setSubjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
+      setSubjects(data);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'subjects');
     }
@@ -400,14 +451,21 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     }
   };
 
-  const handleDeleteSchedule = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this exam schedule?')) {
-      try {
-        await deleteDoc(doc(db, 'exam_schedules', id));
-        fetchSchedules();
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, 'exam_schedules');
-      }
+  const handleDeleteSchedule = (id: string) => {
+    setScheduleToDelete(id);
+  };
+
+  const confirmDeleteSchedule = async () => {
+    if (!scheduleToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'exam_schedules', scheduleToDelete));
+      fetchSchedules();
+      setScheduleToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'exam_schedules');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -436,14 +494,21 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     }
   };
 
-  const handleDeleteExamType = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this exam type?')) {
-      try {
-        await deleteDoc(doc(db, 'exam_types', id));
-        fetchExamTypes();
-      } catch (error) {
-        console.error("Error deleting exam type:", error);
-      }
+  const handleDeleteExamType = (id: string) => {
+    setExamTypeToDelete(id);
+  };
+
+  const confirmDeleteExamType = async () => {
+    if (!examTypeToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'exam_types', examTypeToDelete));
+      fetchExamTypes();
+      setExamTypeToDelete(null);
+    } catch (error) {
+      console.error("Error deleting exam type:", error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -510,14 +575,21 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     }
   };
 
-  const handleDeletePaper = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this exam paper?')) {
-      try {
-        await deleteDoc(doc(db, 'exam_papers', id));
-        fetchExamPapers();
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, 'exam_papers');
-      }
+  const handleDeletePaper = (id: string) => {
+    setPaperToDelete(id);
+  };
+
+  const confirmDeletePaper = async () => {
+    if (!paperToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'exam_papers', paperToDelete));
+      fetchExamPapers();
+      setPaperToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'exam_papers');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -543,8 +615,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       const examTypeName = examTypes.find(t => t.id === aiPrompt.examTypeId)?.name || 'General';
-      const totalQuestions = aiPrompt.easyCount + aiPrompt.mediumCount + aiPrompt.hardCount;
-      const totalByType = aiPrompt.mcqCount + aiPrompt.shortCount + aiPrompt.longCount;
+      const totalQuestions = aiPrompt.mcqCount + aiPrompt.shortCount + aiPrompt.longCount;
 
       const prompt = `You are an expert educator. Generate a high-quality, comprehensive exam paper for Class ${aiPrompt.class} on the subject of ${aiPrompt.subject}.
       
@@ -552,31 +623,36 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       - Exam Type: ${examTypeName}
       - Topic/Syllabus: ${aiPrompt.topic}
       - Duration: ${aiPrompt.duration} minutes
+      - Primary Language: ${aiPrompt.language} ${aiPrompt.language === 'Bilingual' ? '(English and Urdu)' : ''}
       
-      QUESTION DISTRIBUTION BY DIFFICULTY:
-      - Easy: ${aiPrompt.easyCount} questions
-      - Medium: ${aiPrompt.mediumCount} questions
-      - Hard: ${aiPrompt.hardCount} questions
+      QUESTION DISTRIBUTION AND MARKS:
+      - Multiple Choice (MCQ): ${aiPrompt.mcqCount} questions (${aiPrompt.mcqMarks} marks each)
+      - Short Answer: ${aiPrompt.shortCount} questions (${aiPrompt.shortMarks} marks each)
+      - Long Answer: ${aiPrompt.longCount} questions (${aiPrompt.longMarks} marks each)
       
-      QUESTION DISTRIBUTION BY TYPE:
-      - Multiple Choice (MCQ): ${aiPrompt.mcqCount} questions
-      - Short Answer: ${aiPrompt.shortCount} questions
-      - Long Answer: ${aiPrompt.longCount} questions
+      DIFFICULTY TARGETS:
+      - Easy: ~${Math.round((aiPrompt.easyCount / (aiPrompt.easyCount + aiPrompt.mediumCount + aiPrompt.hardCount)) * 100)}%
+      - Medium: ~${Math.round((aiPrompt.mediumCount / (aiPrompt.easyCount + aiPrompt.mediumCount + aiPrompt.hardCount)) * 100)}%
+      - Hard: ~${Math.round((aiPrompt.hardCount / (aiPrompt.easyCount + aiPrompt.mediumCount + aiPrompt.hardCount)) * 100)}%
       
       Total Questions to generate: ${totalQuestions}
       
+      ANSWER KEY REQUIREMENTS:
+      ${aiPrompt.detailedAnswers ? 
+        '- GENERATE A HIGHLY DETAILED ANSWER KEY: For MCQs, provide the correct option. For short answers, provide complete concise answers. For long answers, provide a detailed step-by-step solution, grading rubric, or comprehensive key points.' : 
+        '- Provide brief correct answers or key points for each question.'}
+      
       INSTRUCTIONS:
-      - Ensure the difficulty levels are accurately reflected in the questions.
-      - Questions should be challenging and test conceptual understanding.
-      - If there's a slight mismatch between total by difficulty and total by type, prioritize the total count of ${totalQuestions} and try to satisfy both distributions as closely as possible.
+      - Questions should be challenging and test conceptual understanding appropriate for Class ${aiPrompt.class}.
+      - ${aiPrompt.language === 'Urdu' ? 'The entire paper must be in Urdu.' : aiPrompt.language === 'Bilingual' ? 'Provide questions and options in both English and Urdu where applicable.' : 'The entire paper must be in English.'}
       
       OUTPUT FORMAT:
       Return the output as a JSON array of question objects. Each object MUST have:
       - "question": The question text.
-      - "marks": Suggested marks for the question (integer).
+      - "marks": The marks specified above for this question type.
       - "type": One of "multiple_choice", "short_answer", or "long_answer".
       - "options": An array of 4 strings if type is "multiple_choice", otherwise an empty array [].
-      - "answer": The correct answer or detailed key points expected for grading.
+      - "answer": The correct answer or detailed answer key as requested.
       - "difficulty": The difficulty level assigned to this question ("Easy", "Medium", or "Hard").
       
       Return ONLY the raw JSON array. Do not include any markdown formatting or explanations.`;
@@ -1033,8 +1109,28 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold"
               >
                 <Download className="w-4 h-4" />
-                Download Date Sheet
+                Download
               </button>
+              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  onClick={() => setScheduleView('cards')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                    scheduleView === 'cards' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  Cards
+                </button>
+                <button
+                  onClick={() => setScheduleView('grid')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                    scheduleView === 'grid' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  Grid
+                </button>
+              </div>
             </div>
             {(profile?.role === 'admin' || profile?.role === 'staff') && (
               <button
@@ -1047,92 +1143,160 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {schedules
-              .filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject))
-              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-              .map((s) => (
-              <motion.div
-                key={s.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
-                
-                <div className="flex items-start justify-between mb-4 relative">
-                  <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl">
-                    <Calendar className="w-6 h-6" />
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="px-3 py-1 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
-                      {examTypes.find(t => t.id === s.examTypeId)?.name || 'Exam'}
-                    </span>
-                    <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">
-                      Class {s.class}
-                    </span>
-                  </div>
-                </div>
+          {scheduleView === 'grid' ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Date / Day</th>
+                      {Array.from(new Set(schedules.map(s => s.class))).sort().map(c => (
+                        <th key={c} className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap min-w-[120px]">
+                          Class {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {(Array.from(new Set(schedules.map(s => s.date))) as string[])
+                      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+                      .map(date => {
+                        const dateObj = new Date(date);
+                        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                        const formattedDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                        const uniqueClasses = Array.from(new Set(schedules.map(s => s.class))).sort();
 
-                <h3 className="text-xl font-black text-slate-900 mb-1">{s.subject}</h3>
-                <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-                  <MapPin className="w-4 h-4" />
-                  Room: {s.roomNumber || 'TBD'}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</p>
-                    <p className="text-sm font-bold text-slate-700">{s.date}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time</p>
-                    <p className="text-sm font-bold text-slate-700">{s.time}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Invigilators</p>
-                  <div className="flex flex-wrap gap-2">
-                    {s.invigilatorIds.length > 0 ? (
-                      s.invigilatorIds.map(id => {
-                        const sStaff = staff.find(st => st.id === id);
                         return (
-                          <span key={id} className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-medium border border-slate-100 flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            {sStaff?.name || 'Unknown'}
-                          </span>
+                          <tr key={date} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="p-4 whitespace-nowrap">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-900">{formattedDate}</span>
+                                <span className="text-[10px] text-slate-500 uppercase font-medium">{dayName}</span>
+                              </div>
+                            </td>
+                            {uniqueClasses.map(c => {
+                              const classSchedules = schedules.filter(s => s.date === date && s.class === c);
+                              return (
+                                <td key={c} className="p-4">
+                                  {classSchedules.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {classSchedules.map((s, idx) => (
+                                        <div key={idx} className="bg-indigo-50/50 border border-indigo-100/50 rounded-lg p-2 text-center">
+                                          <p className="text-xs font-bold text-indigo-700 truncate" title={s.subject}>{s.subject}</p>
+                                          <div className="flex items-center justify-center gap-1 mt-1">
+                                            <Clock className="w-2.5 h-2.5 text-indigo-400" />
+                                            <span className="text-[10px] text-indigo-500 font-medium">{s.time}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-2">
+                                      <span className="text-[10px] text-slate-300 font-medium">---</span>
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
                         );
-                      })
-                    ) : (
-                      <span className="text-xs text-slate-400 italic">No invigilators assigned</span>
-                    )}
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {schedules
+                .filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject))
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .map((s) => (
+                <motion.div
+                  key={s.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
+                  
+                  <div className="flex items-start justify-between mb-4 relative">
+                    <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl">
+                      <Calendar className="w-6 h-6" />
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="px-3 py-1 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
+                        {examTypes.find(t => t.id === s.examTypeId)?.name || 'Exam'}
+                      </span>
+                      <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">
+                        Class {s.class}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                {(profile?.role === 'admin' || profile?.role === 'staff') && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setEditingScheduleId(s.id!);
-                        setNewSchedule(s);
-                        setIsScheduleModalOpen(true);
-                      }}
-                      className="flex-1 py-2 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors text-xs font-bold uppercase tracking-widest"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSchedule(s.id!)}
-                      className="flex-1 py-2 bg-rose-50 text-rose-700 rounded-xl hover:bg-rose-100 transition-colors text-xs font-bold uppercase tracking-widest"
-                    >
-                      Delete
-                    </button>
+                  <h3 className="text-xl font-black text-slate-900 mb-1">{s.subject}</h3>
+                  <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                    <MapPin className="w-4 h-4" />
+                    Room: {s.roomNumber || 'TBD'}
                   </div>
-                )}
-              </motion.div>
-            ))}
-          </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</p>
+                      <p className="text-sm font-bold text-slate-700">{s.date}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time</p>
+                      <p className="text-sm font-bold text-slate-700">{s.time}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Invigilators</p>
+                    <div className="flex flex-wrap gap-2">
+                      {s.invigilatorIds.length > 0 ? (
+                        s.invigilatorIds.map(id => {
+                          const sStaff = staff.find(st => st.id === id);
+                          return (
+                            <span key={id} className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-medium border border-slate-100 flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {sStaff?.name || 'Unknown'}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">No invigilators assigned</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {(profile?.role === 'admin' || profile?.role === 'staff') && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingScheduleId(s.id!);
+                          setNewSchedule(s);
+                          setIsScheduleModalOpen(true);
+                        }}
+                        className="flex-1 py-2 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors text-xs font-bold uppercase tracking-widest"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSchedule(s.id!)}
+                        className="flex-1 py-2 bg-rose-50 text-rose-700 rounded-xl hover:bg-rose-100 transition-colors text-xs font-bold uppercase tracking-widest"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          )}
           {schedules.length === 0 && (
             <div className="text-center py-20 bg-white rounded-[32px] border-2 border-dashed border-slate-100">
               <Calendar className="w-16 h-16 text-slate-200 mx-auto mb-4" />
@@ -1306,8 +1470,99 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-3xl p-6 w-full max-w-4xl shadow-2xl overflow-y-auto max-h-[90vh] flex flex-col"
           >
-            <h2 className="text-xl font-bold mb-4">{editingPaperId ? 'Edit Exam Paper' : 'Create Exam Paper (Manual)'}</h2>
-            <form onSubmit={handleAddPaper} className="space-y-6 flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">{editingPaperId ? 'Edit Exam Paper' : 'Create Exam Paper (Manual)'}</h2>
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('edit')}
+                  className={cn(
+                    "px-4 py-1.5 rounded-lg text-sm font-bold transition-all",
+                    previewMode === 'edit' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('preview')}
+                  className={cn(
+                    "px-4 py-1.5 rounded-lg text-sm font-bold transition-all",
+                    previewMode === 'preview' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  Live Preview
+                </button>
+              </div>
+            </div>
+            
+            {previewMode === 'preview' ? (
+              <div className="flex-1 overflow-y-auto pr-2 space-y-8 p-8 border border-slate-100 rounded-3xl bg-slate-50/30">
+                {/* Paper Header Preview */}
+                <div className="text-center border-b-2 border-slate-900 pb-6 mb-8">
+                  <h1 className="text-3xl font-black text-slate-900 uppercase tracking-[0.2em] mb-3">{newPaper.title || 'EXAM PAPER TITLE'}</h1>
+                  <div className="flex items-center justify-center gap-12 text-slate-800 font-bold uppercase tracking-wider text-sm">
+                    <div className="flex flex-col items-start">
+                      <span className="text-[10px] text-slate-400">CLASS</span>
+                      <span>{newPaper.class || '---'}</span>
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className="text-[10px] text-slate-400">SUBJECT</span>
+                      <span>{newPaper.subject || '---'}</span>
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className="text-[10px] text-slate-400">DATE</span>
+                      <span>{newPaper.date || '---'}</span>
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className="text-[10px] text-slate-400">TIME</span>
+                      <span>{newPaper.duration || '---'} MIN</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Questions Preview */}
+                <div className="space-y-8">
+                  {newPaper.questions?.map((q: any, idx: number) => (
+                    <div key={idx} className="space-y-4">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex gap-4">
+                          <span className="font-bold text-slate-900 shrink-0">Q{idx + 1}.</span>
+                          <p className="text-slate-900 font-medium whitespace-pre-wrap leading-relaxed" dir="auto">{q.question || '...'}</p>
+                        </div>
+                        <span className="shrink-0 text-sm font-bold text-slate-500">[{q.marks} Marks]</span>
+                      </div>
+                      
+                      {q.type === 'multiple_choice' && q.options && (
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-12 ml-10">
+                          {q.options.map((opt: string, optIdx: number) => (
+                            <div key={optIdx} className="flex items-center gap-3">
+                              <div className="w-5 h-5 rounded-full border border-slate-400 flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0">
+                                {String.fromCharCode(65 + optIdx)}
+                              </div>
+                              <span className="text-slate-700 font-medium">{opt || '...'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {q.type === 'long_answer' && (
+                        <div className="ml-10 space-y-2">
+                          {[1, 2, 3, 4, 5].map(line => (
+                            <div key={line} className="w-full h-px bg-slate-200 border-b border-dashed border-slate-300" />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-12 text-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">
+                  End of Examination Paper
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleAddPaper} className="space-y-6 flex-1 flex flex-col">
               <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div className="col-span-2 md:col-span-1">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Exam Type</label>
@@ -1358,12 +1613,14 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                     onChange={e => setNewPaper({...newPaper, subject: e.target.value})}
                   >
                     <option value="">Select Subject</option>
-                    {subjects
-                      .filter(s => s.class === newPaper.class)
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map(s => (
+                    {(() => {
+                      const filtered = subjects
+                        .filter(s => s.class.trim().toLowerCase() === newPaper.class.trim().toLowerCase())
+                        .sort((a, b) => a.name.localeCompare(b.name));
+                      return filtered.map(s => (
                         <option key={s.id} value={s.name}>{s.name}</option>
-                      ))}
+                      ));
+                    })()}
                   </select>
                 </div>
                 <div>
@@ -1473,25 +1730,47 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                               </div>
                             </div>
 
-                            {q.type === 'multiple_choice' && q.options && (
-                              <div className="space-y-2 pl-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Options</label>
-                                {q.options.map((opt: string, optIndex: number) => (
-                                  <div key={optIndex} className="flex items-center gap-2">
-                                    <span className="w-6 text-center text-sm font-bold text-slate-400">{String.fromCharCode(65 + optIndex)}.</span>
-                                    <input
-                                      type="text"
-                                      value={opt}
-                                      onChange={(e) => {
-                                        const newOptions = [...q.options];
-                                        newOptions[optIndex] = e.target.value;
-                                        handleManualQuestionEdit(index, 'options', newOptions);
-                                      }}
-                                      className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                                      placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
-                                    />
-                                  </div>
-                                ))}
+                            {q.type === 'multiple_choice' && (
+                              <div className="space-y-4 pl-2">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Options</label>
+                                  <button 
+                                    type="button"
+                                    onClick={() => addOption(index, false)}
+                                    className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline flex items-center gap-1"
+                                  >
+                                    <Plus className="w-3 h-3" /> Add Option
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {(q.options || []).map((opt: string, optIndex: number) => (
+                                    <div key={optIndex} className="flex items-center gap-2">
+                                      <div className="w-8 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0">
+                                        {String.fromCharCode(65 + optIndex)}
+                                      </div>
+                                      <input
+                                        type="text"
+                                        value={opt}
+                                        onChange={(e) => {
+                                          const newOptions = [...(q.options || [])];
+                                          newOptions[optIndex] = e.target.value;
+                                          handleManualQuestionEdit(index, 'options', newOptions);
+                                        }}
+                                        className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                        placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
+                                      />
+                                      {(q.options || []).length > 2 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => removeOption(index, optIndex, false)}
+                                          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1545,6 +1824,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                 </button>
               </div>
             </form>
+            )}
           </motion.div>
         </div>
       )}
@@ -1656,36 +1936,100 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">MCQs</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                      value={aiPrompt.mcqCount}
-                      onChange={e => setAiPrompt({...aiPrompt, mcqCount: parseInt(e.target.value) || 0})}
-                    />
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">MCQs</label>
+                    <div className="flex gap-1">
+                      <input 
+                        type="number" 
+                        min="0"
+                        placeholder="Count"
+                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={aiPrompt.mcqCount}
+                        onChange={e => setAiPrompt({...aiPrompt, mcqCount: parseInt(e.target.value) || 0})}
+                      />
+                      <input 
+                        type="number" 
+                        min="1"
+                        placeholder="Marks"
+                        title="Marks per question"
+                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-bold"
+                        value={aiPrompt.mcqMarks}
+                        onChange={e => setAiPrompt({...aiPrompt, mcqMarks: parseInt(e.target.value) || 1})}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Short</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                      value={aiPrompt.shortCount}
-                      onChange={e => setAiPrompt({...aiPrompt, shortCount: parseInt(e.target.value) || 0})}
-                    />
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Short</label>
+                    <div className="flex gap-1">
+                      <input 
+                        type="number" 
+                        min="0"
+                        placeholder="Count"
+                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={aiPrompt.shortCount}
+                        onChange={e => setAiPrompt({...aiPrompt, shortCount: parseInt(e.target.value) || 0})}
+                      />
+                      <input 
+                        type="number" 
+                        min="1"
+                        placeholder="Marks"
+                        title="Marks per question"
+                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-bold"
+                        value={aiPrompt.shortMarks}
+                        onChange={e => setAiPrompt({...aiPrompt, shortMarks: parseInt(e.target.value) || 1})}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Long</label>
-                    <input 
-                      type="number" 
-                      min="0"
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Long</label>
+                    <div className="flex gap-1">
+                      <input 
+                        type="number" 
+                        min="0"
+                        placeholder="Count"
+                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={aiPrompt.longCount}
+                        onChange={e => setAiPrompt({...aiPrompt, longCount: parseInt(e.target.value) || 0})}
+                      />
+                      <input 
+                        type="number" 
+                        min="1"
+                        placeholder="Marks"
+                        title="Marks per question"
+                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-bold"
+                        value={aiPrompt.longMarks}
+                        onChange={e => setAiPrompt({...aiPrompt, longMarks: parseInt(e.target.value) || 1})}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Language</label>
+                    <select
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                      value={aiPrompt.longCount}
-                      onChange={e => setAiPrompt({...aiPrompt, longCount: parseInt(e.target.value) || 0})}
-                    />
+                      value={aiPrompt.language}
+                      onChange={e => setAiPrompt({...aiPrompt, language: e.target.value as any})}
+                    >
+                      <option value="English">English</option>
+                      <option value="Urdu">Urdu</option>
+                      <option value="Bilingual">Bilingual</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setAiPrompt({...aiPrompt, detailedAnswers: !aiPrompt.detailedAnswers})}
+                      className={cn(
+                        "w-5 h-5 rounded border transition-colors flex items-center justify-center",
+                        aiPrompt.detailedAnswers ? "bg-indigo-600 border-indigo-600" : "border-slate-300"
+                      )}
+                    >
+                      {aiPrompt.detailedAnswers && <div className="w-2 h-2 bg-white rounded-full" />}
+                    </button>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Detailed Key</span>
                   </div>
                 </div>
                 
@@ -1829,7 +2173,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                       />
                     </div>
                     
-                    <div className="md:col-span-3 grid grid-cols-3 gap-4 p-3 bg-white/50 rounded-xl border border-indigo-100">
+                    <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4 p-3 bg-white/50 rounded-xl border border-indigo-100">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Easy / Med / Hard</label>
                         <div className="flex gap-1">
@@ -1839,23 +2183,55 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">MCQ / Short / Long</label>
+                        <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">MCQ / Short / Long counts</label>
                         <div className="flex gap-1">
                           <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.mcqCount} onChange={e => setAiPrompt({...aiPrompt, mcqCount: parseInt(e.target.value) || 0})} />
                           <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.shortCount} onChange={e => setAiPrompt({...aiPrompt, shortCount: parseInt(e.target.value) || 0})} />
                           <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.longCount} onChange={e => setAiPrompt({...aiPrompt, longCount: parseInt(e.target.value) || 0})} />
                         </div>
                       </div>
-                      <div className="flex items-end">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Marks per Type</label>
+                        <div className="flex gap-1">
+                          <input type="number" title="MCQ Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.mcqMarks} onChange={e => setAiPrompt({...aiPrompt, mcqMarks: parseInt(e.target.value) || 0})} />
+                          <input type="number" title="Short Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.shortMarks} onChange={e => setAiPrompt({...aiPrompt, shortMarks: parseInt(e.target.value) || 0})} />
+                          <input type="number" title="Long Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.longMarks} onChange={e => setAiPrompt({...aiPrompt, longMarks: parseInt(e.target.value) || 0})} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                           <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block">Language</label>
+                           <select 
+                             className="w-full px-2 py-1 text-xs border border-indigo-100 rounded"
+                             value={aiPrompt.language}
+                             onChange={e => setAiPrompt({...aiPrompt, language: e.target.value as any})}
+                           >
+                             <option value="English">English</option>
+                             <option value="Urdu">Urdu</option>
+                             <option value="Bilingual">Bilingual</option>
+                           </select>
+                        </div>
                         <button
-                          onClick={() => handleGenerateAIPaper()}
-                          disabled={generating}
-                          className="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 text-sm font-bold"
+                          onClick={() => setAiPrompt({...aiPrompt, detailedAnswers: !aiPrompt.detailedAnswers})}
+                          className={cn(
+                            "w-8 h-8 rounded-lg border transition-colors flex items-center justify-center mt-4",
+                            aiPrompt.detailedAnswers ? "bg-indigo-600 border-indigo-600 text-white" : "border-indigo-200 text-indigo-400"
+                          )}
+                          title="Detailed Answer Key"
                         >
-                          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                          Regenerate
+                          <Award className="w-4 h-4" />
                         </button>
                       </div>
+                    </div>
+                    <div className="md:col-span-4 flex justify-end">
+                      <button
+                        onClick={() => handleGenerateAIPaper()}
+                        disabled={generating}
+                        className="px-8 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 font-bold shadow-lg shadow-indigo-200"
+                      >
+                        {generating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                        Regenerate Paper with New Criteria
+                      </button>
                     </div>
                   </div>
                 </motion.div>
@@ -2198,7 +2574,45 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                             <option value="multiple_choice">Multiple Choice</option>
                           </select>
                           {q.type === 'multiple_choice' && (
-                            <textarea className="w-full p-3 border border-slate-200 rounded-xl" value={q.options?.join('\n')} onChange={e => updateQuestion(index, {...q, options: e.target.value.split('\n')})} placeholder="Options (one per line)" />
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Options</label>
+                                <button 
+                                  type="button"
+                                  onClick={() => addOption(index, false)}
+                                  className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" /> Add Option
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {(q.options || ['','','','']).map((opt: string, optIdx: number) => (
+                                  <div key={optIdx} className="flex items-center gap-2">
+                                    <span className="w-6 text-center text-sm font-bold text-slate-400 shrink-0">{String.fromCharCode(65 + optIdx)}.</span>
+                                    <input
+                                      type="text"
+                                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                      value={opt}
+                                      onChange={(e) => {
+                                        const newOpts = [...(q.options || ['','','',''])];
+                                        newOpts[optIdx] = e.target.value;
+                                        handleManualQuestionEdit(index, 'options', newOpts);
+                                      }}
+                                      placeholder={`Option ${optIdx + 1}`}
+                                    />
+                                    {(q.options || []).length > 2 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeOption(index, optIdx, false)}
+                                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           )}
                           <textarea className="w-full p-3 border border-slate-200 rounded-xl" value={q.answer} onChange={e => updateQuestion(index, {...q, answer: e.target.value})} placeholder="Answer" />
                         </div>
@@ -2685,202 +3099,165 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               </div>
 
               <div className="p-8 overflow-x-auto bg-slate-50">
-                <div ref={resultCardRef} className="w-[800px] mx-auto bg-white p-10 border border-slate-200 shadow-sm font-serif text-slate-900">
-                  {/* School Header */}
-                  <div className="flex items-center justify-center gap-8 mb-8">
-                    <img 
-                      src={schoolSettings?.logoUrl || "https://picsum.photos/seed/school/100/100"} 
-                      alt="Logo" 
-                      className="w-24 h-24 object-contain"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="text-center">
-                      <h1 className="text-5xl font-bold tracking-tight mb-2">{schoolSettings?.schoolName || "Chenab College Shorkot"}</h1>
-                      <p className="text-2xl font-medium uppercase tracking-widest border-b-2 border-slate-900 inline-block pb-1">
-                        TERM WISE REPORT, 2025-26
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Student Info Bar */}
-                  <div className="flex justify-between items-end mb-8">
-                    <div className="border-2 border-slate-900 p-4 min-w-[300px]">
-                      <h2 className="text-2xl font-bold uppercase">{viewingResultCard.name}</h2>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <div className="flex items-center justify-end gap-4">
-                        <span className="text-lg font-bold">Class | Section</span>
-                        <span className="text-lg font-bold min-w-[80px] text-center">{viewingResultCard.class}-{viewingResultCard.section}</span>
-                      </div>
-                      <div className="flex items-center justify-end gap-4">
-                        <span className="text-lg font-bold">Position in Section</span>
-                        <span className="text-lg font-bold min-w-[80px] text-center">
-                          {examResults.find(r => r.studentId === viewingResultCard.id && r.examTypeId === selectedResultExamType)?.position || '-'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Exam Title */}
-                  <div className="text-center mb-4">
-                    <h3 className="text-2xl font-bold">
-                      {examTypes.find(t => t.id === selectedResultExamType)?.name || 'Term'} Exams {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                    </h3>
-                  </div>
-
-                  {/* Marks Table */}
-                  <table className="w-full border-collapse border-2 border-slate-900 mb-8 text-center">
-                    <thead>
-                      <tr className="bg-slate-200">
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Subject</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Max Marks</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Pass Marks</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Obtained Marks</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">%Age</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Grade</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const result = examResults.find(r => r.studentId === viewingResultCard.id && r.examTypeId === selectedResultExamType);
-                        if (!result) return null;
-                        return Object.entries(result.marks).map(([subject, m]: [string, any]) => (
-                          <tr key={subject}>
-                            <td className="border-2 border-slate-900 p-2 font-medium text-left">{subject}</td>
-                            <td className="border-2 border-slate-900 p-2">{m.total}</td>
-                            <td className="border-2 border-slate-900 p-2">{m.pass}</td>
-                            <td className="border-2 border-slate-900 p-2 font-bold">{m.obtained}</td>
-                            <td className="border-2 border-slate-900 p-2">{((m.obtained / m.total) * 100).toFixed(2)}</td>
-                            <td className="border-2 border-slate-900 p-2 font-bold">
-                              {calculateGrade((m.obtained / m.total) * 100)} {getGradeDescription(calculateGrade((m.obtained / m.total) * 100))}
-                            </td>
-                          </tr>
-                        ));
-                      })()}
-                      <tr className="bg-slate-200 font-bold">
-                        <td className="border-2 border-slate-900 p-2 uppercase">Total</td>
-                        {(() => {
-                          const result = examResults.find(r => r.studentId === viewingResultCard.id && r.examTypeId === selectedResultExamType);
-                          return (
-                            <>
-                              <td className="border-2 border-slate-900 p-2">{result?.totalMax}</td>
-                              <td className="border-2 border-slate-900 p-2">---</td>
-                              <td className="border-2 border-slate-900 p-2">{result?.totalObtained}</td>
-                              <td className="border-2 border-slate-900 p-2">{result?.percentage.toFixed(2)}</td>
-                              <td className="border-2 border-slate-900 p-2">
-                                {result?.percentage && result.percentage >= 40 ? 'PASS' : 'FAIL'}
-                              </td>
-                            </>
-                          );
-                        })()}
-                      </tr>
-                    </tbody>
-                  </table>
-
-                  {/* Result Summary */}
-                  <div className="mb-8">
-                    <div className="bg-slate-300 text-center py-1 border-2 border-slate-900 mb-0">
-                      <h4 className="text-xl font-bold uppercase">Result Summary</h4>
-                    </div>
-                    <table className="w-full border-collapse border-2 border-slate-900 text-center text-sm">
-                      <thead>
-                        <tr className="bg-slate-100">
-                          <th className="border-2 border-slate-900 p-2 font-bold">Exams</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">Total Marks</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">Obtained Marks</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">Term wise Percentage</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">Weightage</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">After Applying Weightage Obtained Percentage</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {['1st Term', '2nd Term', '3rd Term'].map((term, idx) => {
-                          const termResult = examResults.find(r => r.studentId === viewingResultCard.id && examTypes.find(t => t.id === r.examTypeId)?.term === term);
-                          const weightage = term === '3rd Term' ? 40 : 30;
-                          const weightedPercentage = termResult ? (termResult.percentage * weightage) / 100 : 0;
-                          return (
-                            <tr key={term}>
-                              <td className="border-2 border-slate-900 p-2 font-bold">{term}</td>
-                              <td className="border-2 border-slate-900 p-2">{termResult?.totalMax.toFixed(2) || '0.00'}</td>
-                              <td className="border-2 border-slate-900 p-2">{termResult?.totalObtained.toFixed(2) || '0.00'}</td>
-                              <td className="border-2 border-slate-900 p-2">{termResult?.percentage.toFixed(2) || '0.00'}</td>
-                              <td className="border-2 border-slate-900 p-2">{weightage}%</td>
-                              <td className="border-2 border-slate-900 p-2">{weightedPercentage.toFixed(2)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Final Result */}
-                  <div className="mb-8">
-                    <div className="bg-slate-300 text-center py-1 border-2 border-slate-900 mb-0">
-                      <h4 className="text-xl font-bold uppercase">Final Result</h4>
-                    </div>
-                    <table className="w-full border-collapse border-2 border-slate-900 text-center">
-                      <thead>
-                        <tr className="bg-slate-100">
-                          <th className="border-2 border-slate-900 p-2 font-bold uppercase">Combined Percentage of All Terms</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold uppercase">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border-2 border-slate-900 p-4 text-2xl font-bold">
-                            {(() => {
-                              const results = examResults.filter(r => r.studentId === viewingResultCard.id);
-                              let combined = 0;
-                              results.forEach(r => {
-                                const term = examTypes.find(t => t.id === r.examTypeId)?.term;
-                                const weightage = term === '3rd Term' ? 0.4 : 0.3;
-                                combined += r.percentage * weightage;
-                              });
-                              return combined.toFixed(2);
-                            })()}
-                          </td>
-                          <td className="border-2 border-slate-900 p-4 text-2xl font-bold">
-                            {(() => {
-                              const results = examResults.filter(r => r.studentId === viewingResultCard.id);
-                              let combined = 0;
-                              results.forEach(r => {
-                                const term = examTypes.find(t => t.id === r.examTypeId)?.term;
-                                const weightage = term === '3rd Term' ? 0.4 : 0.3;
-                                combined += r.percentage * weightage;
-                              });
-                              return combined >= 40 ? 'PROMOTED' : 'NOT PROMOTED';
-                            })()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Remarks */}
-                  <div className="mb-12">
-                    <div className="bg-slate-300 text-center py-1 border-2 border-slate-900 mb-0">
-                      <h4 className="text-xl font-bold uppercase">Remarks</h4>
-                    </div>
-                    <div className="border-2 border-slate-900 p-6 min-h-[80px]">
-                      <p className="text-lg italic">
-                        {examResults.find(r => r.studentId === viewingResultCard.id && r.examTypeId === selectedResultExamType)?.remarks || 'No remarks provided.'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Signatures */}
-                  <div className="flex justify-between items-end mt-20 px-4">
-                    <div className="text-center border-t-2 border-slate-900 pt-2 min-w-[200px]">
-                      <p className="font-bold">Class Incharge</p>
-                    </div>
-                    <div className="text-center border-t-2 border-slate-900 pt-2 min-w-[200px]">
-                      <p className="font-bold">Section Head</p>
-                    </div>
-                    <div className="text-center border-t-2 border-slate-900 pt-2 min-w-[200px]">
-                      <p className="font-bold">Principal</p>
-                    </div>
-                  </div>
+                <div ref={resultCardRef}>
+                  <ReportCard 
+                    student={viewingResultCard}
+                    result={examResults.find(r => r.studentId === viewingResultCard.id && r.examTypeId === selectedResultExamType)}
+                    allResults={examResults}
+                    examTypes={examTypes}
+                    schoolSettings={schoolSettings}
+                    selectedExamTypeId={selectedResultExamType}
+                  />
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {/* Deletion Confirmation Modal */}
+        {paperToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => !isDeleting && setPaperToDelete(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center"
+            >
+              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Delete Exam Paper?</h2>
+              <p className="text-slate-500 mb-8 font-medium">
+                Are you sure you want to delete this exam paper? This action cannot be undone and all associated data will be permanently removed.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPaperToDelete(null)}
+                  disabled={isDeleting}
+                  className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeletePaper}
+                  disabled={isDeleting}
+                  className="flex-1 py-3 px-4 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Paper'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Schedule Deletion Confirmation */}
+        {scheduleToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => !isDeleting && setScheduleToDelete(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center"
+            >
+              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Delete Schedule?</h2>
+              <p className="text-slate-500 mb-8 font-medium">
+                Are you sure you want to delete this exam schedule? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setScheduleToDelete(null)}
+                  disabled={isDeleting}
+                  className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteSchedule}
+                  disabled={isDeleting}
+                  className="flex-1 py-3 px-4 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Schedule'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Exam Type Deletion Confirmation */}
+        {examTypeToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => !isDeleting && setExamTypeToDelete(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center"
+            >
+              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Delete Exam Type?</h2>
+              <p className="text-slate-500 mb-8 font-medium">
+                Are you sure you want to delete this exam type? This may affect results and schedules associated with it.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setExamTypeToDelete(null)}
+                  disabled={isDeleting}
+                  className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteExamType}
+                  disabled={isDeleting}
+                  className="flex-1 py-3 px-4 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Type'
+                  )}
+                </button>
               </div>
             </motion.div>
           </div>
@@ -2899,195 +3276,17 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
             if (!result) return null;
             return (
               <div key={student.id} className="break-after-page p-10 bg-white min-h-screen">
-                <div className="w-[800px] mx-auto font-serif text-slate-900">
-                  {/* School Header */}
-                  <div className="flex items-center justify-center gap-8 mb-8">
-                    <img 
-                      src={schoolSettings?.logoUrl || "https://picsum.photos/seed/school/100/100"} 
-                      alt="Logo" 
-                      className="w-24 h-24 object-contain"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="text-center">
-                      <h1 className="text-5xl font-bold tracking-tight mb-2">{schoolSettings?.schoolName || "Chenab College Shorkot"}</h1>
-                      <p className="text-2xl font-medium uppercase tracking-widest border-b-2 border-slate-900 inline-block pb-1">
-                        TERM WISE REPORT, 2025-26
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Student Info Bar */}
-                  <div className="flex justify-between items-end mb-8">
-                    <div className="border-2 border-slate-900 p-4 min-w-[300px]">
-                      <h2 className="text-2xl font-bold uppercase">{student.name}</h2>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <div className="flex items-center justify-end gap-4">
-                        <span className="text-lg font-bold">Class | Section</span>
-                        <span className="text-lg font-bold min-w-[80px] text-center">{student.class}-{student.section}</span>
-                      </div>
-                      <div className="flex items-center justify-end gap-4">
-                        <span className="text-lg font-bold">Position in Section</span>
-                        <span className="text-lg font-bold min-w-[80px] text-center">
-                          {result.position || '-'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Exam Title */}
-                  <div className="text-center mb-4">
-                    <h3 className="text-2xl font-bold">
-                      {examTypes.find(t => t.id === selectedResultExamType)?.name || 'Term'} Exams {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                    </h3>
-                  </div>
-
-                  {/* Marks Table */}
-                  <table className="w-full border-collapse border-2 border-slate-900 mb-8 text-center">
-                    <thead>
-                      <tr className="bg-slate-200">
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Subject</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Max Marks</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Pass Marks</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Obtained Marks</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">%Age</th>
-                        <th className="border-2 border-slate-900 p-2 font-bold uppercase">Grade</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(result.marks).map(([subject, m]: [string, any]) => (
-                        <tr key={subject}>
-                          <td className="border-2 border-slate-900 p-2 font-medium text-left">{subject}</td>
-                          <td className="border-2 border-slate-900 p-2">{m.total}</td>
-                          <td className="border-2 border-slate-900 p-2">{m.pass}</td>
-                          <td className="border-2 border-slate-900 p-2 font-bold">{m.obtained}</td>
-                          <td className="border-2 border-slate-900 p-2">{((m.obtained / m.total) * 100).toFixed(2)}</td>
-                          <td className="border-2 border-slate-900 p-2 font-bold">
-                            {calculateGrade((m.obtained / m.total) * 100)} {getGradeDescription(calculateGrade((m.obtained / m.total) * 100))}
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="bg-slate-200 font-bold">
-                        <td className="border-2 border-slate-900 p-2 uppercase">Total</td>
-                        <td className="border-2 border-slate-900 p-2">{result.totalMax}</td>
-                        <td className="border-2 border-slate-900 p-2">---</td>
-                        <td className="border-2 border-slate-900 p-2">{result.totalObtained}</td>
-                        <td className="border-2 border-slate-900 p-2">{result.percentage.toFixed(2)}</td>
-                        <td className="border-2 border-slate-900 p-2">
-                          {result.percentage >= 40 ? 'PASS' : 'FAIL'}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-
-                  {/* Result Summary */}
-                  <div className="mb-8">
-                    <div className="bg-slate-300 text-center py-1 border-2 border-slate-900 mb-0">
-                      <h4 className="text-xl font-bold uppercase">Result Summary</h4>
-                    </div>
-                    <table className="w-full border-collapse border-2 border-slate-900 text-center text-sm">
-                      <thead>
-                        <tr className="bg-slate-100">
-                          <th className="border-2 border-slate-900 p-2 font-bold">Exams</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">Total Marks</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">Obtained Marks</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">Term wise Percentage</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">Weightage</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold">After Applying Weightage Obtained Percentage</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {['1st Term', '2nd Term', '3rd Term'].map((term) => {
-                          const termResult = examResults.find(r => r.studentId === student.id && examTypes.find(t => t.id === r.examTypeId)?.term === term);
-                          const weightage = term === '3rd Term' ? 40 : 30;
-                          const weightedPercentage = termResult ? (termResult.percentage * weightage) / 100 : 0;
-                          return (
-                            <tr key={term}>
-                              <td className="border-2 border-slate-900 p-2 font-bold">{term}</td>
-                              <td className="border-2 border-slate-900 p-2">{termResult?.totalMax.toFixed(2) || '0.00'}</td>
-                              <td className="border-2 border-slate-900 p-2">{termResult?.totalObtained.toFixed(2) || '0.00'}</td>
-                              <td className="border-2 border-slate-900 p-2">{termResult?.percentage.toFixed(2) || '0.00'}</td>
-                              <td className="border-2 border-slate-900 p-2">{weightage}%</td>
-                              <td className="border-2 border-slate-900 p-2">{weightedPercentage.toFixed(2)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Final Result */}
-                  <div className="mb-8">
-                    <div className="bg-slate-300 text-center py-1 border-2 border-slate-900 mb-0">
-                      <h4 className="text-xl font-bold uppercase">Final Result</h4>
-                    </div>
-                    <table className="w-full border-collapse border-2 border-slate-900 text-center">
-                      <thead>
-                        <tr className="bg-slate-100">
-                          <th className="border-2 border-slate-900 p-2 font-bold uppercase">Combined Percentage of All Terms</th>
-                          <th className="border-2 border-slate-900 p-2 font-bold uppercase">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border-2 border-slate-900 p-4 text-2xl font-bold">
-                            {(() => {
-                              const results = examResults.filter(r => r.studentId === student.id);
-                              let combined = 0;
-                              results.forEach(r => {
-                                const term = examTypes.find(t => t.id === r.examTypeId)?.term;
-                                const weightage = term === '3rd Term' ? 0.4 : 0.3;
-                                combined += r.percentage * weightage;
-                              });
-                              return combined.toFixed(2);
-                            })()}
-                          </td>
-                          <td className="border-2 border-slate-900 p-4 text-2xl font-bold">
-                            {(() => {
-                              const results = examResults.filter(r => r.studentId === student.id);
-                              let combined = 0;
-                              results.forEach(r => {
-                                const term = examTypes.find(t => t.id === r.examTypeId)?.term;
-                                const weightage = term === '3rd Term' ? 0.4 : 0.3;
-                                combined += r.percentage * weightage;
-                              });
-                              return combined >= 40 ? 'PROMOTED' : 'NOT PROMOTED';
-                            })()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Remarks */}
-                  <div className="mb-12">
-                    <div className="bg-slate-300 text-center py-1 border-2 border-slate-900 mb-0">
-                      <h4 className="text-xl font-bold uppercase">Remarks</h4>
-                    </div>
-                    <div className="border-2 border-slate-900 p-6 min-h-[80px]">
-                      <p className="text-lg italic">
-                        {result.remarks || 'No remarks provided.'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Signatures */}
-                  <div className="flex justify-between items-end mt-20 px-4">
-                    <div className="text-center border-t-2 border-slate-900 pt-2 min-w-[200px]">
-                      <p className="font-bold">Class Incharge</p>
-                    </div>
-                    <div className="text-center border-t-2 border-slate-900 pt-2 min-w-[200px]">
-                      <p className="font-bold">Section Head</p>
-                    </div>
-                    <div className="text-center border-t-2 border-slate-900 pt-2 min-w-[200px]">
-                      <p className="font-bold">Principal</p>
-                    </div>
-                  </div>
-                </div>
+                <ReportCard 
+                  student={student}
+                  result={result}
+                  allResults={examResults}
+                  examTypes={examTypes}
+                  schoolSettings={schoolSettings}
+                  selectedExamTypeId={selectedResultExamType}
+                />
               </div>
             );
-          })
-        }
+          })}
       </div>
     </div>
   );
