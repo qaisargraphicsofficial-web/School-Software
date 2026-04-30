@@ -1,3 +1,4 @@
+import { InlineMath, BlockMath } from 'react-katex';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, query, where, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -21,7 +22,22 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [previewMode, setPreviewMode] = useState<'edit' | 'preview'>('edit');
+  const [editorLanguage, setEditorLanguage] = useState<'English' | 'Urdu'>('English');
   const [activeQuestionIndex, setActiveQuestionIndex] = useState<number | null>(null);
+
+  const renderMath = (text: string) => {
+    if (typeof text !== 'string') return text;
+    // Simple regex to split math blocks $...$ or $$...$$
+    const parts = text.split(/(\$\$.*?\$\$|\$.*?\$)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('$$')) {
+        return <BlockMath key={i} math={part.slice(2, -2)} />;
+      } else if (part.startsWith('$')) {
+        return <InlineMath key={i} math={part.slice(1, -1)} />;
+      }
+      return part;
+    });
+  };
 
   const addOption = (questionIndex: number, isGenerated: boolean = false) => {
     if (isGenerated) {
@@ -102,12 +118,16 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const [newPaper, setNewPaper] = useState<Partial<ExamPaper>>({
     title: '',
+    template: 'formal',
+    schoolName: '',
     class: '',
     subject: '',
     date: new Date().toISOString().split('T')[0],
+    time: '09:00',
     duration: 60,
+    totalMarks: 100,
     examTypeId: '',
-    questions: [],
+    sections: [],
   });
 
   const [activeTab, setActiveTab] = useState<'types' | 'papers' | 'schedules' | 'results'>('types');
@@ -1475,6 +1495,14 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
                 <button
                   type="button"
+                  onClick={() => setEditorLanguage(editorLanguage === 'English' ? 'Urdu' : 'English')}
+                  className="px-4 py-1.5 rounded-lg text-sm font-bold bg-white text-indigo-600 shadow-sm"
+                >
+                  {editorLanguage}
+                </button>
+                <div className="w-px bg-slate-200" />
+                <button
+                  type="button"
                   onClick={() => setPreviewMode('edit')}
                   className={cn(
                     "px-4 py-1.5 rounded-lg text-sm font-bold transition-all",
@@ -1581,10 +1609,22 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">School Name</label>
+                  <input
+                    type="text"
+                    required
+                    dir="auto"
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={schoolSettings?.schoolName || ''}
+                    disabled
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Paper Title</label>
                   <input
                     type="text"
                     required
+                    dir={editorLanguage === 'Urdu' ? 'rtl' : 'ltr'}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
                     value={newPaper.title}
                     onChange={e => setNewPaper({...newPaper, title: e.target.value})}
@@ -1684,8 +1724,15 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                               onChange={(e) => handleManualQuestionEdit(index, 'question', e.target.value)}
                               dir="auto"
                               className="w-full text-slate-900 font-medium bg-white border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[80px]"
-                              placeholder="Question text (Supports English / Urdu)"
+                              placeholder="Question text. Use $ for math, e.g., $\\frac{a}{b}$"
                             />
+                            <div className="flex gap-2 text-[10px] text-slate-500">
+                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$\\frac{a}{b}$')} className="hover:text-indigo-600">Fraction</button>
+                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$x^2$')} className="hover:text-indigo-600">Power</button>
+                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$\\sqrt{x}$')} className="hover:text-indigo-600">Root</button>
+                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$\\int$')} className="hover:text-indigo-600">Integral</button>
+                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$\\sum$')} className="hover:text-indigo-600">Sigma</button>
+                            </div>
                             <div className="flex items-center gap-4">
                               <div className="flex-1">
                                 <label className="text-xs text-slate-500 block mb-1">Question Type</label>
@@ -2619,7 +2666,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                       ) : (
                         <>
                           <div className="flex justify-between items-start gap-4 mb-2">
-                            <p className="text-slate-900 font-medium whitespace-pre-wrap" dir="auto">{q.question}</p>
+                            <div className="text-slate-900 font-medium whitespace-pre-wrap" dir="auto">{renderMath(q.question)}</div>
                             <span className="shrink-0 text-sm font-bold text-slate-500">[{q.marks} Marks]</span>
                           </div>
                           
@@ -2628,7 +2675,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                               {q.options.map((opt: string, optIndex: number) => (
                                 <div key={optIndex} className="flex items-center gap-2">
                                   <span className="font-bold text-slate-500">{String.fromCharCode(65 + optIndex)}.</span>
-                                  <span className="text-slate-700">{opt}</span>
+                                  <span className="text-slate-700">{renderMath(opt)}</span>
                                 </div>
                               ))}
                             </div>

@@ -254,19 +254,28 @@ export interface ExamType {
 export interface ExamPaper {
   id?: string;
   title: string;
+  template: 'formal' | 'minimal' | 'board';
+  schoolName: string;
   class: string;
   subject: string;
   date: string;
+  time: string;
   duration: number; // in minutes
+  totalMarks: number;
   examTypeId?: string;
   term?: string;
-  questions: {
-    question: string;
-    marks: number;
-    options?: string[];
-    answer?: string;
-    type: 'multiple_choice' | 'short_answer' | 'long_answer';
-    difficulty: 'Easy' | 'Medium' | 'Hard';
+  sections: {
+    id: string;
+    title: string;
+    questions: {
+      id: string;
+      question: string;
+      marks: number;
+      options?: string[];
+      answer?: string;
+      type: 'multiple_choice' | 'short_answer' | 'long_answer' | 'fill_in_blank' | 'true_false';
+      difficulty: 'Easy' | 'Medium' | 'Hard';
+    }[];
   }[];
   campusId: string;
 }

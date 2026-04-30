@@ -51,7 +51,7 @@ export default function Academic({ profile }: AcademicProps) {
   const [subjectsList, setSubjectsList] = useState<any[]>([]);
   const [isPrintingIDCards, setIsPrintingIDCards] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent' | 'late'>>({});
-  const [selectedClass, setSelectedClass] = useState('10th');
+  const [selectedClass, setSelectedClass] = useState('All');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0, late: 0, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -246,30 +246,35 @@ export default function Academic({ profile }: AcademicProps) {
     // This is now handled by the useEffect onSnapshot for real-time updates
   };
 
-  const fetchStudents = async () => {
-    setLoading(true);
-    try {
-      const q = query(
-        collection(db, 'students'), 
-        where('class', '==', selectedClass),
-        where('campusId', '==', profile?.campusId || 'main')
-      );
-      const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
-      setStudents(data);
-      
-      // Initialize attendance
-      const initialAttendance: Record<string, 'present' | 'absent' | 'late'> = {};
-      data.forEach(s => {
-        initialAttendance[s.id!] = 'present';
-      });
-      setAttendance(initialAttendance);
-    } catch (error) {
-      console.error("Error fetching students:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Update student fetching to allow "All Classes"
+    const fetchStudents = async () => {
+      setLoading(true);
+      try {
+        let q;
+        const baseConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+        
+        if (selectedClass !== 'All') {
+          q = query(collection(db, 'students'), where('class', '==', selectedClass), ...baseConstraints);
+        } else {
+          q = query(collection(db, 'students'), ...baseConstraints);
+        }
+
+        const querySnapshot = await getDocs(q);
+        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+        setStudents(data);
+        
+        // Initialize attendance
+        const initialAttendance: Record<string, 'present' | 'absent' | 'late'> = {};
+        data.forEach(s => {
+          initialAttendance[s.id!] = 'present';
+        });
+        setAttendance(initialAttendance);
+      } catch (error) {
+        console.error("Error fetching students:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const saveAttendance = async () => {
     setSaving(true);
@@ -387,6 +392,7 @@ export default function Academic({ profile }: AcademicProps) {
             onChange={(e) => setSelectedClass(e.target.value)}
             className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
           >
+            <option value="All">All Classes</option>
             <option>9th</option>
             <option>10th</option>
             <option>11th</option>
@@ -517,8 +523,8 @@ export default function Academic({ profile }: AcademicProps) {
               {/* Pie Chart */}
               <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Distribution</h4>
-                <div className="h-[300px] w-full min-w-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div style={{ height: '300px', width: '100%', minWidth: '200px' }}>
+                  <ResponsiveContainer width="100%" aspect={1.5}>
                     <RePieChart>
                       <Pie
                         data={[
@@ -549,8 +555,8 @@ export default function Academic({ profile }: AcademicProps) {
               {/* Bar Chart */}
               <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Comparison</h4>
-                <div className="h-[300px] w-full min-w-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div style={{ height: '300px', width: '100%', minWidth: '200px' }}>
+                  <ResponsiveContainer width="100%" aspect={1.5}>
                     <BarChart
                       data={[
                         { name: 'Present', count: attendanceStats.present, fill: '#10b981' },
