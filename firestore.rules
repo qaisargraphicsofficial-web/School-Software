@@ -209,6 +209,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /shop_items/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isStaff();
+    }
+
+    match /shop_sales/{id} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
     match /school_applications/{id} {
       allow create: if true;
       allow read, update, delete: if isAdmin();

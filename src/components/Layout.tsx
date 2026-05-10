@@ -224,7 +224,9 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Curriculum', icon: BookText, path: '/curriculum', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'Diary', icon: BookOpen, path: '/diary', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
     { name: 'Certificates', icon: Award, path: '/certificates', roles: ['admin', 'staff'], category: 'ACADEMICS' },
+    { name: 'School Shop', icon: Package, path: '/school-shop', roles: ['admin'], category: 'STAFF & OPS' },
     { name: 'Transport', icon: Bus, path: '/transport', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
+    { name: 'My School Website', icon: School, path: '/school-website', roles: ['admin'], category: 'AI & SETTINGS' },
   ];
 
   const filteredNavItems = navItems.filter(item => {

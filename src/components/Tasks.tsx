@@ -200,12 +200,16 @@ export default function Tasks({ profile }: TasksProps) {
   };
 
   const deleteTask = async (id: string) => {
+    console.log("Delete attempt for ID:", id);
     if (window.confirm('Are you sure you want to delete this task?')) {
       try {
+        console.log("Calling deleteDoc for:", id);
         await deleteDoc(doc(db, 'tasks', id));
+        console.log("deleteDoc successful");
         fetchTasks();
       } catch (error) {
         console.error("Error deleting task:", error);
+        alert("Delete failed: " + (error as Error).message);
       }
     }
   };
@@ -460,12 +464,14 @@ export default function Tasks({ profile }: TasksProps) {
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => task.id && deleteTask(task.id)}
-                    className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {profile?.role === 'admin' && (
+                    <button
+                      onClick={() => deleteTask(task.id!)}
+                      className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 

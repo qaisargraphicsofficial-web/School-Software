@@ -73,6 +73,8 @@ export default function Dashboard({ profile }: DashboardProps) {
     };
 
     // Only fetch tasks for staff/admin, or filter by assignedTo for others to avoid permission errors
+    if (!profile) return;
+    
     let q;
     if (profile.role === 'admin' || profile.role === 'staff') {
       q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(5));

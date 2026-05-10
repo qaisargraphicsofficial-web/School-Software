@@ -36,14 +36,24 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   const [studentSearch, setStudentSearch] = useState('');
   
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ feeRecordId: '', amount: 0, method: 'online' as 'cash' | 'online' | 'bank_transfer' });
+  const [paymentForm, setPaymentForm] = useState({ feeRecordId: '', amount: 0, method: 'online' as 'cash' | 'online' | 'bank_transfer', date: new Date().toISOString().split('T')[0] });
   const [selectedFeeRecord, setSelectedFeeRecord] = useState<FeeRecord | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const [feeRecordSearch, setFeeRecordSearch] = useState('');
   const [feeRecordStatusFilter, setFeeRecordStatusFilter] = useState('all');
 
-  const [generateForm, setGenerateForm] = useState({ feeTypeId: '', termOrYear: '', dueDate: '', targetClass: 'All' });
+  const [generateForm, setGenerateForm] = useState<{
+    feeTypeIds: string[], 
+    termOrYear: string, 
+    dueDate: string, 
+    targetClasses: string[]
+  }>({ 
+    feeTypeIds: [], 
+    termOrYear: '', 
+    dueDate: '', 
+    targetClasses: [] 
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
 
@@ -232,22 +242,15 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   // --- Generate Fees ---
   const handleGenerateFees = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile || !generateForm.feeTypeId || !generateForm.termOrYear || !generateForm.dueDate) return;
+    if (!profile || generateForm.feeTypeIds.length === 0 || !generateForm.termOrYear || !generateForm.dueDate || generateForm.targetClasses.length === 0) {
+      alert("Please select at least one fee type and one class, enter a due date, and term/year.");
+      return;
+    }
     
     setIsGenerating(true);
     try {
-      const feeType = feeTypes.find(f => f.id === generateForm.feeTypeId);
-      if (!feeType) throw new Error("Fee type not found");
-
-      let targetStudents = students.filter(s => s.status === 'active');
-      if (generateForm.targetClass !== 'All') {
-        targetStudents = targetStudents.filter(s => s.class === generateForm.targetClass);
-      }
-
-      // If it's a transport fee, only target students who use transport
-      if (feeType.name.toLowerCase().includes('transport')) {
-        targetStudents = targetStudents.filter(s => s.useTransport);
-      }
+      const selectedFeeTypes = feeTypes.filter(f => generateForm.feeTypeIds.includes(f.id!));
+      let targetStudents = students.filter(s => s.status === 'active' && generateForm.targetClasses.includes(s.class));
 
       if (targetStudents.length === 0) {
         alert("No active students found for the selected criteria.");
@@ -256,26 +259,33 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       }
       
       const batch = writeBatch(db);
+      let recordsCount = 0;
       
       targetStudents.forEach(student => {
-        const newRecordRef = firestoreDoc(collection(db, 'fee_records'));
-        batch.set(newRecordRef, {
-          studentId: student.id,
-          feeTypeId: feeType.id,
-          feeType: feeType.name,
-          amount: Number(feeType.defaultAmount),
-          dueDate: generateForm.dueDate,
-          status: 'pending',
-          paidAmount: 0,
-          termOrYear: generateForm.termOrYear,
-          campusId: profile.campusId || 'main'
+        selectedFeeTypes.forEach(feeType => {
+          // If it's a transport fee, only target students who use transport
+          if (feeType.name.toLowerCase().includes('transport') && !student.useTransport) return;
+
+          const newRecordRef = firestoreDoc(collection(db, 'fee_records'));
+          batch.set(newRecordRef, {
+            studentId: student.id,
+            feeTypeId: feeType.id,
+            feeType: feeType.name,
+            amount: Number(feeType.defaultAmount),
+            dueDate: generateForm.dueDate,
+            status: 'pending',
+            paidAmount: 0,
+            termOrYear: generateForm.termOrYear,
+            campusId: profile.campusId || 'main'
+          });
+          recordsCount++;
         });
       });
 
       await batch.commit();
       
-      alert(`Successfully generated fee records for ${targetStudents.length} students.`);
-      setGenerateForm({ feeTypeId: '', termOrYear: '', dueDate: '', targetClass: 'All' });
+      alert(`Successfully generated ${recordsCount} fee records for ${targetStudents.length} students.`);
+      setGenerateForm({ feeTypeIds: [], termOrYear: '', dueDate: '', targetClasses: [] });
       await fetchData();
       
       // Trigger print after fee generation
@@ -363,7 +373,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         feeRecordId: selectedFeeRecord.id,
         studentId: selectedFeeRecord.studentId,
         amount: Number(paymentForm.amount),
-        date: new Date().toISOString().split('T')[0],
+        date: paymentForm.date,
         method: paymentForm.method,
         transactionId: paymentForm.method === 'online' ? `txn_${Math.random().toString(36).substr(2, 9)}` : undefined,
         campusId: profile.campusId || 'main'
@@ -372,7 +382,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       alert("Payment processed successfully!");
       setIsPaymentModalOpen(false);
       setSelectedFeeRecord(null);
-      setPaymentForm({ feeRecordId: '', amount: 0, method: 'online' });
+      setPaymentForm({ feeRecordId: '', amount: 0, method: 'online', date: new Date().toISOString().split('T')[0] });
       fetchData();
     } catch (error) {
       console.error("Error processing payment:", error);
@@ -1075,7 +1085,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                                         <button 
                                           onClick={() => {
                                             setSelectedFeeRecord(record);
-                                            setPaymentForm({ feeRecordId: record.id!, amount: Math.max(0, record.amount - record.paidAmount - (record.waiverAmount || 0)), method: 'online' });
+                                            setPaymentForm({ feeRecordId: record.id!, amount: Math.max(0, record.amount - record.paidAmount - (record.waiverAmount || 0)), method: 'online', date: new Date().toISOString().split('T')[0] });
                                             setIsPaymentModalOpen(true);
                                           }}
                                           className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors"
@@ -1156,32 +1166,51 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
 
               <form onSubmit={handleGenerateFees} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Fee Type</label>
-                  <select
-                    required
-                    value={generateForm.feeTypeId}
-                    onChange={(e) => setGenerateForm({...generateForm, feeTypeId: e.target.value})}
-                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="">Select Fee Type...</option>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Select Fee Types</label>
+                  <div className="grid grid-cols-2 gap-2">
                     {feeTypes.map(f => (
-                      <option key={f.id} value={f.id}>{f.name} (${f.defaultAmount})</option>
+                      <label key={f.id} className="flex items-center gap-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50">
+                        <input 
+                          type="checkbox" 
+                          checked={generateForm.feeTypeIds.includes(f.id!)}
+                          onChange={(e) => {
+                            if (e.target.checked) setGenerateForm({...generateForm, feeTypeIds: [...generateForm.feeTypeIds, f.id!]});
+                            else setGenerateForm({...generateForm, feeTypeIds: generateForm.feeTypeIds.filter(id => id !== f.id!)});
+                          }}
+                        />
+                        <span className="text-sm text-slate-700">{f.name}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Target Class</label>
-                  <select
-                    required
-                    value={generateForm.targetClass}
-                    onChange={(e) => setGenerateForm({...generateForm, targetClass: e.target.value})}
-                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="All">All Active Students</option>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Select Classes</label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <input 
+                      type="checkbox" 
+                      onChange={(e) => {
+                        const allClasses = Array.from(new Set(students.map(s => s.class)));
+                        if (e.target.checked) setGenerateForm({...generateForm, targetClasses: allClasses});
+                        else setGenerateForm({...generateForm, targetClasses: []});
+                      }}
+                    />
+                    <span className="text-sm font-bold text-slate-900">Select All Classes</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
                     {Array.from(new Set(students.map(s => s.class))).sort().map(cls => (
-                      <option key={cls} value={cls}>Class {cls}</option>
+                      <label key={cls} className="flex items-center gap-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50">
+                        <input 
+                          type="checkbox" 
+                          checked={generateForm.targetClasses.includes(cls)}
+                          onChange={(e) => {
+                            if (e.target.checked) setGenerateForm({...generateForm, targetClasses: [...generateForm.targetClasses, cls]});
+                            else setGenerateForm({...generateForm, targetClasses: generateForm.targetClasses.filter(c => c !== cls)});
+                          }}
+                        />
+                        <span className="text-sm text-slate-700">{cls}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Term / Year</label>
@@ -1537,6 +1566,17 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                   value={paymentForm.amount}
                   onChange={(e) => setPaymentForm({...paymentForm, amount: Number(e.target.value)})}
                   className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Payment Date</label>
+                <input
+                  type="date"
+                  required
+                  value={paymentForm.date}
+                  onChange={(e) => setPaymentForm({...paymentForm, date: e.target.value})}
+                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               

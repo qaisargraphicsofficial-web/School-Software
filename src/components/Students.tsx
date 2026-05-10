@@ -120,7 +120,10 @@ export default function Students({ profile }: StudentsProps) {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'students'));
+      let q = query(collection(db, 'students'), orderBy('name'));
+      if (profile?.campusId) {
+        q = query(collection(db, 'students'), where('campusId', '==', profile.campusId), orderBy('name'));
+      }
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student));
       setStudents(data);

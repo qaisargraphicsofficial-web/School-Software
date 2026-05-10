@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, getDocFromServer } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocFromServer, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile, UserRole, UserStatus } from './types';
 import { Clock } from 'lucide-react';
@@ -44,6 +44,8 @@ import Leave from './components/Leave';
 import Transport from './components/Transport';
 import SubjectsManagement from './components/Subjects';
 import TeachersPortal from './components/TeachersPortal';
+import SchoolWebsite from './components/SchoolWebsite';
+import SchoolShop from './components/SchoolShop';
 
 import Registration from './components/Registration';
 
@@ -61,6 +63,17 @@ export default function App() {
         
         if (docSnap.exists()) {
           const existingProfile = docSnap.data() as UserProfile;
+          
+          // Fix missing campusId for admins
+          if (!existingProfile.campusId && existingProfile.role === 'admin') {
+            const campSnap = await getDocs(collection(db, 'campuses'));
+            if (!campSnap.empty) {
+              const firstCampus = campSnap.docs[0];
+              await updateDoc(docRef, { campusId: firstCampus.id });
+              existingProfile.campusId = firstCampus.id;
+            }
+          }
+
           // Ensure primary admin always has admin role and is approved
           if (firebaseUser.email === "qaisarabbas6496@gmail.com" && (existingProfile.role !== 'admin' || existingProfile.status !== 'approved')) {
             const updatedProfile = { 
@@ -162,6 +175,8 @@ export default function App() {
             <Route path="library" element={<Library profile={profile} />} />
             <Route path="diary" element={<DailyDiary profile={profile} />} />
             <Route path="certificates" element={<Certificates profile={profile} />} />
+            <Route path="school-website" element={profile?.role === 'admin' ? <SchoolWebsite profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="school-shop" element={profile?.role === 'admin' ? <SchoolShop profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="transport" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Transport profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="campuses" element={profile?.role === 'admin' ? <Campuses profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="reports" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Reports profile={profile} /> : <Navigate to="/" replace />} />

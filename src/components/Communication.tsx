@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, query, orderBy, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Notice, UserProfile, Student, ExamResult, Attendance, BulkMessage, FeeRecord, FeeType } from '../types';
+import { Notice, UserProfile, Student, ExamResult, Attendance, BulkMessage, FeeRecord, FeeType, SchoolSettings } from '../types';
 import { 
   Bell, 
   Plus, 
@@ -29,10 +29,12 @@ import { cn } from '../lib/utils';
 interface CommunicationProps { profile: UserProfile | null; }
 
 export default function Communication({ profile }: CommunicationProps) {
-  const [activeTab, setActiveTab] = useState<'notices' | 'bulk' | 'directory'>('notices');
+  const [activeTab, setActiveTab] = useState<'notices' | 'bulk' | 'directory' | 'absent'>('notices');
   const [notices, setNotices] = useState<Notice[]>([]);
   const [bulkMessages, setBulkMessages] = useState<BulkMessage[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [settings, setSettings] = useState<SchoolSettings | null>(null);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,6 +81,10 @@ export default function Communication({ profile }: CommunicationProps) {
       setIsFeeReminderModalOpen(true);
       return;
     }
+    if (templateId === 'attendance_absent') {
+      setActiveTab('absent');
+      return;
+    }
     const template = templates.find(t => t.id === templateId);
     if (template) {
       setBulkFormData({
@@ -110,11 +116,35 @@ export default function Communication({ profile }: CommunicationProps) {
     if (profile?.role === 'admin' || profile?.role === 'staff') {
       fetchStudents();
       fetchFeeData();
+      fetchAttendance();
+      fetchSettings();
     }
     if (profile?.role === 'parent' && linkedStudentId) {
       fetchChildData(linkedStudentId);
     }
   }, [profile, linkedStudentId]);
+
+  const fetchSettings = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'settings'));
+      if (!snap.empty) {
+        setSettings(snap.docs[0].data() as SchoolSettings);
+      }
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+    }
+  };
+
+  const fetchAttendance = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const q = query(collection(db, 'attendance'), where('date', '==', today));
+      const snap = await getDocs(q);
+      setAttendance(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance)));
+    } catch (error) {
+      console.error("Error fetching attendance:", error);
+    }
+  };
 
   const fetchNotices = async () => {
     try {
@@ -191,6 +221,126 @@ export default function Communication({ profile }: CommunicationProps) {
     }
   };
 
+  const openWhatsApp = (phoneNumber?: string, name?: string) => {
+    if (!phoneNumber) {
+      alert("WhatsApp number not found for this contact.");
+      return;
+    }
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    let formattedPhone = cleanPhone;
+    if (cleanPhone.startsWith('0')) {
+      formattedPhone = '92' + cleanPhone.substring(1);
+    } else if (!cleanPhone.startsWith('92') && cleanPhone.length === 10) {
+      formattedPhone = '92' + cleanPhone;
+    }
+    const message = `Hello ${name || 'Parent'}, this is a message from the school management.`;
+    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const printDirectory = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const rows = students.map(s => `
+      <tr>
+        <td>${s.rollNumber}</td>
+        <td>${s.name}</td>
+        <td>${s.parentName}</td>
+        <td>${s.email || '-'}</td>
+        <td>${s.whatsappNumber || s.contact || '-'}</td>
+        <td>${s.contact || '-'}</td>
+        <td>${s.emergencyContact || '-'}</td>
+        <td>${s.address || '-'}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Student Directory - ${settings?.schoolName || 'EduManage Pro'}</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #1e293b; }
+            h1 { text-align: center; color: #4f46e5; text-transform: uppercase; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10px; }
+            th { background: #f8fafc; padding: 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+            td { padding: 10px; border-bottom: 1px solid #f1f5f9; }
+            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; }
+          </style>
+        </head>
+        <body>
+          <h1>STUDENT DIRECTORY</h1>
+          <p style="text-align: center;"><strong>Total Students:</strong> ${students.length} | <strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Roll No</th>
+                <th>Student Name</th>
+                <th>Guardian Name</th>
+                <th>Email</th>
+                <th>WhatsApp</th>
+                <th>Phone</th>
+                <th>Emergency</th>
+                <th>Address</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="footer">EduManage Pro - Academic Excellence System</div>
+          <script>window.print(); setTimeout(() => window.close(), 500);</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const printAbsentList = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const absentStudents = students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent'));
+    const rows = absentStudents.map(s => `
+      <tr>
+        <td>${s.rollNumber}</td>
+        <td>${s.name}</td>
+        <td>${s.parentName}</td>
+        <td>${s.class} - ${s.section}</td>
+        <td>${s.contact || s.whatsappNumber || '-'}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Absent Students List - ${new Date().toLocaleDateString()}</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            h1 { text-align: center; color: #e11d48; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th { background: #fee2e2; padding: 10px; text-align: left; border-bottom: 2px solid #fecaca; }
+            td { padding: 10px; border-bottom: 1px solid #f1f5f9; }
+          </style>
+        </head>
+        <body>
+          <h1>DAILY ABSENT LIST - ${new Date().toLocaleDateString()}</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Roll No</th>
+                <th>Student Name</th>
+                <th>Guardian Name</th>
+                <th>Class</th>
+                <th>Contact</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <script>window.print(); setTimeout(() => window.close(), 500);</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -205,12 +355,6 @@ export default function Communication({ profile }: CommunicationProps) {
       }
 
       setSendingProgress({ current: 0, total: recipients.length });
-
-      // Simulate sending progress
-      for (let i = 1; i <= recipients.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay for visual effect
-        setSendingProgress(prev => prev ? { ...prev, current: i } : null);
-      }
 
       if (bulkFormData.type === 'email') {
         const emails = recipients.map(s => s.email).filter(Boolean) as string[];
@@ -234,14 +378,39 @@ export default function Communication({ profile }: CommunicationProps) {
         if (!result.success) {
           throw new Error(result.error || "Failed to send emails");
         }
+
+        // Mark as sent in local state/DB for history
+        await addDoc(collection(db, 'bulk_messages'), {
+          ...bulkFormData,
+          date: new Date().toISOString().split('T')[0],
+          recipientsCount: recipients.length,
+          status: 'sent',
+          campusId: profile?.campusId || 'main'
+        });
+
+      } else if (bulkFormData.type === 'whatsapp') {
+        // WhatsApp Web sharing pre-filled text
+        const text = encodeURIComponent(bulkFormData.content || '');
+        const waUrl = `https://web.whatsapp.com/send?text=${text}`;
+        
+        window.open(waUrl, '_blank');
+
+        // Mark as sent in local state/DB for history
+        await addDoc(collection(db, 'bulk_messages'), {
+          ...bulkFormData,
+          date: new Date().toISOString().split('T')[0],
+          recipientsCount: recipients.length,
+          status: 'sent',
+          campusId: profile?.campusId || 'main'
+        });
       } else if (bulkFormData.type === 'sms') {
-        const phoneNumbers = recipients.map(s => s.contact).filter(Boolean) as string[];
+        const phoneNumbers = recipients.map(s => s.contact || s.whatsappNumber).filter(Boolean) as string[];
         if (phoneNumbers.length === 0) {
           setSendingProgress(null);
           alert("No parent contact numbers found for the selected students.");
           return;
         }
-
+        
         const response = await fetch('/api/send-bulk-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -255,45 +424,25 @@ export default function Communication({ profile }: CommunicationProps) {
         if (!result.success) {
           throw new Error(result.error || "Failed to send SMS");
         }
-      } else if (bulkFormData.type === 'whatsapp') {
-        const phoneNumbers = recipients.map(s => s.whatsappNumber || s.contact).filter(Boolean) as string[];
-        if (phoneNumbers.length === 0) {
-          setSendingProgress(null);
-          alert("No parent WhatsApp numbers found for the selected students.");
-          return;
-        }
 
-        const response = await fetch('/api/send-bulk-whatsapp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: bulkFormData.content,
-            recipients: phoneNumbers
-          })
+        await addDoc(collection(db, 'bulk_messages'), {
+          ...bulkFormData,
+          date: new Date().toISOString().split('T')[0],
+          recipientsCount: recipients.length,
+          status: 'sent',
+          campusId: profile?.campusId || 'main'
         });
-
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.error || "Failed to send WhatsApp messages");
-        }
       }
-
-      await addDoc(collection(db, 'bulk_messages'), {
-        ...bulkFormData,
-        date: new Date().toISOString().split('T')[0],
-        recipientsCount: recipients.length,
-        status: 'sent'
-      });
 
       setSendingProgress(null);
       setIsBulkModalOpen(false);
       setBulkFormData({ subject: '', content: '', type: 'email', targetClass: 'All' });
       fetchBulkMessages();
-      alert(`Bulk ${bulkFormData.type} sent successfully to ${recipients.length} parents!`);
+      alert(`Bulk ${bulkFormData.type} process completed for ${recipients.length} recipients!`);
     } catch (error) {
       setSendingProgress(null);
       console.error("Error sending bulk message:", error);
-      alert("Failed to send bulk message. Check console for details.");
+      alert(error instanceof Error ? error.message : "Failed to send bulk message. Check console for details.");
     }
   };
 
@@ -357,53 +506,66 @@ export default function Communication({ profile }: CommunicationProps) {
       return;
     }
 
-    if (!window.confirm(`Send bulk ${type} reminders to ${studentsToNotify.length} parents?`)) return;
-
-    setSendingProgress({ current: 0, total: studentsToNotify.length });
+    if (!window.confirm(`Send ${type} reminders to ${studentsToNotify.length} parents?`)) return;
 
     try {
-      for (let i = 0; i < studentsToNotify.length; i++) {
-        const { student, records } = studentsToNotify[i];
-        const feeDetails = records.map(r => {
-          const type = feeTypes.find(t => t.id === r.feeTypeId);
-          return `${type?.name || 'Fee'}: $${(r.amount - r.paidAmount - (r.waiverAmount || 0)).toLocaleString()}`;
-        }).join(', ');
+      setSendingProgress({ current: 0, total: studentsToNotify.length });
 
-        const content = `Dear Parent, this is a reminder regarding outstanding fees for ${student.name}. Details: ${feeDetails}. Please ensure payment is made at your earliest convenience.`;
+      if (type === 'email') {
+        const reminders = studentsToNotify.map(({ student, records }) => {
+          const totalPending = records.reduce((sum, r) => sum + (r.amount - r.paidAmount - (r.waiverAmount || 0)), 0);
+          return {
+            email: student.email,
+            studentName: student.name,
+            amount: `PKR ${totalPending.toLocaleString()}`,
+            dueDate: records[0].dueDate,
+            type: 'overdue'
+          };
+        }).filter(r => r.email);
+
+        const response = await fetch('/api/send-fee-reminders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reminders })
+        });
+
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error);
+
+      } else if (type === 'whatsapp') {
+        const content = encodeURIComponent('Dear Parent, this is a reminder regarding outstanding school fees. Please settle the dues at your earliest convenience. Thank you!');
+        window.open(`https://web.whatsapp.com/send?text=${content}`, '_blank');
+      } else if (type === 'sms') {
+        const phones = studentsToNotify.map(s => s.student.contact || s.student.whatsappNumber).filter(Boolean) as string[];
         
-        const recipient = type === 'email' ? student.email : (type === 'whatsapp' ? (student.whatsappNumber || student.contact) : student.contact);
+        const response = await fetch('/api/send-bulk-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: 'Fee Reminder: Please settle your child\'s outstanding school dues at your earliest convenience. Thank you!',
+            recipients: phones
+          })
+        });
 
-        if (recipient) {
-          const endpoint = type === 'email' ? '/api/send-bulk-email' : (type === 'whatsapp' ? '/api/send-bulk-whatsapp' : '/api/send-bulk-sms');
-          const body = type === 'email' 
-            ? { subject: 'Fee Payment Reminder', content, recipients: [recipient] }
-            : { content, recipients: [recipient] };
-
-          await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
-        }
-
-        setSendingProgress(prev => prev ? { ...prev, current: i + 1 } : null);
-        await new Promise(resolve => setTimeout(resolve, 50));
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error);
       }
 
       await addDoc(collection(db, 'bulk_messages'), {
         subject: 'Bulk Fee Reminders',
-        content: 'Personalized fee reminders sent to parents with outstanding balances.',
+        content: 'Fee reminders processed for parents with outstanding balances.',
         type,
         date: new Date().toISOString().split('T')[0],
         recipientsCount: studentsToNotify.length,
-        status: 'sent'
+        status: 'sent',
+        campusId: profile?.campusId || 'main'
       });
 
-      alert(`Successfully sent ${type} reminders to ${studentsToNotify.length} parents.`);
+      alert(`Bulk ${type} reminders processed successfully.`);
       fetchBulkMessages();
     } catch (error) {
       console.error("Error sending bulk fee reminders:", error);
-      alert("Failed to send some reminders. Check console for details.");
+      alert("Failed to process reminders. Check console for details.");
     } finally {
       setSendingProgress(null);
       setIsFeeReminderModalOpen(false);
@@ -443,6 +605,15 @@ export default function Communication({ profile }: CommunicationProps) {
             >
               Student Directory
             </button>
+            <button
+              onClick={() => setActiveTab('absent')}
+              className={cn(
+                "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                activeTab === 'absent' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              Absent Students
+            </button>
           </>
         )}
       </div>
@@ -459,32 +630,141 @@ export default function Communication({ profile }: CommunicationProps) {
                 {students.length} Students
               </span>
             </div>
+            <button
+              onClick={printDirectory}
+              className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-100 transition-colors border border-indigo-100 shadow-sm"
+            >
+              <FileText className="w-5 h-5" />
+              Print Directory
+            </button>
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Name</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Parent/Guardian</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Email</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Phone</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">WhatsApp</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Other</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {students.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-900">{student.name}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.parentName}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.email || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.contact || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.whatsappNumber || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{student.emergencyContact || '-'}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 border-b border-slate-100 text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Roll No</th>
+                    <th className="px-4 py-3 text-left">Student Name</th>
+                    <th className="px-4 py-3">Guardian Name</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">WhatsApp</th>
+                    <th className="px-4 py-3">Phone</th>
+                    <th className="px-4 py-3">Emergency</th>
+                    <th className="px-4 py-3">Address</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {students.map((student) => (
+                    <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 font-bold text-slate-900">{student.rollNumber}</td>
+                      <td className="px-4 py-3 text-left">
+                        <div className="font-bold text-slate-900">{student.name}</div>
+                        <div className="text-[10px] text-slate-400 font-medium">Class {student.class}-{student.section}</div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 uppercase text-[11px] font-semibold">{student.parentName}</td>
+                      <td className="px-4 py-3 text-slate-500 font-medium">{student.email || '-'}</td>
+                      <td className="px-4 py-3">
+                         <div className="flex items-center gap-2">
+                           <span className="text-slate-600 font-medium">{student.whatsappNumber || '-'}</span>
+                           {student.whatsappNumber && (
+                             <button onClick={() => openWhatsApp(student.whatsappNumber, student.name)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
+                               <MessageSquare size={14} />
+                             </button>
+                           )}
+                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 font-medium">{student.contact || '-'}</td>
+                      <td className="px-4 py-3 text-rose-600 font-bold">{student.emergencyContact || '-'}</td>
+                      <td className="px-4 py-3 text-slate-500 max-w-[150px] truncate" title={student.address}>{student.address || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      ) : activeTab === 'absent' ? (
+        <section className="space-y-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-rose-600 rounded-lg shadow-lg shadow-rose-200">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">Absent Students</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Today: {new Date().toLocaleDateString()}
+                  </span>
+                  <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Total: {students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent')).length}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={printAbsentList}
+                className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-100 transition-all border border-indigo-100"
+              >
+                <FileText className="w-5 h-5" />
+                Print List
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent')).length === 0 ? (
+              <div className="col-span-full py-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                <XCircle className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                <p className="font-bold">No students marked absent today.</p>
+                <p className="text-sm">Great! Everyone is present.</p>
+              </div>
+            ) : (
+              students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent')).map((student) => (
+                <div key={student.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-4 bg-rose-50 text-rose-600 rounded-bl-2xl">
+                      <Clock className="w-4 h-4" />
+                   </div>
+                   
+                   <div className="flex items-start gap-4 mb-4">
+                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400">
+                        {student.name[0]}
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-900 leading-tight">{student.name}</h4>
+                        <p className="text-xs font-bold text-slate-400 mt-0.5 uppercase tracking-wider">Class {student.class}-{student.section}</p>
+                      </div>
+                   </div>
+
+                   <div className="space-y-3 pt-4 border-t border-slate-50">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400 font-bold uppercase tracking-wider">Guardian</span>
+                        <span className="text-slate-900 font-black">{student.parentName}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400 font-bold uppercase tracking-wider">Contact</span>
+                        <span className="text-slate-900 font-black">{student.contact || '-'}</span>
+                      </div>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-2 mt-6">
+                      <button 
+                        onClick={() => openWhatsApp(student.whatsappNumber || student.contact, student.name)}
+                        className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm shadow-emerald-100"
+                      >
+                         <MessageSquare size={14} /> WhatsApp
+                      </button>
+                      <button 
+                        onClick={() => window.location.href = `tel:${student.contact}`}
+                        className="flex items-center justify-center gap-2 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm shadow-indigo-100"
+                      >
+                         <Bell size={14} /> SMS/Call
+                      </button>
+                   </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
       ) : activeTab === 'notices' ? (

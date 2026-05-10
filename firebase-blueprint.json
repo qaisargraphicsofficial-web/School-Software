@@ -343,6 +343,75 @@
       },
       "required": ["name", "code", "class", "campusId"]
     },
+    "SchoolWebsite": {
+      "title": "SchoolWebsite",
+      "description": "Customizable landing page content for the school",
+      "type": "object",
+      "properties": {
+        "schoolWebAddress": { "type": "string" },
+        "tagline": { "type": "string" },
+        "announcement": { "type": "string" },
+        "about": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "facebookUrl": { "type": "string" },
+        "instagramUrl": { "type": "string" },
+        "coverPhotos": { "type": "array", "items": { "type": "string" } },
+        "spotlight": {
+          "type": "object",
+          "properties": {
+            "heading": { "type": "string" },
+            "photoUrl": { "type": "string" },
+            "name": { "type": "string" },
+            "title": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        },
+        "mainVideoUrl": { "type": "string" },
+        "moreVideos": { "type": "array", "items": { "type": "string" } },
+        "customLinks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          }
+        },
+        "campusId": { "type": "string" }
+      },
+      "required": ["schoolWebAddress", "campusId"]
+    },
+    "ShopItem": {
+      "title": "ShopItem",
+      "description": "Items available in the school shop",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "cost": { "type": "number" },
+        "stock": { "type": "number" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["name", "category", "price", "cost", "stock", "campusId"]
+    },
+    "ShopSale": {
+      "title": "ShopSale",
+      "description": "Sales records for the school shop",
+      "type": "object",
+      "properties": {
+        "itemId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "saleDate": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["itemId", "itemName", "quantity", "totalAmount", "saleDate", "campusId"]
+    },
     "Class": {
       "title": "Class",
       "description": "Class and section definitions with assigned teachers",
@@ -389,6 +458,9 @@
     "leave_requests": { "schema": "LeaveRequest", "description": "Collection of staff leave requests" },
     "leave_balances": { "schema": "LeaveBalance", "description": "Collection of staff leave balances" },
     "subjects": { "schema": "Subject", "description": "Collection of subjects" },
+    "school_websites": { "schema": "SchoolWebsite", "description": "Collection of school website configurations" },
+    "shop_items": { "schema": "ShopItem", "description": "Collection of items available in the shop" },
+    "shop_sales": { "schema": "ShopSale", "description": "Collection of shop sales records" },
     "classes": { "schema": "Class", "description": "Collection of class and section definitions" }
   }
 }

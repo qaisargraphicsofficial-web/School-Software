@@ -212,6 +212,7 @@ export interface Payroll {
 export interface InventoryItem {
   id?: string;
   name: string;
+  price: number;
   quantity: number;
   category: string;
   details?: string;

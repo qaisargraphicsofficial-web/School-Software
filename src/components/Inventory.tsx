@@ -30,6 +30,7 @@ export default function Inventory({ profile }: InventoryProps) {
 
   const [formData, setFormData] = useState<Partial<InventoryItem>>({
     name: '',
+    price: 0,
     quantity: 0,
     category: 'Assets',
     details: '',
@@ -189,6 +190,10 @@ export default function Inventory({ profile }: InventoryProps) {
                   <span className="text-xs text-slate-400 font-medium">Quantity</span>
                   <span className="text-xl font-bold text-slate-900">{item.quantity}</span>
                 </div>
+                <div className="flex flex-col text-right">
+                  <span className="text-xs text-slate-400 font-medium">Price</span>
+                  <span className="text-xl font-bold text-slate-900">PKR {item.price}</span>
+                </div>
                 <div className="flex gap-1">
                   <button 
                     onClick={() => updateQuantity(item.id!, item.quantity - 1)}
@@ -244,7 +249,7 @@ export default function Inventory({ profile }: InventoryProps) {
                     onChange={e => setFormData({...formData, name: e.target.value})}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Quantity</label>
                     <input
@@ -253,6 +258,16 @@ export default function Inventory({ profile }: InventoryProps) {
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                       value={formData.quantity}
                       onChange={e => setFormData({...formData, quantity: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">Price (PKR)</label>
+                    <input
+                      required
+                      type="number"
+                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                      value={formData.price}
+                      onChange={e => setFormData({...formData, price: Number(e.target.value)})}
                     />
                   </div>
                   <div className="space-y-2">
