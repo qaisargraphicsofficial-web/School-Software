@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, setDoc, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, setDoc, where, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Staff, UserProfile, Payroll } from '../types';
+import { Staff, UserProfile, Payroll, SchoolSettings, ClassGroup } from '../types';
 import { 
   Plus, 
   Search, 
@@ -27,7 +27,8 @@ import {
   QrCode,
   Scan,
   Loader2,
-  Upload
+  Upload,
+  IdCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -54,12 +55,16 @@ export default function StaffManagement({ profile }: StaffProps) {
   const [loading, setLoading] = useState(true);
   const [viewingSalaryHistory, setViewingSalaryHistory] = useState<Staff | null>(null);
   const [viewingAttendanceHistory, setViewingAttendanceHistory] = useState<Staff | null>(null);
+  const [viewingIdCard, setViewingIdCard] = useState<Staff | null>(null);
+  const [viewingStaffDetail, setViewingStaffDetail] = useState<Staff | null>(null);
+  const [assignedClasses, setAssignedClasses] = useState<string[]>([]);
   const [payrollHistory, setPayrollHistory] = useState<Payroll[]>([]);
   const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [settings, setSettings] = useState<SchoolSettings | null>(null);
   const [selectedStaffForCreds, setSelectedStaffForCreds] = useState<Staff | null>(null);
   const [credFormData, setCredFormData] = useState({
     username: '',
@@ -111,6 +116,9 @@ export default function StaffManagement({ profile }: StaffProps) {
       const q = query(
         collection(db, 'attendance'), 
         where('targetId', '==', staffId),
+        where('targetType', '==', staffId.startsWith('STF') ? 'staff' : 'staff'), // Adjusting for actual implementation if needed, seems to just use staffId in Staff.tsx
+        // Wait, looking at handleGenerateCredentials/onScanSuccess, it seems staffId is used as targetId.
+        // The query in fetchAttendanceHistory seems okay: targetType: 'staff'
         where('targetType', '==', 'staff'),
         orderBy('date', 'desc')
       );
@@ -122,11 +130,27 @@ export default function StaffManagement({ profile }: StaffProps) {
     }
   };
 
+  const handleViewDetail = async (staff: Staff) => {
+    setViewingStaffDetail(staff);
+    fetchPayrollHistory(staff.id!);
+    try {
+        const snap = await getDocs(collection(db, 'classes'));
+        const classes = snap.docs.map(d => d.data() as ClassGroup);
+        const staffClasses = classes.filter(c => c.sections.some(s => s.teacherIds.includes(staff.id!)))
+            .map(c => `${c.className} ${c.sections.filter(s => s.teacherIds.includes(staff.id!)).map(s => s.name).join(', ')}`);
+        setAssignedClasses(staffClasses);
+    } catch (e) {
+        console.error("Error fetching assigned classes:", e);
+        setAssignedClasses([]);
+    }
+  };
+
   const initialFormData: Partial<Staff> = {
     name: '',
     staffId: '',
     role: 'Teacher',
-    contact: '',
+    whatsappNumber: '',
+    secondaryContact: '',
     salary: 0,
     joiningDate: new Date().toISOString().split('T')[0],
     leavingDate: '',
@@ -135,6 +159,12 @@ export default function StaffManagement({ profile }: StaffProps) {
     remainingDues: 0,
     status: 'active',
     campusId: profile?.campusId || 'main',
+    bankAccount: '',
+    bankDetails: {
+      bankName: '',
+      accountTitle: '',
+      accountNumber: ''
+    }
   };
 
   const [formData, setFormData] = useState<Partial<Staff>>(initialFormData);
@@ -142,8 +172,21 @@ export default function StaffManagement({ profile }: StaffProps) {
   useEffect(() => {
     if (profile) {
       fetchStaff();
+      fetchSettings();
     }
   }, [profile]);
+
+  const fetchSettings = async () => {
+    try {
+      const docRef = doc(db, 'settings', 'global');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setSettings(docSnap.data() as SchoolSettings);
+      }
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+    }
+  };
 
   useEffect(() => {
     if (isScannerOpen) {
@@ -247,8 +290,10 @@ export default function StaffManagement({ profile }: StaffProps) {
           campusId: profile?.campusId || 'main'
         });
       } else {
-        await addDoc(collection(db, 'staff'), {
+        const newDocRef = doc(collection(db, 'staff'));
+        await setDoc(newDocRef, {
           ...formData,
+          staffId: newDocRef.id,
           campusId: profile?.campusId || 'main'
         });
       }
@@ -331,12 +376,13 @@ export default function StaffManagement({ profile }: StaffProps) {
 
   const exportToCSV = () => {
     try {
-      const headers = ['Name', 'Staff ID', 'Role', 'Contact', 'Salary', 'Joining Date', 'Status', 'Class Incharge', 'Total Received', 'Remaining Dues'];
+      const headers = ['Name', 'Staff ID', 'Role', 'WhatsApp Number', 'Secondary Contact', 'Salary', 'Joining Date', 'Status', 'Class Incharge', 'Total Received', 'Remaining Dues'];
       const data = filteredStaff.map(s => [
         s.name,
         s.staffId,
         s.role,
-        s.contact,
+        s.whatsappNumber,
+        s.secondaryContact,
         s.salary,
         s.joiningDate,
         s.status,
@@ -486,7 +532,7 @@ export default function StaffManagement({ profile }: StaffProps) {
                   ) : (
                     filteredStaff.map((staff) => (
                       <tr key={staff.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-6 py-4">
+                       <td className="px-6 py-4 cursor-pointer" onClick={() => handleViewDetail(staff)}>
                           <div className="flex items-center gap-4">
                             <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold relative group-hover:shadow-md transition-shadow overflow-hidden">
                               {staff.photoUrl ? (
@@ -518,7 +564,8 @@ export default function StaffManagement({ profile }: StaffProps) {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm text-slate-600 flex items-center gap-2"><Phone className="w-3 h-3" /> {staff.contact}</span>
+                            {staff.whatsappNumber && <span className="text-sm text-slate-600 flex items-center gap-2"><Phone className="w-3 h-3 text-green-500" /> {staff.whatsappNumber}</span>}
+                            {staff.secondaryContact && <span className="text-sm text-slate-600 flex items-center gap-2"><Phone className="w-3 h-3 text-slate-400" /> {staff.secondaryContact}</span>}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-600">
@@ -565,6 +612,15 @@ export default function StaffManagement({ profile }: StaffProps) {
                               title="Attendance History"
                             >
                               <UserCheck className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setViewingIdCard(staff);
+                              }}
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                              title="View ID Card"
+                            >
+                              <IdCard className="w-4 h-4" />
                             </button>
                             <button 
                               onClick={() => handleQuickPay(staff)}
@@ -718,6 +774,67 @@ export default function StaffManagement({ profile }: StaffProps) {
         )}
       </AnimatePresence>
 
+      {/* ID Card Modal */}
+      <AnimatePresence>
+        {viewingIdCard && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setViewingIdCard(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-sm"
+            >
+              <div className="p-4 flex items-center justify-between border-b border-slate-100">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2"><IdCard className="w-5 h-5" /> Staff ID Card</h3>
+                <button onClick={() => setViewingIdCard(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+              <div className="p-8 pb-10 bg-slate-50">
+                <div id="print-id-card" className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative" style={{ width: '280px', height: '440px', margin: '0 auto' }}>
+                  <div className="bg-indigo-600 h-24 absolute top-0 left-0 right-0 z-0"></div>
+                  
+                  <div className="relative z-10 flex flex-col items-center pt-8">
+                    <div className="w-24 h-24 bg-white rounded-full p-1 shadow-md mb-4 relative">
+                       <div className="w-full h-full rounded-full overflow-hidden bg-slate-100 flex items-center justify-center font-bold text-3xl text-slate-400">
+                         {viewingIdCard.photoUrl ? (
+                           <img src={viewingIdCard.photoUrl} alt={viewingIdCard.name} className="w-full h-full object-cover" />
+                         ) : viewingIdCard.name[0]}
+                       </div>
+                    </div>
+                    
+                    <h2 className="text-xl font-bold text-slate-900 mb-1 px-4 text-center leading-tight">{viewingIdCard.name}</h2>
+                    <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">{viewingIdCard.role}</p>
+                    
+                    <div className="w-full px-6 py-4 mt-4 border-t border-slate-50">
+                      <div className="flex justify-between items-center mb-4">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">UID</span>
+                         <span className="font-mono font-bold text-slate-800 text-sm tracking-wider">{viewingIdCard.staffId}</span>
+                      </div>
+                      
+                      <div className="flex justify-center mt-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <QRCodeSVG value={viewingIdCard.staffId} size={110} />
+                      </div>
+                      
+                      <p className="text-center text-[10px] text-slate-400 mt-4 font-medium max-w-xs mx-auto">
+                        Scan for quick attendance
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Salary History Modal */}
       <AnimatePresence>
         {viewingSalaryHistory && (
@@ -780,6 +897,56 @@ export default function StaffManagement({ profile }: StaffProps) {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Staff Detail Modal */}
+      <AnimatePresence>
+        {viewingStaffDetail && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setViewingStaffDetail(null)} />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6 border-b pb-6">
+                <h2 className="text-2xl font-black text-slate-900">Staff Details</h2>
+                <button onClick={() => setViewingStaffDetail(null)} className="p-2 hover:bg-slate-100 rounded-xl"><X className="w-6 h-6"/></button>
+              </div>
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center text-3xl font-bold text-indigo-600">
+                    {viewingStaffDetail.photoUrl ? <img src={viewingStaffDetail.photoUrl} className="w-full h-full rounded-full object-cover" /> : viewingStaffDetail.name[0]}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black">{viewingStaffDetail.name}</h3>
+                    <p className="text-slate-500">{viewingStaffDetail.role}</p>
+                    <p className="text-xs font-bold text-indigo-600">ID: {viewingStaffDetail.staffId}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><p className="text-slate-400 font-bold uppercase text-[10px]">WhatsApp</p>{viewingStaffDetail.whatsappNumber}</div>
+                  <div><p className="text-slate-400 font-bold uppercase text-[10px]">Secondary Contact</p>{viewingStaffDetail.secondaryContact || 'N/A'}</div>
+                  <div><p className="text-slate-400 font-bold uppercase text-[10px]">Salary</p>${viewingStaffDetail.salary.toLocaleString()}</div>
+                  <div><p className="text-slate-400 font-bold uppercase text-[10px]">Joining Date</p>{viewingStaffDetail.joiningDate}</div>
+                </div>
+                <div>
+                   <p className="text-slate-400 font-bold uppercase text-[10px] mb-2">Assigned Classes</p>
+                   {assignedClasses.length > 0 ? (
+                       <div className="flex flex-wrap gap-2">
+                           {assignedClasses.map(cls => <span key={cls} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold">{cls}</span>)}
+                       </div>
+                   ) : <p className="text-sm italic text-slate-500">No classes assigned</p>}
+                </div>
+                {payrollHistory.length > 0 && (
+                   <div>
+                       <p className="text-slate-400 font-bold uppercase text-[10px] mb-2">Latest Salary Payment</p>
+                       <div className="p-4 bg-emerald-50 rounded-xl">
+                           <p className="font-bold text-emerald-900">${payrollHistory[0].netPay.toLocaleString()}</p>
+                           <p className="text-xs text-emerald-700">{payrollHistory[0].paymentDate}</p>
+                       </div>
+                   </div>
+                )}
               </div>
             </motion.div>
           </div>
@@ -855,20 +1022,17 @@ export default function StaffManagement({ profile }: StaffProps) {
                       placeholder="John Doe"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Staff ID</label>
-                    <input
-                      required
-                      type="text"
-                      className="input-field"
-                      value={formData.staffId}
-                      onChange={e => setFormData({...formData, staffId: e.target.value})}
-                      placeholder="STF001"
-                      pattern="[a-zA-Z0-9]+"
-                      minLength={5}
-                      title="Staff ID must be at least 5 characters long and contain only alphanumeric characters."
-                    />
-                  </div>
+                  {isEditMode && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Staff ID</label>
+                      <input
+                        readOnly
+                        type="text"
+                        className="input-field bg-slate-100"
+                        value={formData.staffId}
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Role</label>
                     <select
@@ -898,27 +1062,42 @@ export default function StaffManagement({ profile }: StaffProps) {
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Monthly Salary</label>
                     <div className="relative">
-                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
+                        {settings?.currency === 'PKR' ? 'Rs.' : (settings?.currency === 'GBP' ? '£' : (settings?.currency === 'EUR' ? '€' : (settings?.currency === 'INR' ? '₹' : '$')))}
+                      </span>
                       <input
                         required
                         type="number"
-                        className="input-field pl-10"
+                        className="input-field pl-12"
                         value={formData.salary}
                         onChange={e => setFormData({...formData, salary: Number(e.target.value)})}
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Contact Number</label>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">WhatsApp Number</label>
                     <div className="relative">
                       <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
                         required
                         type="tel"
                         className="input-field pl-10"
-                        value={formData.contact}
-                        onChange={e => setFormData({...formData, contact: e.target.value})}
-                        placeholder="+1 234 567 890"
+                        value={formData.whatsappNumber}
+                        onChange={e => setFormData({...formData, whatsappNumber: e.target.value})}
+                        placeholder="+92 300 1234567"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Secondary Contact Number</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="tel"
+                        className="input-field pl-10"
+                        value={formData.secondaryContact}
+                        onChange={e => setFormData({...formData, secondaryContact: e.target.value})}
+                        placeholder="+92 300 7654321"
                       />
                     </div>
                   </div>
@@ -961,6 +1140,62 @@ export default function StaffManagement({ profile }: StaffProps) {
                       value={formData.remainingDues}
                       onChange={e => setFormData({...formData, remainingDues: Number(e.target.value)})}
                     />
+                  </div>
+                  <div className="col-span-full mt-4">
+                    <h4 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4">Bank Information</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="space-y-2 relative">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Bank / Wallet Name</label>
+                        <select
+                          className="input-field"
+                          value={formData.bankDetails?.bankName || ''}
+                          onChange={e => setFormData({
+                            ...formData, 
+                            bankDetails: { ...formData.bankDetails, bankName: e.target.value } as any
+                          })}
+                        >
+                          <option value="">Select Bank Details</option>
+                          <option value="HBL">🏦 HBL - Habib Bank Limited</option>
+                          <option value="Meezan Bank">🏦 Meezan Bank</option>
+                          <option value="Allied Bank">🏦 Allied Bank</option>
+                          <option value="MCB">🏦 MCB Bank</option>
+                          <option value="UBL">🏦 UBL</option>
+                          <option value="Bank Alfalah">🏦 Bank Alfalah</option>
+                          <option value="Standard Chartered">🏦 Standard Chartered</option>
+                          <option value="JazzCash">📱 JazzCash</option>
+                          <option value="EasyPaisa">📱 EasyPaisa</option>
+                          <option value="Nayapay">📱 Nayapay</option>
+                          <option value="SadaPay">📱 SadaPay</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Account Title</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          value={formData.bankDetails?.accountTitle || ''}
+                          onChange={e => setFormData({
+                            ...formData, 
+                            bankDetails: { ...formData.bankDetails, accountTitle: e.target.value } as any
+                          })}
+                          placeholder="e.g. John Doe"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Account Number / IBAN</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          value={formData.bankDetails?.accountNumber || formData.bankAccount || ''}
+                          onChange={e => setFormData({
+                            ...formData, 
+                            bankDetails: { ...formData.bankDetails, accountNumber: e.target.value } as any,
+                            bankAccount: e.target.value
+                          })}
+                          placeholder="e.g. PK00HABB123456789"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
                 

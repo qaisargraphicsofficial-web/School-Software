@@ -52,10 +52,22 @@ export default function Students({ profile }: StudentsProps) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isIdCardModalOpen, setIsIdCardModalOpen] = useState(false);
-  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'academic' | 'attendance'>('info');
+  const [isBulkIdCardModalOpen, setIsBulkIdCardModalOpen] = useState(false);
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
   const [studentAttendance, setStudentAttendance] = useState<Attendance[]>([]);
   const [studentExamResults, setStudentExamResults] = useState<ExamResult[]>([]);
+  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'academic' | 'attendance'>('info');
+  const [selectedStudents, setSelectedStudents] = useState<Student[]>([]);
+  const toggleStudentSelection = (student: Student) => {
+    setSelectedStudents(prev => 
+      prev.find(s => s.id === student.id) 
+        ? prev.filter(s => s.id !== student.id)
+        : [...prev, student]
+    );
+  };
+  const toggleAllStudents = () => {
+    setSelectedStudents(prev => prev.length === filteredStudents.length ? [] : filteredStudents);
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [classFilter, setClassFilter] = useState('all');
@@ -292,20 +304,65 @@ export default function Students({ profile }: StudentsProps) {
     }
   };
 
-  const generateIDCard = async (student: Student) => {
-    setSelectedStudent(student);
-    // Wait for modal to render
-    setTimeout(async () => {
-      if (idCardRef.current) {
-        const canvas = await html2canvas(idCardRef.current);
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        pdf.addImage(imgData, 'PNG', 10, 10, 85, 55); // Standard ID card size
-        pdf.save(`${student.name}_S_O_${student.parentName}_ID_Card.pdf`);
-        setSelectedStudent(null);
-      }
-    }, 500);
-  };
+const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Ref<HTMLDivElement>, id?: string, key?: string }) => (
+    <div id={id} ref={ref} className="w-[350px] h-[220px] bg-white border-2 border-indigo-600 rounded-2xl overflow-hidden flex flex-col shadow-xl">
+      <div className="bg-indigo-600 p-4 flex items-center gap-3">
+        <School className="w-8 h-8 text-white" />
+        <div>
+          <h3 className="text-white font-bold text-lg leading-tight">EduManage Pro</h3>
+          <p className="text-indigo-100 text-[10px] uppercase tracking-wider font-semibold">Student Identity Card</p>
+        </div>
+      </div>
+      <div className="flex-1 p-4 flex gap-4">
+        <div className="w-24 h-24 bg-slate-100 rounded-xl border-2 border-slate-200 flex items-center justify-center overflow-hidden">
+          {student.photoUrl ? (
+            <img 
+              src={student.photoUrl} 
+              alt={student.name} 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+            />
+          ) : (
+            <Camera className="w-8 h-8 text-slate-300" />
+          )}
+        </div>
+        <div className="flex-1 space-y-2">
+          <h4 className="text-xl font-black text-slate-900 tracking-tight">{student.name}</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-0.5">
+              <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Roll Number</p>
+              <p className="text-xs font-bold text-slate-700">{student.rollNumber}</p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Class</p>
+              <p className="text-xs font-bold text-slate-700">{student.class}</p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Section</p>
+              <p className="text-xs font-bold text-slate-700">{student.section}</p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Campus</p>
+              <p className="text-xs font-bold text-slate-700">{student.campusId || 'Main'}</p>
+            </div>
+          </div>
+        </div>
+        <div className="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center">
+          <QRCodeSVG 
+            value={student.id!} 
+            size={64}
+            level="H"
+            includeMargin={false}
+          />
+        </div>
+      </div>
+      <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex justify-between items-center">
+        <p className="text-[10px] text-slate-400 font-medium">Valid for Academic Year 2026-27</p>
+        <div className="w-12 h-6 bg-slate-200 rounded"></div>
+      </div>
+    </div>
+);
 
   const exportToCSV = () => {
     try {
@@ -496,6 +553,15 @@ export default function Students({ profile }: StudentsProps) {
             <FileSpreadsheet className="w-4 h-4" />
             Export CSV
           </button>
+          {selectedStudents.length > 0 && (
+            <button
+              onClick={() => setIsBulkIdCardModalOpen(true)}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Printer className="w-4 h-4" />
+              Print ({selectedStudents.length})
+            </button>
+          )}
           {profile?.role === 'admin' && (
             <button
               onClick={() => setIsModalOpen(true)}
@@ -580,6 +646,9 @@ export default function Students({ profile }: StudentsProps) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600 w-10">
+                  <input type="checkbox" checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0} onChange={toggleAllStudents} />
+                </th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Parent/Guardian</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Roll No</th>
@@ -609,6 +678,9 @@ export default function Students({ profile }: StudentsProps) {
                     className="hover:bg-slate-50 transition-colors group cursor-pointer"
                     onClick={() => handleViewDetails(student)}
                   >
+                    <td className="px-6 py-5">
+                      <input type="checkbox" checked={selectedStudents.some(s => s.id === student.id)} onChange={(e) => { e.stopPropagation(); toggleStudentSelection(student); }} />
+                    </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-4">
                         {student.photoUrl ? (
@@ -1458,6 +1530,43 @@ export default function Students({ profile }: StudentsProps) {
         )}
       </AnimatePresence>
 
+      {/* Bulk ID Card Modal */}
+      <AnimatePresence>
+        {isBulkIdCardModalOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm no-print"
+              onClick={() => setIsBulkIdCardModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden print-container"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between no-print">
+                <h2 className="text-xl font-bold text-slate-900">Bulk ID Card Generation</h2>
+                <div className="flex gap-3">
+                  <button onClick={() => setIsBulkIdCardModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                    <X className="w-6 h-6 text-slate-400" />
+                  </button>
+                  <button onClick={() => window.print()} className="btn-primary flex items-center gap-2">
+                    <Printer className="w-4 h-4" />
+                    Print All
+                  </button>
+                </div>
+              </div>
+              <div className="p-8 grid grid-cols-2 gap-8 justify-items-center max-h-[70vh] overflow-y-auto">
+                {selectedStudents.map(s => <IdCardTemplate key={s.id} student={s} />)}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ID Card Modal */}
       <AnimatePresence>
         {isIdCardModalOpen && viewingStudent && (
@@ -1483,63 +1592,7 @@ export default function Students({ profile }: StudentsProps) {
               </div>
               
               <div className="p-8 flex flex-col items-center gap-8">
-                <div id="printable-id-card" className="w-[350px] h-[220px] bg-white border-2 border-indigo-600 rounded-2xl overflow-hidden flex flex-col shadow-xl">
-                  <div className="bg-indigo-600 p-4 flex items-center gap-3">
-                    <School className="w-8 h-8 text-white" />
-                    <div>
-                      <h3 className="text-white font-bold text-lg leading-tight">EduManage Pro</h3>
-                      <p className="text-indigo-100 text-[10px] uppercase tracking-wider font-semibold">Student Identity Card</p>
-                    </div>
-                  </div>
-                  <div className="flex-1 p-4 flex gap-4">
-                    <div className="w-24 h-24 bg-slate-100 rounded-xl border-2 border-slate-200 flex items-center justify-center overflow-hidden">
-                      {viewingStudent.photoUrl ? (
-                        <img 
-                          src={viewingStudent.photoUrl} 
-                          alt={viewingStudent.name} 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
-                        />
-                      ) : (
-                        <Camera className="w-8 h-8 text-slate-300" />
-                      )}
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <h4 className="text-xl font-black text-slate-900 tracking-tight">{viewingStudent.name}</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Roll Number</p>
-                          <p className="text-xs font-bold text-slate-700">{viewingStudent.rollNumber}</p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Class</p>
-                          <p className="text-xs font-bold text-slate-700">{viewingStudent.class}</p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Section</p>
-                          <p className="text-xs font-bold text-slate-700">{viewingStudent.section}</p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Campus</p>
-                          <p className="text-xs font-bold text-slate-700">{viewingStudent.campusId || 'Main'}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center">
-                      <QRCodeSVG 
-                        value={viewingStudent.id!} 
-                        size={64}
-                        level="H"
-                        includeMargin={false}
-                      />
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex justify-between items-center">
-                    <p className="text-[10px] text-slate-400 font-medium">Valid for Academic Year 2026-27</p>
-                    <div className="w-12 h-6 bg-slate-200 rounded"></div>
-                  </div>
-                </div>
+                <IdCardTemplate student={viewingStudent} id="printable-id-card" />
 
                 <div className="flex gap-3 w-full no-print">
                   <button 
@@ -1550,7 +1603,19 @@ export default function Students({ profile }: StudentsProps) {
                     Print ID Card
                   </button>
                   <button 
-                    onClick={() => generateIDCard(viewingStudent)}
+                    onClick={() => {
+                        setSelectedStudent(viewingStudent);
+                        setTimeout(async () => {
+                          if (idCardRef.current) {
+                            const canvas = await html2canvas(idCardRef.current);
+                            const imgData = canvas.toDataURL('image/png');
+                            const pdf = new jsPDF('p', 'mm', 'a4');
+                            pdf.addImage(imgData, 'PNG', 10, 10, 85, 55); // Standard ID card size
+                            pdf.save(`${viewingStudent.name}_ID_Card.pdf`);
+                            setSelectedStudent(null);
+                          }
+                        }, 500);
+                    }}
                     className="flex-1 btn-secondary py-3 flex items-center justify-center gap-2"
                   >
                     <Download className="w-5 h-5" />

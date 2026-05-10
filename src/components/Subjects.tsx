@@ -222,13 +222,16 @@ export default function SubjectsManagement({ profile }: SubjectsProps) {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Class</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. 10th" 
-                    value={formData.class} 
-                    onChange={e => setFormData({...formData, class: e.target.value})} 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                  />
+                  <select 
+                    value={formData.class}
+                    onChange={e => setFormData({...formData, class: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all appearance-none"
+                  >
+                    <option value="">-- Select Class --</option>
+                    {['Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'].map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               

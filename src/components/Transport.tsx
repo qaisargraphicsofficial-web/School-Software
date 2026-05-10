@@ -611,9 +611,13 @@ export default function Transport({ profile }: TransportProps) {
                     <input
                       required
                       type="number"
+                      min="1"
                       className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
-                      value={vehicleFormData.capacity}
-                      onChange={e => setVehicleFormData({...vehicleFormData, capacity: parseInt(e.target.value)})}
+                      value={vehicleFormData.capacity || ''}
+                      onChange={e => {
+                        const val = parseInt(e.target.value);
+                        setVehicleFormData({...vehicleFormData, capacity: isNaN(val) ? 0 : val});
+                      }}
                       placeholder="e.g. 40"
                     />
                   </div>

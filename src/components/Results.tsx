@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Student, ExamResult, UserProfile, ExamPaper, ExamType, SchoolSettings } from '../types';
+import { Student, ExamResult, UserProfile, ExamPaper, ExamType, SchoolSettings, ClassGroup } from '../types';
 import { Search, FileText, Calendar, Award, Download, Eye, XCircle, Upload, Check, AlertCircle, Loader2, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -15,6 +15,7 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [results, setResults] = useState<ExamResult[]>([]);
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
+  const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
   const [examPapers, setExamPapers] = useState<Record<string, ExamPaper>>({});
   const [selectedPaper, setSelectedPaper] = useState<ExamPaper | null>(null);
@@ -51,8 +52,20 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
     fetchStudents();
     fetchResults();
     fetchExamTypes();
+    fetchClasses();
     fetchSchoolSettings();
   }, [profile]);
+
+  const fetchClasses = async () => {
+    try {
+      const campusId = profile?.campusId || 'main';
+      const q = query(collection(db, 'classes'), where('campusId', '==', campusId));
+      const snap = await getDocs(q);
+      setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup)));
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+    }
+  };
 
   const fetchSchoolSettings = async () => {
     try {
@@ -312,8 +325,8 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
             className="bg-transparent text-sm font-medium text-slate-600 focus:outline-none w-full"
           >
             <option value="">All Exam Types</option>
-            {Array.from(new Set(results.map(r => r.examTypeId))).map(typeId => (
-              <option key={typeId} value={typeId}>{typeId}</option>
+            {examTypes.map(type => (
+              <option key={type.id} value={type.id}>{type.name}</option>
             ))}
           </select>
         </div>
@@ -321,12 +334,25 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
           <Calendar className="w-4 h-4 text-slate-400" />
           <select
             value={resultFilters.class}
-            onChange={(e) => setResultFilters({...resultFilters, class: e.target.value})}
+            onChange={(e) => setResultFilters({...resultFilters, class: e.target.value, section: ''})}
             className="bg-transparent text-sm font-medium text-slate-600 focus:outline-none w-full"
           >
             <option value="">All Classes</option>
-            {Array.from(new Set(results.map(r => r.class))).map(c => (
-              <option key={c} value={c}>{c}</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.className}>{c.className}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 flex-1 min-w-[200px]">
+          <Calendar className="w-4 h-4 text-slate-400" />
+          <select
+            value={resultFilters.section}
+            onChange={(e) => setResultFilters({...resultFilters, section: e.target.value})}
+            className="bg-transparent text-sm font-medium text-slate-600 focus:outline-none w-full"
+          >
+            <option value="">All Sections</option>
+            {classes.find(c => c.className === resultFilters.class)?.sections.map(s => (
+              <option key={s.id} value={s.name}>{s.name}</option>
             ))}
           </select>
         </div>

@@ -92,6 +92,7 @@ export default function PayrollManagement({ profile }: PayrollManagementProps) {
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Gross</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Deductions</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Net Pay</th>
+              <th className="px-6 py-4 text-sm font-semibold text-slate-600">Bank Account</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Month</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Status</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Actions</th>
@@ -109,6 +110,21 @@ export default function PayrollManagement({ profile }: PayrollManagementProps) {
                   <td className="px-6 py-4 text-sm font-bold text-slate-900">${p.amount.toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm font-bold text-rose-600">${(p.deductions || 0).toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm font-bold text-emerald-600">${(p.netPay || 0).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">
+                    {staff.find(s => s.id === p.staffId)?.bankAccount || (
+                      <button 
+                        onClick={() => {
+                          const account = prompt("Enter bank account number:");                
+                          if (account) {
+                            updateDoc(doc(db, 'staff', p.staffId), { bankAccount: account }).then(fetchData);
+                          }
+                        }}
+                        className="text-indigo-600 font-bold hover:underline"
+                      >
+                        Link Account
+                      </button>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-slate-600">{p.month}</td>
                   <td className="px-6 py-4">
                     <span className={cn(
@@ -122,8 +138,16 @@ export default function PayrollManagement({ profile }: PayrollManagementProps) {
                     <div className="flex items-center justify-end gap-2">
                       <button className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Receipt className="w-5 h-5" /></button>
                       {p.status === 'pending' && (
-                        <button onClick={() => updateDoc(doc(db, 'payroll', p.id!), { status: 'paid' }).then(fetchData)} className="px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors">
-                          Send Pay
+                        <button 
+                          onClick={() => {
+                            const acc = staff.find(s => s.id === p.staffId)?.bankAccount;
+                            if (confirm(`Disburse $${p.netPay.toLocaleString()} to account ${acc || 'N/A'}?`)) {
+                              updateDoc(doc(db, 'payroll', p.id!), { status: 'paid' }).then(fetchData);
+                            }
+                          }} 
+                          className="px-3 py-1 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-colors"
+                        >
+                          Disburse
                         </button>
                       )}
                     </div>

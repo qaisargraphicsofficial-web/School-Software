@@ -12,9 +12,11 @@ import {
   RefreshCw,
   Box,
   Library,
-  Shirt
+  Shirt,
+  Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { cn } from '../lib/utils';
 
 interface InventoryProps { profile: UserProfile | null; }
@@ -24,11 +26,13 @@ export default function Inventory({ profile }: InventoryProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<InventoryItem>>({
     name: '',
     quantity: 0,
     category: 'Assets',
+    details: '',
     lastUpdated: new Date().toISOString().split('T')[0],
   });
 
@@ -43,7 +47,7 @@ export default function Inventory({ profile }: InventoryProps) {
       const snap = await getDocs(q);
       setItems(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as InventoryItem)));
     } catch (error) {
-      console.error("Error fetching inventory:", error);
+      handleFirestoreError(error, OperationType.LIST, 'inventory');
     } finally {
       setLoading(false);
     }
@@ -52,12 +56,18 @@ export default function Inventory({ profile }: InventoryProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'inventory'), formData);
+      if (formData.id) {
+        const updateData = { ...formData, lastUpdated: new Date().toISOString().split('T')[0] };
+        delete updateData.id;
+        await updateDoc(doc(db, 'inventory', formData.id), updateData);
+      } else {
+        await addDoc(collection(db, 'inventory'), formData);
+      }
       setIsModalOpen(false);
-      setFormData({ name: '', quantity: 0, category: 'Assets', lastUpdated: new Date().toISOString().split('T')[0] });
+      setFormData({ name: '', quantity: 0, category: 'Assets', details: '', lastUpdated: new Date().toISOString().split('T')[0] });
       fetchInventory();
     } catch (error) {
-      console.error("Error adding item:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'inventory');
     }
   };
 
@@ -66,7 +76,19 @@ export default function Inventory({ profile }: InventoryProps) {
       await updateDoc(doc(db, 'inventory', id), { quantity: newQty, lastUpdated: new Date().toISOString().split('T')[0] });
       fetchInventory();
     } catch (error) {
-      console.error("Error updating quantity:", error);
+      handleFirestoreError(error, OperationType.UPDATE, 'inventory');
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      try {
+        await deleteDoc(doc(db, 'inventory', itemToDelete));
+        setItemToDelete(null);
+        fetchInventory();
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `inventory/${itemToDelete}`);
+      }
     }
   };
 
@@ -86,7 +108,10 @@ export default function Inventory({ profile }: InventoryProps) {
         <h1 className="text-2xl font-bold text-slate-900">Inventory Management</h1>
         {profile?.role === 'admin' && (
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setFormData({ name: '', quantity: 0, category: 'Assets', details: '', lastUpdated: new Date().toISOString().split('T')[0] });
+              setIsModalOpen(true);
+            }}
             className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
           >
             <Plus className="w-5 h-5" />
@@ -123,15 +148,41 @@ export default function Inventory({ profile }: InventoryProps) {
                 <div className="p-3 bg-slate-50 rounded-xl">
                   <Icon className="w-6 h-6 text-slate-600" />
                 </div>
-                {item.quantity < 10 && (
-                  <div className="flex items-center gap-1 text-rose-600 bg-rose-50 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                    <AlertTriangle className="w-3 h-3" />
-                    Low Stock
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {item.quantity < 10 && (
+                    <div className="flex items-center gap-1 text-rose-600 bg-rose-50 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                      <AlertTriangle className="w-3 h-3" />
+                      Low Stock
+                    </div>
+                  )}
+                  {profile?.role === 'admin' && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => {
+                          setFormData(item);
+                          setIsModalOpen(true);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors"
+                        title="Edit Item"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setItemToDelete(item.id!)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-50 rounded-lg transition-colors"
+                        title="Delete Item"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-1">{item.name}</h3>
-              <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-4">{item.category}</p>
+              <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-2">{item.category}</p>
+              {item.details && (
+                <p className="text-sm text-slate-600 mb-4 line-clamp-2">{item.details}</p>
+              )}
               
               <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                 <div className="flex flex-col">
@@ -177,7 +228,7 @@ export default function Inventory({ profile }: InventoryProps) {
               className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
-                <h2 className="text-xl font-bold">Add Inventory Item</h2>
+                <h2 className="text-xl font-bold">{formData.id ? 'Edit Inventory Item' : 'Add Inventory Item'}</h2>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
                   <X className="w-6 h-6" />
                 </button>
@@ -220,6 +271,16 @@ export default function Inventory({ profile }: InventoryProps) {
                     </select>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Details</label>
+                  <textarea
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                    rows={4}
+                    value={formData.details || ''}
+                    onChange={e => setFormData({...formData, details: e.target.value})}
+                    placeholder="Enter comprehensive descriptive information..."
+                  />
+                </div>
                 <div className="flex justify-end gap-4 pt-4">
                   <button
                     type="button"
@@ -232,10 +293,51 @@ export default function Inventory({ profile }: InventoryProps) {
                     type="submit"
                     className="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
                   >
-                    Add to Inventory
+                    {formData.id ? 'Save Changes' : 'Add to Inventory'}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {itemToDelete && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={() => setItemToDelete(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center"
+            >
+              <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Delete Item?</h3>
+              <p className="text-slate-500 mb-6 font-medium">Are you sure you want to delete this item? This action cannot be undone.</p>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setItemToDelete(null)}
+                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 px-4 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

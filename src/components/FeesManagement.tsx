@@ -1,21 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, orderBy, addDoc, updateDoc, doc, deleteDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, addDoc, updateDoc, doc as firestoreDoc, deleteDoc, where, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { FeeReceipt } from './FeeReceipt';
+import { FeeVoucherList } from './FeeVoucher';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { FeeType, FeeRecord, PaymentHistory, Student, UserProfile } from '../types';
+import { FeeType, FeeRecord, PaymentHistory, Student, UserProfile, SchoolSettings } from '../types';
 import { Wallet, Receipt, Plus, Printer, Download, CheckCircle2, XCircle, Search, Calendar, CreditCard, BarChart3, Settings, AlertCircle, FileText, Trash2, Edit2, ChevronRight, ArrowLeft, Mail, Bell, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
-interface FeesManagementProps { profile: UserProfile | null; }
-
 const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b'];
+
+interface FeesManagementProps { profile: UserProfile | null; }
 
 export default function FeesManagement({ profile }: FeesManagementProps) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'feeTypes' | 'studentFees' | 'generate'>('dashboard');
+  const [settings, setSettings] = useState<SchoolSettings | null>(null);
   
   // Data states
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
@@ -45,10 +47,83 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
 
+  const vouchersToPrint = useMemo(() => {
+    return feeRecords
+        .filter(r => r.status === 'pending' || r.status === 'partial')
+        .map(r => ({
+            feeRecord: r,
+            student: students.find(s => s.id === r.studentId)!,
+            feeType: feeTypes.find(t => t.id === r.feeTypeId) || { id: r.feeTypeId, name: r.feeType || 'Unknown', defaultAmount: 0, defaultDueDate: '', campusId: r.campusId } as FeeType
+        }))
+        .filter(r => r.student && r.feeType);
+  }, [feeRecords, students, feeTypes]);
+
   const [isWaiverModalOpen, setIsWaiverModalOpen] = useState(false);
   const [waiverForm, setWaiverForm] = useState({ amount: 0, reason: '' });
   const [selectedRecordForWaiver, setSelectedRecordForWaiver] = useState<FeeRecord | null>(null);
   const [isApplyingWaiver, setIsApplyingWaiver] = useState(false);
+
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const executePrint = () => {
+    const printContent = document.getElementById('print-content');
+    if (printContent) {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Print Vouchers</title>
+              <script src="https://cdn.tailwindcss.com"></script>
+              <style>
+                @page { size: A4 portrait; margin: 10mm; }
+                @media print {
+                  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white; }
+                  .break-inside-avoid { page-break-inside: avoid; }
+                  .print\\:p-0 { padding: 0 !important; }
+                  .print\\:border-black { border-color: black !important; }
+                }
+                body { font-family: ui-sans-serif, system-ui, sans-serif; }
+              </style>
+            </head>
+            <body class="bg-white">
+              ${printContent.innerHTML}
+              <script>
+                window.onload = () => {
+                  setTimeout(() => {
+                    window.focus();
+                    window.print();
+                  }, 500);
+                };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        return;
+      }
+    }
+    
+    // Fallback if popup blocked
+    window.focus();
+    window.print();
+  };
+
+  const handlePrint = () => {
+    setIsPrinting(true);
+    setTimeout(() => {
+      executePrint();
+    }, 500);
+  };
+
+  useEffect(() => {
+    const afterPrint = () => {
+      // Optional: automatically go back to dashboard after printing
+      // setIsPrinting(false);
+    };
+    window.addEventListener('afterprint', afterPrint);
+    return () => window.removeEventListener('afterprint', afterPrint);
+  }, []);
 
   const [isEditRecordModalOpen, setIsEditRecordModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FeeRecord | null>(null);
@@ -57,7 +132,20 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
 
   useEffect(() => {
     fetchData();
+    fetchSettings();
   }, [profile]);
+
+  const fetchSettings = async () => {
+    try {
+      const docRef = firestoreDoc(db, 'settings', 'global');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setSettings(docSnap.data() as SchoolSettings);
+      }
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+    }
+  };
 
   const fetchData = async () => {
     if (!profile) return;
@@ -82,6 +170,11 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatCurrency = (amount: number) => {
+    const symbol = settings?.currency === 'PKR' ? 'Rs. ' : '$';
+    return `${symbol}${amount.toLocaleString()}`;
   };
 
   // --- Fee Types Management ---
@@ -109,7 +202,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       };
 
       if (editingFeeType?.id) {
-        await updateDoc(doc(db, 'fee_types', editingFeeType.id), feeTypeData);
+        await updateDoc(firestoreDoc(db, 'fee_types', editingFeeType.id), feeTypeData);
       } else {
         await addDoc(collection(db, 'fee_types'), feeTypeData);
       }
@@ -128,7 +221,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   const handleDeleteFeeType = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this fee type?")) {
       try {
-        await deleteDoc(doc(db, 'fee_types', id));
+        await deleteDoc(firestoreDoc(db, 'fee_types', id));
         fetchData();
       } catch (error) {
         console.error("Error deleting fee type:", error);
@@ -165,10 +258,11 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       const batch = writeBatch(db);
       
       targetStudents.forEach(student => {
-        const newRecordRef = doc(collection(db, 'fee_records'));
+        const newRecordRef = firestoreDoc(collection(db, 'fee_records'));
         batch.set(newRecordRef, {
           studentId: student.id,
           feeTypeId: feeType.id,
+          feeType: feeType.name,
           amount: Number(feeType.defaultAmount),
           dueDate: generateForm.dueDate,
           status: 'pending',
@@ -179,11 +273,19 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       });
 
       await batch.commit();
+      
       alert(`Successfully generated fee records for ${targetStudents.length} students.`);
       setGenerateForm({ feeTypeId: '', termOrYear: '', dueDate: '', targetClass: 'All' });
-      fetchData();
+      await fetchData();
+      
+      // Trigger print after fee generation
+      setTimeout(() => {
+        handlePrint();
+      }, 500);
+
     } catch (error) {
       console.error("Error generating fees:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'fee_records');
       alert("Failed to generate fees.");
     } finally {
       setIsGenerating(false);
@@ -192,27 +294,43 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
 
   const [receiptData, setReceiptData] = useState<{feeRecord: FeeRecord, student: Student, payment: PaymentHistory} | null>(null);
 
+  useEffect(() => {
+    if (receiptData) {
+      console.log('Generating PDF for:', receiptData);
+      const generatePDF = async () => {
+        // Wait for React to render the component in the DOM
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const element = document.getElementById('fee-receipt');
+        if (element) {
+          console.log('Element found, generating canvas...');
+          const canvas = await html2canvas(element, { scale: 2 });
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.save(`Receipt_${receiptData.student.name}_${receiptData.payment.date}.pdf`);
+          console.log('PDF saved.');
+          setReceiptData(null);
+        } else {
+          console.error('Element not found');
+        }
+      };
+      generatePDF();
+    }
+  }, [receiptData]);
+
   const handleDownloadReceipt = async (payment: PaymentHistory) => {
+    console.log('Download triggered for:', payment);
     const feeRecord = feeRecords.find(f => f.id === payment.feeRecordId);
     const student = students.find(s => s.id === payment.studentId);
-    if (!feeRecord || !student) return;
+    if (!feeRecord || !student) {
+      console.error('FeeRecord or Student not found', { feeRecord, student });
+      return;
+    }
 
     setReceiptData({ feeRecord, student, payment });
-    
-    setTimeout(async () => {
-      const element = document.getElementById('fee-receipt');
-      if (element) {
-        const canvas = await html2canvas(element, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`Receipt_${student.name}_${payment.date}.pdf`);
-      }
-      setReceiptData(null);
-    }, 500);
   };
 
   const handleProcessPayment = async (e: React.FormEvent) => {
@@ -236,7 +354,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         newStatus = 'partial';
       }
 
-      await updateDoc(doc(db, 'fee_records', selectedFeeRecord.id!), {
+      await updateDoc(firestoreDoc(db, 'fee_records', selectedFeeRecord.id!), {
         paidAmount: newPaidAmount,
         status: newStatus
       });
@@ -287,7 +405,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         newStatus = 'pending';
       }
 
-      await updateDoc(doc(db, 'fee_records', selectedRecordForWaiver.id!), {
+      await updateDoc(firestoreDoc(db, 'fee_records', selectedRecordForWaiver.id!), {
         waiverAmount: newWaiver,
         waiverReason: waiverForm.reason,
         status: newStatus
@@ -319,7 +437,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         status: recordForm.status
       };
 
-      await updateDoc(doc(db, 'fee_records', editingRecord.id), updatedData);
+      await updateDoc(firestoreDoc(db, 'fee_records', editingRecord.id), updatedData);
       
       alert("Fee record updated successfully!");
       setIsEditRecordModalOpen(false);
@@ -337,7 +455,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     if (!window.confirm("Are you sure you want to delete this fee record? This action cannot be undone.")) return;
     
     try {
-      await deleteDoc(doc(db, 'fee_records', id));
+      await deleteDoc(firestoreDoc(db, 'fee_records', id));
       fetchData();
     } catch (error) {
       console.error("Error deleting fee record:", error);
@@ -483,13 +601,44 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     return feeRecords
       .filter(f => f.studentId === selectedStudent.id)
       .filter(f => {
-        const feeType = feeTypes.find(t => t.id === f.feeTypeId);
-        const matchesSearch = (feeType?.name || '').toLowerCase().includes(feeRecordSearch.toLowerCase()) || 
+        const feeTypeName = f.feeType || feeTypes.find(t => t.id === f.feeTypeId)?.name;
+        const matchesSearch = (feeTypeName || '').toLowerCase().includes(feeRecordSearch.toLowerCase()) || 
                              f.termOrYear.toLowerCase().includes(feeRecordSearch.toLowerCase());
         const matchesStatus = feeRecordStatusFilter === 'all' || f.status === feeRecordStatusFilter;
         return matchesSearch && matchesStatus;
       });
   }, [selectedStudent, feeRecords, feeTypes, feeRecordSearch, feeRecordStatusFilter]);
+
+  if (isPrinting) {
+    return (
+      <div className="bg-white min-h-screen">
+        <div className="p-4 print:hidden border-b flex justify-between items-center bg-slate-50">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">Print Preview</h2>
+            <p className="text-sm text-slate-500 max-w-xl">If the print dialog doesn't open automatically, please click "Print Now" or use your browser's print command (Ctrl+P / Cmd+P).</p>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={executePrint}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium shadow hover:bg-indigo-700 transition"
+            >
+              <Printer className="w-4 h-4 inline-block mr-2" />
+              Print Now
+            </button>
+            <button 
+              onClick={() => setIsPrinting(false)}
+              className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg font-medium hover:bg-slate-300 transition"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+        <div id="print-content" className="print:p-0">
+          <FeeVoucherList records={vouchersToPrint} settings={settings || undefined} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -499,6 +648,13 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
           <p className="text-slate-500 text-sm">Manage fee types, records, and online payments</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition-all"
+          >
+            <Printer className="w-4 h-4" />
+            Print Vouchers
+          </button>
           <button
             onClick={handleSendReminders}
             disabled={isSendingReminders}
@@ -557,14 +713,14 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-indigo-200 transition-colors">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL EXPECTED</p>
-                  <h3 className="text-3xl font-black text-slate-900 tracking-tight">${dashboardStats.totalExpected.toLocaleString()}</h3>
+                  <h3 className="text-3xl font-black text-slate-900 tracking-tight">{formatCurrency(dashboardStats.totalExpected)}</h3>
                   <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div className="h-full bg-indigo-500" style={{ width: '100%' }} />
                   </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-emerald-200 transition-colors">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL COLLECTED</p>
-                  <h3 className="text-3xl font-black text-emerald-600 tracking-tight">${dashboardStats.totalCollected.toLocaleString()}</h3>
+                  <h3 className="text-3xl font-black text-emerald-600 tracking-tight">{formatCurrency(dashboardStats.totalCollected)}</h3>
                   <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-emerald-500" 
@@ -574,7 +730,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-rose-200 transition-colors">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL OUTSTANDING</p>
-                  <h3 className="text-3xl font-black text-rose-600 tracking-tight">${dashboardStats.totalOutstanding.toLocaleString()}</h3>
+                  <h3 className="text-3xl font-black text-rose-600 tracking-tight">{formatCurrency(dashboardStats.totalOutstanding)}</h3>
                   <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-rose-500" 
@@ -614,7 +770,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                         </Pie>
                         <RechartsTooltip 
                           contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                          formatter={(value: number) => [`$${value.toLocaleString()}`, 'Amount']} 
+                          formatter={(value: number) => [formatCurrency(value), 'Amount']} 
                         />
                         <Legend verticalAlign="bottom" height={36} iconType="circle" />
                       </PieChart>
@@ -646,12 +802,12 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                           axisLine={false} 
                           tickLine={false} 
                           tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
-                          tickFormatter={(value) => `$${value}`}
+                          tickFormatter={(value) => formatCurrency(value)}
                         />
                         <RechartsTooltip 
                           cursor={{ fill: '#f8fafc' }}
                           contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                          formatter={(value: number) => [`$${value.toLocaleString()}`, 'Outstanding']} 
+                          formatter={(value: number) => [formatCurrency(value), 'Outstanding']} 
                         />
                         <Bar dataKey="amount" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={32} />
                       </BarChart>
@@ -689,11 +845,11 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                           axisLine={false} 
                           tickLine={false} 
                           tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
-                          tickFormatter={(value) => `$${value}`}
+                          tickFormatter={(value) => formatCurrency(value)}
                         />
                         <RechartsTooltip 
                           contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                          formatter={(value: number) => [`$${value.toLocaleString()}`, 'Collected']} 
+                          formatter={(value: number) => [formatCurrency(value), 'Collected']} 
                         />
                         <Line 
                           type="monotone" 
@@ -789,19 +945,19 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                       <div className="flex gap-4 text-right">
                         <div>
                           <p className="text-xs font-bold text-slate-400 uppercase">Total Due</p>
-                          <p className="text-lg font-bold text-slate-900">${studentFeeSummary.totalDue.toLocaleString()}</p>
+                          <p className="text-lg font-bold text-slate-900">{formatCurrency(studentFeeSummary.totalDue)}</p>
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 uppercase">Waiver</p>
-                          <p className="text-lg font-bold text-indigo-600">${studentFeeSummary.totalWaiver.toLocaleString()}</p>
+                          <p className="text-lg font-bold text-indigo-600">{formatCurrency(studentFeeSummary.totalWaiver)}</p>
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 uppercase">Paid</p>
-                          <p className="text-lg font-bold text-emerald-600">${studentFeeSummary.totalPaid.toLocaleString()}</p>
+                          <p className="text-lg font-bold text-emerald-600">{formatCurrency(studentFeeSummary.totalPaid)}</p>
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 uppercase">Outstanding</p>
-                          <p className="text-lg font-bold text-rose-600">${studentFeeSummary.outstanding.toLocaleString()}</p>
+                          <p className="text-lg font-bold text-rose-600">{formatCurrency(studentFeeSummary.outstanding)}</p>
                         </div>
                       </div>
                   </div>
@@ -849,16 +1005,16 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {filteredStudentFeeRecords.map(record => {
-                            const feeType = feeTypes.find(t => t.id === record.feeTypeId);
+                            const feeTypeName = record.feeType || feeTypes.find(t => t.id === record.feeTypeId)?.name;
                             return (
                               <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-4 font-medium text-slate-900">{feeType?.name || 'Unknown'}</td>
+                                <td className="p-4 font-medium text-slate-900">{feeTypeName || 'Unknown'}</td>
                                 <td className="p-4 text-sm text-slate-700">{record.termOrYear}</td>
                                 <td className="p-4 text-sm text-slate-700">{record.dueDate}</td>
-                                <td className="p-4 text-sm font-medium text-slate-900">${record.amount.toLocaleString()}</td>
+                                <td className="p-4 text-sm font-medium text-slate-900">{formatCurrency(record.amount)}</td>
                                 <td className="p-4">
                                   <div className="text-sm font-medium text-indigo-600">
-                                    {record.waiverAmount ? `$${record.waiverAmount.toLocaleString()}` : '-'}
+                                    {record.waiverAmount ? formatCurrency(record.waiverAmount) : '-'}
                                   </div>
                                   {record.waiverReason && (
                                     <div className="text-[10px] text-slate-400 italic truncate max-w-[100px]" title={record.waiverReason}>
@@ -866,7 +1022,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                                     </div>
                                   )}
                                 </td>
-                                <td className="p-4 text-sm font-medium text-emerald-600">${record.paidAmount.toLocaleString()}</td>
+                                <td className="p-4 text-sm font-medium text-emerald-600">{formatCurrency(record.paidAmount)}</td>
                                 <td className="p-4">
                                   <span className={cn(
                                     "px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
@@ -980,7 +1136,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
           )}
 
           {receiptData && (
-            <div className="fixed -left-[9999px] top-0">
+            <div className="fixed inset-0 opacity-0 pointer-events-none -z-50">
               <FeeReceipt {...receiptData} />
             </div>
           )}

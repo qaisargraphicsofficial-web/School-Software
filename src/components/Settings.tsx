@@ -52,7 +52,9 @@ import {
   PieChart,
   CheckSquare,
   LayoutDashboard,
-  Library
+  Library,
+  Landmark,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -276,6 +278,7 @@ export default function Settings({ profile }: SettingsProps) {
   const tabs = [
     { id: 'general', name: 'General', icon: Building2 },
     { id: 'academic', name: 'Academic', icon: Calendar },
+    { id: 'voucher', name: 'Voucher Settings', icon: Receipt },
     { id: 'security', name: 'Security & Access', icon: ShieldCheck },
     { id: 'system', name: 'System', icon: Database },
     ...(isSuperAdmin ? [{ id: 'applications', name: 'System Applications', icon: FileText }] : []),
@@ -476,20 +479,204 @@ export default function Settings({ profile }: SettingsProps) {
                       </div>
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Address / Location</label>
-                        <Tooltip text="The physical location of the main campus." />
+                    <div className="space-y-6 md:col-span-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">School Address / Location</label>
+                          <Tooltip text="The physical location of the main campus." />
+                        </div>
+                        <div className="relative">
+                          <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
+                          <textarea
+                            rows={3}
+                            className="input-field pl-11 pt-3"
+                            value={settings.schoolAddress}
+                            onChange={e => setSettings({...settings, schoolAddress: e.target.value})}
+                            placeholder="Full physical address or location details..."
+                          />
+                        </div>
                       </div>
-                      <div className="relative">
-                        <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
-                        <textarea
-                          rows={3}
-                          className="input-field pl-11 pt-3"
-                          value={settings.schoolAddress}
-                          onChange={e => setSettings({...settings, schoolAddress: e.target.value})}
-                          placeholder="Full physical address or location details..."
-                        />
+
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'voucher' && (
+                <div className="space-y-8">
+                  <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
+                    <div className="p-3 bg-violet-50 rounded-2xl text-violet-600">
+                      <Receipt className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900">Voucher Settings</h3>
+                      <p className="text-sm text-slate-500 font-medium">Design and configure fee voucher layout, fonts, and payment methods.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* General Voucher Layout */}
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Vouchers per Page (A4)</label>
+                          <Tooltip text="Dynamic layout adjusts based on selected count. Target is usually 3." />
+                        </div>
+                        <div className="relative">
+                          <Layout className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select 
+                            className="input-field pl-11"
+                            value={settings.voucherSettings?.vouchersPerPage || 3}
+                            onChange={e => setSettings({
+                              ...settings, 
+                              voucherSettings: { ...settings.voucherSettings, vouchersPerPage: parseInt(e.target.value) } as any
+                            })}
+                          >
+                            <option value={1}>1 Voucher per page</option>
+                            <option value={2}>2 Vouchers per page</option>
+                            <option value={3}>3 Vouchers per page</option>
+                            <option value={4}>4 Vouchers per page</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Preferred Font</label>
+                          <Tooltip text="Select typography for the vouchers." />
+                        </div>
+                        <div className="relative">
+                          <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select 
+                            className="input-field pl-11"
+                            value={settings.voucherSettings?.fontFamily || 'monospace'}
+                            onChange={e => setSettings({
+                              ...settings, 
+                              voucherSettings: { ...settings.voucherSettings, fontFamily: e.target.value } as any
+                            })}
+                          >
+                            <option value="monospace">Default Monospace (Technical)</option>
+                            <option value="ui-sans-serif, system-ui, sans-serif">Modern Sans-serif (Clean)</option>
+                            <option value="ui-serif, Georgia, serif">Classic Serif (Formal)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Custom Note to Parents</label>
+                          <Tooltip text="Displayed at the bottom of every voucher." />
+                        </div>
+                        <div className="relative">
+                          <Mail className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
+                          <textarea
+                            rows={3}
+                            className="input-field pl-11 pt-3"
+                            value={settings.voucherSettings?.customNote || ''}
+                            onChange={e => setSettings({
+                              ...settings, 
+                              voucherSettings: { ...settings.voucherSettings, customNote: e.target.value } as any
+                            })}
+                            placeholder="Please pay by the 10th of every month..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bank Accounts Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800">Bank Accounts & Wallets</h4>
+                          <p className="text-xs text-slate-500">Payment details to print on vouchers</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentAccounts = settings.voucherSettings?.bankAccounts || [];
+                            setSettings({
+                              ...settings,
+                              voucherSettings: {
+                                ...(settings.voucherSettings as any),
+                                bankAccounts: [...currentAccounts, { bankName: 'Meezan Bank', accountTitle: '', accountNumber: '' }]
+                              }
+                            });
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Account
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {(settings.voucherSettings?.bankAccounts || []).map((account, idx) => (
+                          <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                            <div className="flex items-center justify-between">
+                              <select
+                                className="w-full text-sm font-bold bg-transparent border-none p-0 focus:ring-0 text-slate-800"
+                                value={account.bankName}
+                                onChange={e => {
+                                  const updated = [...(settings.voucherSettings?.bankAccounts || [])];
+                                  updated[idx].bankName = e.target.value;
+                                  setSettings({ ...settings, voucherSettings: { ...settings.voucherSettings, bankAccounts: updated } as any });
+                                }}
+                              >
+                                <option value="HBL">HBL - Habib Bank Limited</option>
+                                <option value="Meezan Bank">Meezan Bank</option>
+                                <option value="Allied Bank">Allied Bank</option>
+                                <option value="MCB">MCB Bank</option>
+                                <option value="UBL">UBL</option>
+                                <option value="Bank Alfalah">Bank Alfalah</option>
+                                <option value="Standard Chartered">Standard Chartered</option>
+                                <option value="JazzCash">JazzCash (Mobile Wallet)</option>
+                                <option value="EasyPaisa">EasyPaisa (Mobile Wallet)</option>
+                                <option value="Nayapay">Nayapay (Mobile Wallet)</option>
+                                <option value="SadaPay">SadaPay (Mobile Wallet)</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...(settings.voucherSettings?.bankAccounts || [])];
+                                  updated.splice(idx, 1);
+                                  setSettings({ ...settings, voucherSettings: { ...settings.voucherSettings, bankAccounts: updated } as any });
+                                }}
+                                className="text-rose-400 hover:text-rose-600 shrink-0 ml-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                className="input-field text-xs px-3 py-2 bg-white"
+                                placeholder="Account Title"
+                                value={account.accountTitle}
+                                onChange={e => {
+                                  const updated = [...(settings.voucherSettings?.bankAccounts || [])];
+                                  updated[idx].accountTitle = e.target.value;
+                                  setSettings({ ...settings, voucherSettings: { ...settings.voucherSettings, bankAccounts: updated } as any });
+                                }}
+                              />
+                              <input
+                                type="text"
+                                className="input-field text-xs px-3 py-2 bg-white"
+                                placeholder="Account Number / IBAN"
+                                value={account.accountNumber}
+                                onChange={e => {
+                                  const updated = [...(settings.voucherSettings?.bankAccounts || [])];
+                                  updated[idx].accountNumber = e.target.value;
+                                  setSettings({ ...settings, voucherSettings: { ...settings.voucherSettings, bankAccounts: updated } as any });
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {(!settings.voucherSettings?.bankAccounts || settings.voucherSettings.bankAccounts.length === 0) && (
+                          <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl">
+                            <Landmark className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                            <p className="text-sm font-medium text-slate-500">No bank accounts added yet.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, getDocs, query, where, orderBy, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Student, Attendance, UserProfile, Staff } from '../types';
+import { Student, Attendance, UserProfile, Staff, ClassGroup } from '../types';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -45,6 +45,7 @@ interface AcademicProps {
 }
 
 export default function Academic({ profile }: AcademicProps) {
+  const [classGroups, setClassGroups] = useState<ClassGroup[]>([]);
   const [activeTab, setActiveTab] = useState<'attendance' | 'qr-scan' | 'stats'>('attendance');
   const [students, setStudents] = useState<Student[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -138,8 +139,19 @@ export default function Academic({ profile }: AcademicProps) {
       fetchStudents();
       fetchStaff();
       fetchSubjects();
+      fetchClasses();
     }
   }, [selectedClass, profile]);
+
+  const fetchClasses = async () => {
+    try {
+      const q = query(collection(db, 'classes'), where('campusId', '==', profile?.campusId || 'main'));
+      const snap = await getDocs(q);
+      setClassGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup)));
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+    }
+  };
 
   const fetchSubjects = async () => {
     try {
@@ -260,7 +272,7 @@ export default function Academic({ profile }: AcademicProps) {
         }
 
         const querySnapshot = await getDocs(q);
-        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+        const data = querySnapshot.docs.map(studentDoc => ({ id: studentDoc.id, ...(studentDoc.data() as any) } as Student));
         setStudents(data);
         
         // Initialize attendance
@@ -387,16 +399,15 @@ export default function Academic({ profile }: AcademicProps) {
       <div className="card p-5 flex flex-wrap gap-6 items-center">
         <div className="flex items-center gap-3">
           <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Class</span>
-          <select 
+            <select 
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
             className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
           >
             <option value="All">All Classes</option>
-            <option>9th</option>
-            <option>10th</option>
-            <option>11th</option>
-            <option>12th</option>
+            {classGroups.map(group => (
+              <option key={group.id} value={group.className}>{group.className}</option>
+            ))}
           </select>
         </div>
         <div className="flex items-center gap-3">
@@ -523,8 +534,8 @@ export default function Academic({ profile }: AcademicProps) {
               {/* Pie Chart */}
               <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Distribution</h4>
-                <div style={{ height: '300px', width: '100%', minWidth: '200px' }}>
-                  <ResponsiveContainer width="100%" aspect={1.5}>
+                <div style={{ height: '300px', width: '100%', minWidth: '0' }}>
+                  <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                       <Pie
                         data={[
@@ -555,8 +566,8 @@ export default function Academic({ profile }: AcademicProps) {
               {/* Bar Chart */}
               <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Comparison</h4>
-                <div style={{ height: '300px', width: '100%', minWidth: '200px' }}>
-                  <ResponsiveContainer width="100%" aspect={1.5}>
+                <div style={{ height: '300px', width: '100%', minWidth: '0' }}>
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={[
                         { name: 'Present', count: attendanceStats.present, fill: '#10b981' },

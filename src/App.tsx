@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocFromServer } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile, UserRole, UserStatus } from './types';
 import { Clock } from 'lucide-react';
+
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if(error instanceof Error && error.message.includes('the client is offline')) {
+      console.error("Please check your Firebase configuration.");
+    }
+  }
+}
+testConnection();
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -24,6 +35,7 @@ import DailyDiary from './components/DailyDiary';
 import Certificates from './components/Certificates';
 import Campuses from './components/Campuses';
 import Tasks from './components/Tasks';
+import TeacherAttendance from './components/TeacherAttendance';
 import Settings from './components/Settings';
 import Reports from './components/Reports';
 import Classes from './components/Classes';
@@ -136,6 +148,7 @@ export default function App() {
               <Route path="schedule" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Schedule profile={profile} /> : <Navigate to="/" replace />} />
               <Route path="leave" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Leave profile={profile} /> : <Navigate to="/" replace />} />
               <Route path="tasks" element={<Tasks profile={profile} />} />
+              <Route path="attendance" element={<TeacherAttendance profile={profile} />} />
             </Route>
 
             <Route path="subjects" element={profile?.role === 'admin' || profile?.role === 'staff' ? <SubjectsManagement profile={profile} /> : <Navigate to="/" replace />} />

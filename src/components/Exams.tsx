@@ -90,6 +90,67 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAIGenModalOpen, setIsAIGenModalOpen] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [extracting, setExtracting] = useState(false);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadedFile(file);
+    setExtracting(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = (reader.result as string).split(',')[1];
+        
+        // Use Gemini to extract questions from image/PDF
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        
+        const prompt = `Extract exam questions from this document.
+        Return ONLY a JSON array of question objects. Each object MUST have:
+        - "question": The question text.
+        - "marks": number.
+        - "type": "multiple_choice" | "short_answer" | "long_answer".
+        - "options": An array of strings if type is "multiple_choice", otherwise [].
+        - "answer": string.
+        - "difficulty": "Easy" | "Medium" | "Hard".
+        Return raw JSON only, no markdown.`;
+        
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: [
+            prompt,
+            {
+              inlineData: {
+                data: base64String,
+                mimeType: file.type
+              }
+            }
+          ],
+        });
+        
+        const extracted = JSON.parse(response.text || '[]');
+        setGeneratedPaperData({
+          title: 'Extracted Paper',
+          class: 'Unknown',
+          subject: 'Unknown',
+          date: new Date().toISOString().split('T')[0],
+          duration: 60,
+          sections: [{ id: 'section-1', title: 'Section 1', questions: extracted }],
+          campusId: profile?.campusId || 'main',
+        });
+        setReviewMode(true);
+        setExtracting(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("OCR error:", error);
+      alert("Failed to extract content.");
+      setExtracting(false);
+    }
+  };
+
   const [isExamTypesModalOpen, setIsExamTypesModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
@@ -622,7 +683,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       date: paper.date,
       duration: paper.duration,
       examTypeId: paper.examTypeId,
-      questions: paper.questions,
+      sections: paper.sections,
     });
     setIsModalOpen(true);
   };
@@ -691,6 +752,14 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
         const questions = JSON.parse(generatedQuestionsText);
         
         // Create the paper with generated questions
+        const sections = [
+          {
+            id: 'section-a',
+            title: 'Section A',
+            questions: questions
+          }
+        ];
+
         const generatedPaper = {
           title: `${aiPrompt.subject} - ${aiPrompt.topic} (${examTypeName})`,
           class: aiPrompt.class,
@@ -698,8 +767,8 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
           date: new Date().toISOString().split('T')[0],
           duration: aiPrompt.duration,
           examTypeId: aiPrompt.examTypeId,
-          questions: questions,
-          originalQuestions: JSON.parse(JSON.stringify(questions)), // Deep copy for reference
+          sections: sections,
+          originalSections: JSON.parse(JSON.stringify(sections)), // Deep copy for reference
           campusId: profile?.campusId || 'main',
         };
 
@@ -1888,7 +1957,26 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               </div>
               <h2 className="text-xl font-bold">AI Paper Generator</h2>
             </div>
+            
+            <div className="p-4 border-2 border-dashed border-slate-300 rounded-2xl text-center mb-4">
+              <input 
+                  type="file" 
+                  accept="image/*,application/pdf" 
+                  onChange={handleFileUpload}
+                  className="hidden" 
+                  id="file-upload"
+              />
+              <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                  <FileText className="w-8 h-8 text-slate-400" />
+                  <span className="text-sm text-slate-600">Upload existing paper (PDF/Image)</span>
+              </label>
+              {extracting && <p className="text-xs text-indigo-600 mt-2">Extracting questions...</p>}
+            </div>
+
+            <div className="text-center text-sm text-slate-500 mb-4 font-bold">OR configure generation</div>
+
             <form onSubmit={handleGenerateAIPaper} className="space-y-4">
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Exam Type</label>
                 <select

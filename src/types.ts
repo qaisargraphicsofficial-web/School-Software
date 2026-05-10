@@ -69,7 +69,8 @@ export interface Staff {
   staffId: string;
   role: string;
   photoUrl?: string;
-  contact: string;
+  whatsappNumber?: string;
+  secondaryContact?: string;
   salary: number;
   joiningDate: string;
   leavingDate?: string;
@@ -78,6 +79,12 @@ export interface Staff {
   remainingDues?: number;
   status: 'active' | 'inactive';
   campusId: string;
+  bankAccount?: string;
+  bankDetails?: {
+    bankName: string;
+    accountTitle: string;
+    accountNumber: string;
+  };
 }
 
 export interface Attendance {
@@ -88,6 +95,29 @@ export interface Attendance {
   status: 'present' | 'absent' | 'late';
   campusId: string;
   method?: 'manual' | 'qr';
+}
+
+export interface SubjectMark {
+  subjectName: string;
+  maxMarks: number;
+  passMarks: number;
+  obtainedMarks: number;
+}
+
+export interface TermData {
+  termName: string;
+  weightage: number; // e.g., 0.3 for 30%
+  subjects: SubjectMark[];
+}
+
+export interface ReportCard {
+  id?: string;
+  studentId: string;
+  academicSession: string;
+  terms: TermData[];
+  overallRemarks?: string;
+  campusId: string;
+  createdAt: string;
 }
 
 export interface ExamResult {
@@ -130,6 +160,7 @@ export interface FeeRecord {
   id?: string;
   studentId: string;
   feeTypeId: string;
+  feeType?: string;
   amount: number;
   dueDate: string;
   status: 'paid' | 'pending' | 'overdue' | 'partial';
@@ -183,6 +214,7 @@ export interface InventoryItem {
   name: string;
   quantity: number;
   category: string;
+  details?: string;
   lastUpdated: string;
   campusId: string;
 }
@@ -351,6 +383,19 @@ export interface SchoolSettings {
   allowParentRegistration: boolean;
   maintenanceMode: boolean;
   logoUrl?: string;
+  bankAccountDetails?: string;
+  customPaymentNote?: string;
+  voucherSettings?: {
+    vouchersPerPage: number;
+    fontFamily: string;
+    bankAccounts: {
+      bankName: string;
+      accountTitle: string;
+      accountNumber: string;
+      logo?: string;
+    }[];
+    customNote: string;
+  };
   updatedAt: string;
 }
 

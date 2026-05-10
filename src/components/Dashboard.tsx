@@ -215,8 +215,8 @@ export default function Dashboard({ profile }: DashboardProps) {
               <h3 className="text-lg font-black text-slate-900 tracking-tight">Fee Collection Overview</h3>
               <div className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full uppercase tracking-widest">Monthly</div>
             </div>
-            <div className="h-80 min-h-[320px]">
-              <ResponsiveContainer width="100%" aspect={2}>
+            <div className="h-80 min-h-[320px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={feeData}>
                   <defs>
                     <linearGradient id="colorFees" x1="0" y1="0" x2="0" y2="1">
@@ -241,8 +241,8 @@ export default function Dashboard({ profile }: DashboardProps) {
               <h3 className="text-lg font-black text-slate-900 tracking-tight">Weekly Attendance Rate</h3>
               <div className="px-3 py-1 bg-purple-50 text-purple-600 text-[10px] font-black rounded-full uppercase tracking-widest">Weekly</div>
             </div>
-            <div className="h-80 min-h-[320px]">
-              <ResponsiveContainer width="100%" aspect={2}>
+            <div className="h-80 min-h-[320px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={attendanceData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} />

@@ -5,7 +5,8 @@ import {
   Users, 
   Calendar, 
   FileText, 
-  CheckSquare 
+  CheckSquare,
+  ClipboardCheck
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { UserProfile } from '../types';
@@ -22,6 +23,7 @@ export default function TeachersPortal({ profile }: TeachersPortalProps) {
     { name: 'Schedule', path: '/teachers/schedule', icon: Calendar },
     { name: 'Leave', path: '/teachers/leave', icon: FileText },
     { name: 'Tasks', path: '/teachers/tasks', icon: CheckSquare },
+    { name: 'Attendance', path: '/teachers/attendance', icon: ClipboardCheck },
   ];
 
   return (

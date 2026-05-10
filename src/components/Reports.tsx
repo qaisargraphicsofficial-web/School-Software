@@ -14,8 +14,7 @@ import {
   Printer
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface ReportsProps {
   profile: UserProfile | null;
@@ -26,7 +25,6 @@ export default function Reports({ profile }: ReportsProps) {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any[]>([]);
   const reportRef = useRef<HTMLDivElement>(null);
-  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   useEffect(() => {
     fetchReportData();
@@ -34,50 +32,49 @@ export default function Reports({ profile }: ReportsProps) {
 
   const fetchReportData = async () => {
     setLoading(true);
+    const campusId = profile?.campusId || 'main';
     try {
       if (activeTab === 'students') {
         const q = query(collection(db, 'students'), orderBy('name'));
         const snap = await getDocs(q);
-        setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.campusId === campusId));
       } else if (activeTab === 'finance') {
-        const q = query(collection(db, 'fees'), orderBy('date', 'desc'));
+        const q = query(collection(db, 'payment_history'), orderBy('date', 'desc'));
         const snap = await getDocs(q);
-        setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.campusId === campusId));
       } else if (activeTab === 'attendance') {
         const q = query(collection(db, 'attendance'), orderBy('date', 'desc'));
         const snap = await getDocs(q);
-        setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.campusId === campusId));
       } else if (activeTab === 'academic') {
-        const q = query(collection(db, 'results'), orderBy('term', 'desc'));
+        const examTypesSnap = await getDocs(collection(db, 'exam_types'));
+        const examTypes = examTypesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const q = query(collection(db, 'exam_results'), orderBy('createdAt', 'desc'));
         const snap = await getDocs(q);
-        setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        
+        const results = snap.docs.map(doc => {
+          const data = doc.data();
+          const examType: any = examTypes.find(t => t.id === data.examTypeId);
+          return { 
+            id: doc.id, 
+            term: examType?.term || '-',
+            examType: examType?.name || '-',
+            ...data 
+          };
+        }).filter((r: any) => r.campusId === campusId);
+        
+        setReportData(results);
       }
     } catch (error) {
-      console.error("Error fetching report data:", error);
+      handleFirestoreError(error, OperationType.LIST, activeTab);
     } finally {
       setLoading(false);
     }
   };
 
   const exportToPDF = async () => {
-    if (!reportRef.current) return;
-    setGeneratingPDF(true);
-    // Add small delay to ensure DOM is fully rendered
-    await new Promise(resolve => setTimeout(resolve, 500));
-    try {
-      const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${activeTab}_report_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-    } finally {
-      setGeneratingPDF(false);
-    }
+    window.print();
   };
 
   const renderStudentReport = () => (
@@ -216,10 +213,10 @@ export default function Reports({ profile }: ReportsProps) {
           </button>
           <button
             onClick={exportToPDF}
-            disabled={generatingPDF || loading || reportData.length === 0}
+            disabled={loading || reportData.length === 0}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 print:hidden"
           >
-            {generatingPDF ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+            <Download className="w-5 h-5" />
             Export PDF
           </button>
         </div>
