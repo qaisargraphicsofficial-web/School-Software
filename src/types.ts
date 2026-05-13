@@ -32,6 +32,8 @@ export interface Campus {
   name: string;
   location: string;
   contact: string;
+  headOfCampusName?: string;
+  headOfCampusContact?: string;
 }
 
 export interface Student {
@@ -133,6 +135,20 @@ export interface ExamResult {
   grade: string;
   remarks?: string;
   position?: number;
+  campusId: string;
+  updatedAt?: string;
+}
+
+export interface ExamSchedule {
+  id?: string;
+  examTypeId: string;
+  class: string;
+  subject: string;
+  date: string;
+  time: string;
+  duration: number; // in minutes
+  invigilatorIds: string[];
+  roomNumber: string;
   campusId: string;
   updatedAt?: string;
 }
@@ -252,15 +268,6 @@ export interface Syllabus {
   campusId: string;
 }
 
-export interface DailyDiary {
-  id?: string;
-  date: string;
-  class: string;
-  section: string;
-  subject: string;
-  homework: string;
-  campusId: string;
-}
 
 export interface Certificate {
   id?: string;
@@ -313,17 +320,88 @@ export interface ExamPaper {
   campusId: string;
 }
 
-export interface ExamSchedule {
-  id?: string;
-  examTypeId: string;
-  class: string;
-  subject: string;
+export interface DateSheetNote {
+  id: string;
+  text: string;
+}
+
+export interface DateSheetSignature {
+  id: string;
+  label: string;
+  name: string;
+  signatureUrl?: string; // Optional image upload
+}
+
+export interface DateSheetRow {
+  id: string;
   date: string;
-  time: string;
-  duration: number; // in minutes
-  invigilatorIds: string[]; // staffIds
-  roomNumber?: string;
+  day: string;
+  subjects: Record<string, string>; // Maps ClassName -> SubjectName
+}
+
+export interface DateSheet {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  classes: string[]; // List of class names for columns
+  rows: DateSheetRow[];
+  notes: DateSheetNote[];
+  signatures: DateSheetSignature[];
   campusId: string;
+  updatedAt: string;
+}
+
+export interface TimetablePeriod {
+  id: string;
+  name: string; // e.g., "Period 1" or "Class 10A"
+  startTime?: string;
+  endTime?: string;
+  type?: 'period' | 'class';
+}
+
+export interface TimetableCell {
+  subject: string;
+  teacher: string;
+  notes?: string;
+}
+
+export interface TimetableRow {
+  id: string;
+  date?: string; // Optional if using generic labels
+  day?: string;  // Optional if using generic labels
+  label?: string; // Generic row label (e.g., "Class 10A" or "Monday")
+  cells: Record<string, TimetableCell>; // columnId -> cell data
+}
+
+export interface TimetableSignature {
+  id: string;
+  label: string;
+  name: string;
+  signatureUrl?: string;
+}
+
+export interface TimetableNote {
+  id: string;
+  text: string;
+  isVisible: boolean;
+}
+
+export interface Timetable {
+  id?: string;
+  campusId: string;
+  className: string; // "School Wide" or specific class
+  mode: 'class-monthly' | 'school-daily' | 'custom';
+  title: string;
+  subtitle?: string;
+  periods: TimetablePeriod[]; // These are columns
+  rows: TimetableRow[];
+  notes: TimetableNote[];
+  signatures: TimetableSignature[];
+  updatedAt: string;
+  schoolInfo: {
+    name: string;
+    logo?: string;
+  };
 }
 
 export interface LibraryLoan {
@@ -460,5 +538,54 @@ export interface LeaveBalance {
   casualLeave: number;
   paidLeave: number;
   campusId: string;
+}
+
+export interface SchoolWebsiteConfig {
+  id?: string;
+  campusId: string;
+  slug: string;
+  tagline: string;
+  announcement: string;
+  about: string;
+  phone: string;
+  whatsapp: string;
+  email: string;
+  socialLinks: {
+    facebook?: string;
+    instagram?: string;
+    youtube?: string;
+    tiktok?: string;
+  };
+  coverPhotos: string[];
+  spotlight: {
+    heading: string;
+    name: string;
+    role: string;
+    message: string;
+    photoUrl?: string;
+  };
+  videos: {
+    main: string;
+    others: string[];
+  };
+  customLinks: {
+    label: string;
+    url: string;
+  }[];
+  updatedAt: string;
+}
+
+export interface PublicAdmission {
+  id?: string;
+  campusId: string;
+  studentName: string;
+  parentName: string;
+  contact: string;
+  whatsapp?: string;
+  class: string;
+  previousSchool?: string;
+  address?: string;
+  status: 'pending' | 'contacted' | 'admitted' | 'rejected';
+  createdAt: string;
 }
 

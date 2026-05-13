@@ -200,18 +200,77 @@
       },
       "required": ["date", "class", "subject", "homework", "campusId"]
     },
-    "Certificate": {
-      "title": "Certificate",
-      "description": "Digital certificates issued to students",
+    "ExamType": {
+      "title": "ExamType",
+      "description": "Types of exams (e.g., Final, Mid-term)",
       "type": "object",
       "properties": {
-        "studentId": { "type": "string" },
-        "type": { "type": "string", "enum": ["achievement", "completion", "participation"] },
-        "date": { "type": "string", "format": "date" },
-        "content": { "type": "string" },
+        "name": { "type": "string" },
+        "term": { "type": "string" },
         "campusId": { "type": "string" }
       },
-      "required": ["studentId", "type", "date", "campusId"]
+      "required": ["name", "term", "campusId"]
+    },
+    "PublicAdmission": {
+      "title": "PublicAdmission",
+      "description": "Admission inquiries from the public website",
+      "type": "object",
+      "properties": {
+        "studentName": { "type": "string" },
+        "parentName": { "type": "string" },
+        "contact": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "class": { "type": "string" },
+        "previousSchool": { "type": "string" },
+        "address": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "contacted", "admitted", "rejected"] },
+        "campusId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentName", "parentName", "contact", "class", "status", "campusId", "createdAt"]
+    },
+    "WebsiteSlug": {
+      "title": "WebsiteSlug",
+      "description": "Mapping of unique school slugs to campus IDs",
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string" },
+        "campusId": { "type": "string" }
+      },
+      "required": ["slug", "campusId"]
+    },
+    "Timetable": {
+      "title": "Timetable",
+      "description": "Class schedule/timetable configuration",
+      "type": "object",
+      "properties": {
+        "campusId": { "type": "string" },
+        "className": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "periods": { "type": "array" },
+        "rows": { "type": "array" },
+        "notes": { "type": "array" },
+        "signatures": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "schoolInfo": { "type": "object" }
+      },
+      "required": ["campusId", "className", "title", "periods", "rows", "updatedAt"]
+    },
+    "SchoolSettings": {
+      "title": "SchoolSettings",
+      "description": "Global school settings and preferences",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string" },
+        "schoolAddress": { "type": "string" },
+        "schoolContact": { "type": "string" },
+        "schoolEmail": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "academicSession": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schoolName", "updatedAt"]
     },
     "ExamPaper": {
       "title": "ExamPaper",
@@ -432,6 +491,20 @@
         "campusId": { "type": "string" }
       },
       "required": ["className", "campusId"]
+    },
+    "DateSheet": {
+      "title": "DateSheet",
+      "description": "Exam date sheet details",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "classes": { "type": "array", "items": { "type": "string" } },
+        "rows": { "type": "array" },
+        "campusId": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "campusId"]
     }
   },
   "firestore": {
@@ -459,8 +532,14 @@
     "leave_balances": { "schema": "LeaveBalance", "description": "Collection of staff leave balances" },
     "subjects": { "schema": "Subject", "description": "Collection of subjects" },
     "school_websites": { "schema": "SchoolWebsite", "description": "Collection of school website configurations" },
+    "exam_types": { "schema": "ExamType", "description": "Collection of exam types" },
+    "public_admissions": { "schema": "PublicAdmission", "description": "Collection of public admission inquiries" },
+    "website_slugs": { "schema": "WebsiteSlug", "description": "Collection of website slug mappings" },
+    "timetables": { "schema": "Timetable", "description": "Collection of class timetables" },
+    "school_settings": { "schema": "SchoolSettings", "description": "Collection of school settings" },
     "shop_items": { "schema": "ShopItem", "description": "Collection of items available in the shop" },
     "shop_sales": { "schema": "ShopSale", "description": "Collection of shop sales records" },
-    "classes": { "schema": "Class", "description": "Collection of class and section definitions" }
+    "classes": { "schema": "Class", "description": "Collection of class and section definitions" },
+    "dateSheets": { "schema": "DateSheet", "description": "Collection of exam date sheets" }
   }
 }

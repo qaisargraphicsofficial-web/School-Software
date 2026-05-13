@@ -146,7 +146,10 @@ export default function Academic({ profile }: AcademicProps) {
   const fetchClasses = async () => {
     try {
       const q = query(collection(db, 'classes'), where('campusId', '==', profile?.campusId || 'main'));
-      const snap = await getDocs(q);
+      let snap = await getDocs(q);
+      if (snap.empty) {
+        snap = await getDocs(query(collection(db, 'classes')));
+      }
       setClassGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup)));
     } catch (error) {
       console.error("Error fetching classes:", error);
@@ -156,7 +159,10 @@ export default function Academic({ profile }: AcademicProps) {
   const fetchSubjects = async () => {
     try {
       const q = query(collection(db, 'subjects'), where('campusId', '==', profile?.campusId || 'main'));
-      const snap = await getDocs(q);
+      let snap = await getDocs(q);
+      if (snap.empty) {
+         snap = await getDocs(query(collection(db, 'subjects')));
+      }
       setSubjectsList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
       console.error("Error fetching subjects:", error);
@@ -223,7 +229,10 @@ export default function Academic({ profile }: AcademicProps) {
         try {
           // Fetch students of the selected class
           const sQuery = query(collection(db, 'students'), where('class', '==', selectedClass), where('campusId', '==', campusId));
-          const sSnap = await getDocs(sQuery);
+          let sSnap = await getDocs(sQuery);
+          if (sSnap.empty) {
+            sSnap = await getDocs(query(collection(db, 'students'), where('class', '==', selectedClass)));
+          }
           const classStudentIds = sSnap.docs.map(doc => doc.id);
 
           if (classStudentIds.length === 0) {
@@ -271,7 +280,16 @@ export default function Academic({ profile }: AcademicProps) {
           q = query(collection(db, 'students'), ...baseConstraints);
         }
 
-        const querySnapshot = await getDocs(q);
+        let querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          if (selectedClass !== 'All') {
+            querySnapshot = await getDocs(query(collection(db, 'students'), where('class', '==', selectedClass)));
+          } else {
+            querySnapshot = await getDocs(query(collection(db, 'students')));
+          }
+        }
+
         const data = querySnapshot.docs.map(studentDoc => ({ id: studentDoc.id, ...(studentDoc.data() as any) } as Student));
         setStudents(data);
         

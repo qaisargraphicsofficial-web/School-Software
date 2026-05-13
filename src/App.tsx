@@ -2,20 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, getDocFromServer, collection, getDocs } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile, UserRole, UserStatus } from './types';
 import { Clock } from 'lucide-react';
 
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
-    }
-  }
-}
-testConnection();
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -31,7 +21,6 @@ import Curriculum from './components/Curriculum';
 import Exams from './components/Exams';
 import Results from './components/Results';
 import Library from './components/Library';
-import DailyDiary from './components/DailyDiary';
 import Certificates from './components/Certificates';
 import Campuses from './components/Campuses';
 import Tasks from './components/Tasks';
@@ -48,6 +37,8 @@ import SchoolWebsite from './components/SchoolWebsite';
 import SchoolShop from './components/SchoolShop';
 
 import Registration from './components/Registration';
+import PublicWebsite from './components/PublicWebsite';
+import PublicResultView from './components/PublicResultView';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -59,18 +50,28 @@ export default function App() {
       if (firebaseUser) {
         setUser(firebaseUser);
         const docRef = doc(db, 'users', firebaseUser.uid);
-        const docSnap = await getDoc(docRef);
+        let docSnap;
+        try {
+          docSnap = await getDoc(docRef);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, 'users/' + firebaseUser.uid);
+          return;
+        }
         
-        if (docSnap.exists()) {
+        if (docSnap && docSnap.exists()) {
           const existingProfile = docSnap.data() as UserProfile;
           
           // Fix missing campusId for admins
           if (!existingProfile.campusId && existingProfile.role === 'admin') {
-            const campSnap = await getDocs(collection(db, 'campuses'));
-            if (!campSnap.empty) {
-              const firstCampus = campSnap.docs[0];
-              await updateDoc(docRef, { campusId: firstCampus.id });
-              existingProfile.campusId = firstCampus.id;
+            try {
+              const campSnap = await getDocs(collection(db, 'campuses'));
+              if (!campSnap.empty) {
+                const firstCampus = campSnap.docs[0];
+                await updateDoc(docRef, { campusId: firstCampus.id });
+                existingProfile.campusId = firstCampus.id;
+              }
+            } catch (err) {
+              console.error("Error setting default campus:", err);
             }
           }
 
@@ -145,6 +146,8 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/register" element={<Registration />} />
+        <Route path="/school/:slug" element={<PublicWebsite />} />
+        <Route path="/school/:slug/results/:resultId" element={<PublicResultView />} />
         {!user ? (
           <Route path="*" element={<Login />} />
         ) : (
@@ -173,7 +176,6 @@ export default function App() {
             <Route path="curriculum" element={<Curriculum profile={profile} />} />
             <Route path="exams" element={<Exams profile={profile} />} />
             <Route path="library" element={<Library profile={profile} />} />
-            <Route path="diary" element={<DailyDiary profile={profile} />} />
             <Route path="certificates" element={<Certificates profile={profile} />} />
             <Route path="school-website" element={profile?.role === 'admin' ? <SchoolWebsite profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="school-shop" element={profile?.role === 'admin' ? <SchoolShop profile={profile} /> : <Navigate to="/" replace />} />

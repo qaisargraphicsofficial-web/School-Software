@@ -1,0 +1,117 @@
+195:                    value={searchQuery}
+203:                  value={filterPaperClass}
+209:                  <option value="All">All Classes</option>
+211:                    <option key={c.id} value={c.className}>{c.className}</option>
+216:                  value={filterPaperSubject}
+219:                  <option value="All">All Subjects</option>
+224:                      <option key={s.id} value={s.name}>{s.name}</option>
+1131:                    value={newPaper.examTypeId || ''}
+1137:                    <option value="">Select Type</option>
+1139:                      <option key={t.id} value={t.id}>{t.name} ({t.term})</option>
+1150:                    value={schoolSettings?.schoolName || ''}
+1162:                    value={newPaper.title}
+1171:                    value={newPaper.class}
+1174:                    <option value="">Select Class</option>
+1176:                      <option key={c.id} value={c.className}>{c.className}</option>
+1185:                    value={newPaper.subject}
+1188:                    <option value="">Select Subject</option>
+1194:                        <option key={s.id} value={s.name}>{s.name}</option>
+1205:                    value={newPaper.date}
+1215:                    value={newPaper.duration}
+1256:                              value={q.question}
+1273:                                  value={q.type}
+1285:                                  <option value="multiple_choice">Multiple Choice</option>
+1286:                                  <option value="short_answer">Short Answer</option>
+1287:                                  <option value="long_answer">Long Answer</option>
+1293:                                  value={q.difficulty}
+1297:                                  <option value="Easy">Easy</option>
+1298:                                  <option value="Medium">Medium</option>
+1299:                                  <option value="Hard">Hard</option>
+1306:                                  value={q.marks}
+1333:                                        value={opt}
+1361:                            value={q.answer}
+1448:                  value={aiPrompt.examTypeId || ''}
+1451:                  <option value="">Select Type (Optional)</option>
+1453:                    <option key={t.id} value={t.id}>{t.name} ({t.term})</option>
+1463:                    value={aiPrompt.class}
+1466:                    <option value="">Select Class</option>
+1468:                      <option key={c.id} value={c.className}>{c.className}</option>
+1477:                    value={aiPrompt.subject}
+1480:                    <option value="">Select Subject</option>
+1485:                        <option key={s.id} value={s.name}>{s.name}</option>
+1497:                  value={aiPrompt.topic}
+1512:                      value={aiPrompt.easyCount}
+1522:                      value={aiPrompt.mediumCount}
+1532:                      value={aiPrompt.hardCount}
+1547:                        value={aiPrompt.mcqCount}
+1556:                        value={aiPrompt.mcqMarks}
+1569:                        value={aiPrompt.shortCount}
+1578:                        value={aiPrompt.shortMarks}
+1591:                        value={aiPrompt.longCount}
+1600:                        value={aiPrompt.longMarks}
+1612:                      value={aiPrompt.language}
+1615:                      <option value="English">English</option>
+1616:                      <option value="Urdu">Urdu</option>
+1617:                      <option value="Bilingual">Bilingual</option>
+1649:                    value={aiPrompt.duration}
+1751:                        value={aiPrompt.class}
+1760:                        value={aiPrompt.subject}
+1769:                        value={aiPrompt.topic}
+1779:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.easyCount} onChange={e => setAiPrompt({...aiPrompt, easyCount: parseInt(e.target.value) || 0})} />
+1780:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.mediumCount} onChange={e => setAiPrompt({...aiPrompt, mediumCount: parseInt(e.target.value) || 0})} />
+1781:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.hardCount} onChange={e => setAiPrompt({...aiPrompt, hardCount: parseInt(e.target.value) || 0})} />
+1787:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.mcqCount} onChange={e => setAiPrompt({...aiPrompt, mcqCount: parseInt(e.target.value) || 0})} />
+1788:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.shortCount} onChange={e => setAiPrompt({...aiPrompt, shortCount: parseInt(e.target.value) || 0})} />
+1789:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.longCount} onChange={e => setAiPrompt({...aiPrompt, longCount: parseInt(e.target.value) || 0})} />
+1795:                          <input type="number" title="MCQ Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.mcqMarks} onChange={e => setAiPrompt({...aiPrompt, mcqMarks: parseInt(e.target.value) || 0})} />
+1796:                          <input type="number" title="Short Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.shortMarks} onChange={e => setAiPrompt({...aiPrompt, shortMarks: parseInt(e.target.value) || 0})} />
+1797:                          <input type="number" title="Long Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.longMarks} onChange={e => setAiPrompt({...aiPrompt, longMarks: parseInt(e.target.value) || 0})} />
+1805:                             value={aiPrompt.language}
+1808:                             <option value="English">English</option>
+1809:                             <option value="Urdu">Urdu</option>
+1810:                             <option value="Bilingual">Bilingual</option>
+1843:                    value={generatedPaperData.title}
+1852:                    value={generatedPaperData.class}
+1861:                    value={generatedPaperData.subject}
+1870:                    value={generatedPaperData.duration}
+1904:                              value={q.question}
+1913:                                  value={q.type}
+1925:                                  <option value="multiple_choice">Multiple Choice</option>
+1926:                                  <option value="short_answer">Short Answer</option>
+1927:                                  <option value="long_answer">Long Answer</option>
+1933:                                  value={q.difficulty}
+1937:                                  <option value="Easy">Easy</option>
+1938:                                  <option value="Medium">Medium</option>
+1939:                                  <option value="Hard">Hard</option>
+1946:                                  value={q.marks}
+1963:                                  value={opt}
+1979:                            value={q.answer}
+2037:                  value={newExamType.name}
+2047:                  value={newExamType.term}
+2075:                      value={editingPaper?.title || ''}
+2132:                <input className="px-3 py-2 rounded-lg border border-slate-200" value={editingPaper?.class} onChange={e => setEditingPaper({...editingPaper!, class: e.target.value})} placeholder="Class" />
+2133:                <input className="px-3 py-2 rounded-lg border border-slate-200" value={editingPaper?.subject} onChange={e => setEditingPaper({...editingPaper!, subject: e.target.value})} placeholder="Subject" />
+2134:                <input type="date" className="px-3 py-2 rounded-lg border border-slate-200" value={editingPaper?.date} onChange={e => setEditingPaper({...editingPaper!, date: e.target.value})} />
+2135:                <input type="number" className="px-3 py-2 rounded-lg border border-slate-200" value={editingPaper?.duration} onChange={e => setEditingPaper({...editingPaper!, duration: parseInt(e.target.value)})} placeholder="Duration (min)" />
+2162:                          <textarea className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={q.question} onChange={e => updateQuestion(index, {...q, question: e.target.value})} placeholder="Question text" />
+2164:                            <input type="number" className="p-3 border border-slate-200 rounded-xl" value={q.marks} onChange={e => updateQuestion(index, {...q, marks: parseInt(e.target.value)})} placeholder="Marks" />
+2165:                            <select className="p-3 border border-slate-200 rounded-xl" value={q.difficulty} onChange={e => updateQuestion(index, {...q, difficulty: e.target.value})}>
+2171:                          <select className="w-full p-3 border border-slate-200 rounded-xl" value={q.type} onChange={e => updateQuestion(index, {...q, type: e.target.value})}>
+2172:                            <option value="long_answer">Long Answer</option>
+2173:                            <option value="multiple_choice">Multiple Choice</option>
+2194:                                      value={opt}
+2216:                          <textarea className="w-full p-3 border border-slate-200 rounded-xl" value={q.answer} onChange={e => updateQuestion(index, {...q, answer: e.target.value})} placeholder="Answer" />
+2431:                      value={newSchedule.examTypeId}
+2434:                      <option value="">SELECT EXAM TYPE</option>
+2436:                        <option key={t.id} value={t.id}>{t.name.toUpperCase()} ({t.term.toUpperCase()})</option>
+2446:                      value={newSchedule.roomNumber}
+2456:                      value={newSchedule.date}
+2466:                      value={newSchedule.time}
+2476:                      value={newSchedule.duration}
+2494:                            value={bulkClassSubjects[className] || ''}
+2497:                            <option value="">-- OFF --</option>
+2502:                                <option key={s.id} value={s.name}>{s.name}</option>
+2576:                              value={m.total}
+2584:                              value={m.pass}
+2593:                              value={m.obtained}
+2608:                    value={resultRemarks}

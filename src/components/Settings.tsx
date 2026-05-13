@@ -75,7 +75,6 @@ const MODULE_CATEGORIES = {
     { name: 'Results', icon: GraduationCap },
     { name: 'Schedule', icon: Calendar },
     { name: 'Curriculum', icon: BookText },
-    { name: 'Diary', icon: BookOpen },
     { name: 'Certificates', icon: Award },
   ],
   'Finance': [
@@ -204,8 +203,8 @@ export default function Settings({ profile }: SettingsProps) {
       sms: false
     },
     staffPermissions: {
-      'Teacher': ['Dashboard', 'Students', 'Classes', 'Attendance', 'Diary', 'Results', 'Schedule', 'Communication', 'Tasks'],
-      'Administrator': ['Dashboard', 'Students', 'Teachers', 'Classes', 'Attendance', 'Results', 'Fees', 'Payroll', 'Expenses', 'Schedule', 'Leave', 'Tasks', 'Communication', 'Reports', 'Settings', 'Campuses', 'Library', 'Inventory', 'Curriculum', 'Diary', 'Certificates'],
+      'Teacher': ['Dashboard', 'Students', 'Classes', 'Attendance', 'Results', 'Schedule', 'Communication', 'Tasks'],
+      'Administrator': ['Dashboard', 'Students', 'Teachers', 'Classes', 'Attendance', 'Results', 'Fees', 'Payroll', 'Expenses', 'Schedule', 'Leave', 'Tasks', 'Communication', 'Reports', 'Settings', 'Campuses', 'Library', 'Inventory', 'Curriculum', 'Certificates'],
       'Accountant': ['Dashboard', 'Fees', 'Payroll', 'Expenses', 'Inventory', 'Reports'],
       'Librarian': ['Dashboard', 'Library', 'Tasks']
     },

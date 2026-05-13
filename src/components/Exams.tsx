@@ -3,15 +3,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, query, where, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { ExamPaper, UserProfile, ExamType, Student, ExamResult, ExamSchedule, Staff, Subject, ClassGroup, SchoolSettings } from '../types';
-import { FileText, Plus, Search, Calendar, Clock, ChevronRight, FilePlus, Sparkles, Loader2, Printer, Settings, X, Trash2, Award, Download, Users, MapPin, GraduationCap } from 'lucide-react';
+import { FileText, Plus, Search, Calendar, Clock, ChevronRight, FilePlus, Sparkles, Loader2, Printer, Settings, X, Trash2, Award, Download, Users, MapPin, GraduationCap, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { cn } from '../lib/utils';
+import * as XLSX from 'xlsx';
 
 import { ReportCard } from './ReportCard';
+import DateSheetModule from './DateSheetModule';
 
 export default function Exams({ profile }: { profile: UserProfile | null }) {
   const [examTypes, setExamTypes] = useState<ExamType[]>([]);
@@ -74,18 +76,32 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       setNewPaper({ ...newPaper, questions: updatedQuestions });
     }
   };
-  const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
   const [selectedResultClass, setSelectedResultClass] = useState('');
   const [selectedResultSection, setSelectedResultSection] = useState('');
   const [selectedResultExamType, setSelectedResultExamType] = useState('');
   const [viewingResultCard, setViewingResultCard] = useState<Student | null>(null);
   const resultCardRef = useRef<HTMLDivElement>(null);
+  const bulkUploadRef = useRef<HTMLInputElement>(null);
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
   const [isMarksEntryModalOpen, setIsMarksEntryModalOpen] = useState(false);
   const [selectedStudentForMarks, setSelectedStudentForMarks] = useState<Student | null>(null);
   const [marksEntryData, setMarksEntryData] = useState<Record<string, { obtained: number; total: number; pass: number }>>({});
   const [resultRemarks, setResultRemarks] = useState('');
   const [savingResults, setSavingResults] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [newSchedule, setNewSchedule] = useState<Partial<ExamSchedule>>({
+    examTypeId: '',
+    class: '',
+    subject: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '09:00',
+    duration: 180,
+    invigilatorIds: [],
+    roomNumber: ''
+  });
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
+  const [bulkClassSubjects, setBulkClassSubjects] = useState<Record<string, string>>({});
   
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -152,30 +168,15 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   };
 
   const [isExamTypesModalOpen, setIsExamTypesModalOpen] = useState(false);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [staffSearch, setStaffSearch] = useState('');
   const [generating, setGenerating] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
   const [generatedPaperData, setGeneratedPaperData] = useState<any>(null);
   const [viewingPaper, setViewingPaper] = useState<ExamPaper | null>(null);
   const [paperToDelete, setPaperToDelete] = useState<string | null>(null);
-  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
   const [examTypeToDelete, setExamTypeToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [scheduleView, setScheduleView] = useState<'cards' | 'grid'>('cards');
   
   const [newExamType, setNewExamType] = useState({ name: '', term: '' });
-
-  const [newSchedule, setNewSchedule] = useState<Partial<ExamSchedule>>({
-    examTypeId: '',
-    class: '',
-    subject: '',
-    date: new Date().toISOString().split('T')[0],
-    time: '09:00',
-    duration: 180,
-    invigilatorIds: [],
-    roomNumber: ''
-  });
 
   const [newPaper, setNewPaper] = useState<Partial<ExamPaper>>({
     title: '',
@@ -191,7 +192,238 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     sections: [],
   });
 
-  const [activeTab, setActiveTab] = useState<'types' | 'papers' | 'schedules' | 'results'>('types');
+  const [activeTab, setActiveTab] = useState<'types' | 'papers' | 'dateSheet' | 'results'>('types');
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'papers':
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm print:hidden">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search papers..."
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <select
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+                  value={filterPaperClass}
+                  onChange={(e) => {
+                    setFilterPaperClass(e.target.value);
+                    setFilterPaperSubject('All');
+                  }}
+                >
+                  <option value="All">All Classes</option>
+                  {classes.sort((a, b) => a.className.localeCompare(b.className)).map(c => (
+                    <option key={c.id} value={c.className}>{c.className}</option>
+                  ))}
+                </select>
+                <select
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+                  value={filterPaperSubject}
+                  onChange={(e) => setFilterPaperSubject(e.target.value)}
+                >
+                  <option value="All">All Subjects</option>
+                  {subjects
+                    .filter(s => filterPaperClass === 'All' || s.class === filterPaperClass)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(s => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+      case 'dateSheet':
+        return <DateSheetModule campusId={profile?.campusId || 'main'} />;
+      case 'results':
+        return (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden p-6 print:hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <h2 className="text-xl font-bold">Manage Exam Results</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file"
+                  ref={bulkUploadRef}
+                  onChange={handleBulkUpload}
+                  accept=".xlsx, .xls"
+                  className="hidden"
+                />
+                <button
+                  onClick={downloadUploadTemplate}
+                  className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-100 transition-all shadow-sm border border-indigo-100"
+                >
+                  <Download className="w-4 h-4" />
+                  Template
+                </button>
+                <button
+                  onClick={() => bulkUploadRef.current?.click()}
+                  disabled={!selectedResultExamType || !selectedResultClass || savingResults}
+                  className="px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-amber-100 transition-all shadow-sm border border-amber-100 disabled:opacity-50"
+                >
+                  <FilePlus className="w-4 h-4" />
+                  {savingResults ? 'Uploading...' : 'Bulk Upload'}
+                </button>
+                <button
+                  onClick={handleExportResults}
+                  disabled={!selectedResultExamType || !selectedResultClass}
+                  className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-emerald-100 transition-all shadow-sm border border-emerald-100 disabled:opacity-50"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export Excel
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  disabled={!selectedResultExamType || !selectedResultClass}
+                  className="px-4 py-2 bg-rose-50 text-rose-700 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-rose-100 transition-all shadow-sm border border-rose-100 disabled:opacity-50"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print All
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Exam Type</label>
+                <select 
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={selectedResultExamType} 
+                  onChange={(e) => setSelectedResultExamType(e.target.value)}
+                >
+                  <option value="">Select Exam Type</option>
+                  {examTypes.map(et => (<option key={et.id} value={et.id}>{et.name}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Class</label>
+                <select 
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={selectedResultClass} 
+                  onChange={(e) => {
+                    setSelectedResultClass(e.target.value);
+                    setSelectedResultSection('');
+                  }}
+                >
+                  <option value="">Select Class</option>
+                  {classes.map(c => (<option key={c.id} value={c.className}>{c.className}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Section (Optional)</label>
+                <select 
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={selectedResultSection} 
+                  onChange={(e) => setSelectedResultSection(e.target.value)}
+                >
+                  <option value="">All Sections</option>
+                  {classes.find(c => c.className === selectedResultClass)?.sections.map(s => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {selectedResultClass && subjects.filter(s => s.class === selectedResultClass).length === 0 && (
+              <div className="mb-6 p-4 bg-amber-50 text-amber-800 rounded-2xl text-xs font-bold flex items-center gap-3 border border-amber-200">
+                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
+                  <AlertCircle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="uppercase tracking-tight">No subjects found for Class {selectedResultClass}</p>
+                  <p className="font-medium text-[10px] text-amber-600">Please add subjects in the "Subjects" module or use "Add Subject" manually when entering marks.</p>
+                </div>
+              </div>
+            )}
+
+            {selectedResultExamType && selectedResultClass ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 border-y border-slate-200">
+                    <tr>
+                      <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Student Name</th>
+                      <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Roll No</th>
+                      <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Marks</th>
+                      <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Percentage</th>
+                      <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Grade</th>
+                      <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {students
+                      .filter(s => s.class === selectedResultClass && (!selectedResultSection || s.section === selectedResultSection))
+                      .map(student => {
+                        const result = examResults.find(r => r.studentId === student.id && r.examTypeId === selectedResultExamType);
+                        return (
+                          <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-4 font-medium text-slate-900">{student.name}</td>
+                            <td className="p-4 text-slate-600">{student.rollNumber || '-'}</td>
+                            <td className="p-4 text-slate-600">
+                              {result ? `${result.totalObtained} / ${result.totalMax}` : 'Pending'}
+                            </td>
+                            <td className="p-4 text-center text-slate-900 font-bold">
+                              {result ? `${result.percentage.toFixed(1)}%` : '-'}
+                            </td>
+                            <td className="p-4 text-center">
+                              {result ? (
+                                <span className={cn(
+                                  "px-2 py-1 rounded-lg text-xs font-bold border",
+                                  result.grade === 'F' ? "bg-rose-50 text-rose-700 border-rose-100" : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                )}>
+                                  {result.grade}
+                                </span>
+                              ) : '-'}
+                            </td>
+                            <td className="p-4 text-right space-x-2">
+                              <button
+                                onClick={() => handleEnterMarks(student)}
+                                className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors"
+                              >
+                                {result ? 'Edit Marks' : 'Enter Marks'}
+                              </button>
+                              {result && (
+                                <button
+                                  onClick={() => setViewingResultCard(student)}
+                                  className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                  View Card
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                    })}
+                    {students.filter(s => s.class === selectedResultClass && (!selectedResultSection || s.section === selectedResultSection)).length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-500">
+                          No students found in this class/section.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center p-12 text-slate-500 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                Please select both Exam Type and Class to manage results.
+              </div>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+
   const [examResults, setExamResults] = useState<ExamResult[]>([]);
 
   const [aiPrompt, setAiPrompt] = useState({
@@ -218,7 +450,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       fetchExamPapers();
       fetchExamTypes();
       fetchStudents();
-      fetchSchedules();
       fetchStaff();
       fetchSubjects();
       fetchClasses();
@@ -317,6 +548,220 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     return 'F';
   };
 
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedResultExamType || !selectedResultClass) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const bstr = event.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        setSavingResults(true);
+        
+        // Loop through data and find students
+        for (const row of data as any[]) {
+          const rollNumber = String(row['Roll No'] || row['Roll Number'] || '');
+          const studentName = String(row['Student Name'] || row['Name'] || '');
+          
+          const student = students.find(s => 
+            s.class === selectedResultClass && 
+            (s.rollNumber === rollNumber || s.name.toLowerCase() === studentName.toLowerCase())
+          );
+
+          if (student) {
+            const classSubjects = subjects.filter(s => s.class === selectedResultClass);
+            const marks: Record<string, { obtained: number; total: number; pass: number }> = {};
+            let totalObtained = 0;
+            let totalMax = 0;
+
+            classSubjects.forEach(sub => {
+              const obtained = Number(row[sub.name] || 0);
+              const total = 100; // Default
+              const pass = 40;
+              marks[sub.name] = { obtained, total, pass };
+              totalObtained += obtained;
+              totalMax += total;
+            });
+
+            const percentage = (totalObtained / totalMax) * 100;
+            const grade = calculateGrade(percentage);
+
+            const resultData: Omit<ExamResult, 'id'> = {
+              studentId: student.id!,
+              examTypeId: selectedResultExamType,
+              class: selectedResultClass,
+              section: student.section || '',
+              marks,
+              totalObtained,
+              totalMax,
+              percentage,
+              grade,
+              remarks: row['Remarks'] || '',
+              campusId: profile?.campusId || 'main',
+              updatedAt: new Date().toISOString(),
+            };
+
+            const existing = examResults.find(r => r.studentId === student.id && r.examTypeId === selectedResultExamType);
+            if (existing) {
+              await updateDoc(doc(db, 'exam_results', existing.id!), resultData);
+            } else {
+              await addDoc(collection(db, 'exam_results'), resultData);
+            }
+          }
+        }
+
+        await fetchExamResults();
+        alert('Results uploaded successfully!');
+      } catch (error) {
+        console.error('Error uploading results:', error);
+        alert('Error uploading results. Please check the file format.');
+      } finally {
+        setSavingResults(false);
+        if (bulkUploadRef.current) bulkUploadRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const campusId = profile?.campusId || 'main';
+      if (editingScheduleId) {
+        // Simple case for single update if needed, but usually we use bulk below or just this one
+        await updateDoc(doc(db, 'exam_schedules', editingScheduleId), {
+          ...newSchedule,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        // Bulk schedule logic if bulkClassSubjects is used
+        const classesToSchedule = Object.entries(bulkClassSubjects).filter(([_, sub]) => sub !== '');
+        
+        if (classesToSchedule.length > 0) {
+          for (const [className, subjectName] of classesToSchedule) {
+            await addDoc(collection(db, 'exam_schedules'), {
+              ...newSchedule,
+              class: className,
+              subject: subjectName,
+              campusId,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        } else {
+          // Single schedule
+          await addDoc(collection(db, 'exam_schedules'), {
+            ...newSchedule,
+            campusId,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+      setIsScheduleModalOpen(false);
+      setEditingScheduleId(null);
+      setBulkClassSubjects({});
+      fetchExamSchedules();
+    } catch (error) {
+      handleFirestoreError(error, editingScheduleId ? OperationType.UPDATE : OperationType.CREATE, 'exam_schedules');
+    }
+  };
+
+  const fetchExamSchedules = async () => {
+    try {
+      const campusId = profile?.campusId || 'main';
+      const q = query(collection(db, 'exam_schedules'), where('campusId', '==', campusId));
+      const snap = await getDocs(q);
+      setSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamSchedule)));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'exam_schedules');
+    }
+  };
+
+  const confirmDeleteSchedule = async () => {
+    if (!scheduleToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'exam_schedules', scheduleToDelete));
+      fetchExamSchedules();
+      setScheduleToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'exam_schedules');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleExportResults = () => {
+    if (!selectedResultClass || !selectedResultExamType) return;
+
+    const filteredStudents = students.filter(s => 
+      s.class === selectedResultClass && 
+      (!selectedResultSection || s.section === selectedResultSection)
+    );
+
+    const classSubjects = subjects.filter(s => s.class === selectedResultClass);
+    
+    const exportData = filteredStudents.map(student => {
+      const result = examResults.find(r => r.studentId === student.id && r.examTypeId === selectedResultExamType);
+      const row: any = {
+        'Roll No': student.rollNumber,
+        'Student Name': student.name,
+      };
+
+      classSubjects.forEach(sub => {
+        row[sub.name] = result?.marks[sub.name]?.obtained || 0;
+      });
+
+      row['Total Obtained'] = result?.totalObtained || 0;
+      row['Total Max'] = result?.totalMax || 0;
+      row['Percentage'] = result?.percentage?.toFixed(2) || '0';
+      row['Grade'] = result?.grade || '-';
+      row['Remarks'] = result?.remarks || '';
+
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Exam Results');
+    XLSX.writeFile(wb, `${selectedResultClass}_${selectedResultExamType}_Results.xlsx`);
+  };
+
+  const downloadUploadTemplate = () => {
+    if (!selectedResultClass) {
+      alert("Please select a class first");
+      return;
+    }
+
+    const filteredStudents = students.filter(s => 
+      s.class === selectedResultClass && 
+      (!selectedResultSection || s.section === selectedResultSection)
+    );
+
+    const classSubjects = subjects.filter(s => s.class === selectedResultClass);
+    
+    const templateData = filteredStudents.map(student => {
+      const row: any = {
+        'Roll No': student.rollNumber,
+        'Student Name': student.name,
+      };
+      classSubjects.forEach(sub => {
+        row[sub.name] = 0;
+      });
+      row['Remarks'] = '';
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, `${selectedResultClass}_Upload_Template.xlsx`);
+  };
+
   const getGradeDescription = (grade: string) => {
     switch (grade) {
       case 'A+': return 'OUTSTANDING';
@@ -394,10 +839,10 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   const [editingPaper, setEditingPaper] = useState<ExamPaper | null>(null);
   const [isEditingPaper, setIsEditingPaper] = useState(false);
   const [editingPaperId, setEditingPaperId] = useState<string | null>(null);
-  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const dateSheetRef = useRef<HTMLDivElement>(null);
-  const [filterClass, setFilterClass] = useState<string>('All');
+  const [filterClasses, setFilterClasses] = useState<string[]>([]);
   const [filterSubject, setFilterSubject] = useState<string>('All');
+  const [filterExamType, setFilterExamType] = useState<string>('All');
   const [filterPaperClass, setFilterPaperClass] = useState<string>('All');
   const [filterPaperSubject, setFilterPaperSubject] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -448,23 +893,16 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     try {
       const campusId = profile?.campusId || 'main';
       const q = query(collection(db, 'students'), where('campusId', '==', campusId));
-      const snap = await getDocs(q);
+      let snap = await getDocs(q);
+      if (snap.empty) {
+        snap = await getDocs(query(collection(db, 'students')));
+      }
       setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'students');
     }
   };
 
-  const fetchSchedules = async () => {
-    try {
-      const campusId = profile?.campusId || 'main';
-      const q = query(collection(db, 'exam_schedules'), where('campusId', '==', campusId));
-      const snap = await getDocs(q);
-      setSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamSchedule)));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'exam_schedules');
-    }
-  };
 
   const fetchStaff = async () => {
     try {
@@ -479,7 +917,8 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchSubjects = async () => {
     try {
-      const q = query(collection(db, 'subjects'));
+      const campusId = profile?.campusId || 'main';
+      const q = query(collection(db, 'subjects'), where('campusId', '==', campusId));
       const snap = await getDocs(q);
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
       setSubjects(data);
@@ -499,56 +938,6 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     }
   };
 
-  const handleSaveSchedule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const campusId = profile?.campusId || 'main';
-      if (editingScheduleId) {
-        await updateDoc(doc(db, 'exam_schedules', editingScheduleId), {
-          ...newSchedule,
-          campusId
-        });
-      } else {
-        await addDoc(collection(db, 'exam_schedules'), {
-          ...newSchedule,
-          campusId
-        });
-      }
-      setIsScheduleModalOpen(false);
-      setEditingScheduleId(null);
-      setNewSchedule({
-        examTypeId: '',
-        class: '',
-        subject: '',
-        date: new Date().toISOString().split('T')[0],
-        time: '09:00',
-        duration: 180,
-        invigilatorIds: [],
-        roomNumber: ''
-      });
-      fetchSchedules();
-    } catch (error) {
-      handleFirestoreError(error, editingScheduleId ? OperationType.UPDATE : OperationType.CREATE, 'exam_schedules');
-    }
-  };
-
-  const handleDeleteSchedule = (id: string) => {
-    setScheduleToDelete(id);
-  };
-
-  const confirmDeleteSchedule = async () => {
-    if (!scheduleToDelete) return;
-    setIsDeleting(true);
-    try {
-      await deleteDoc(doc(db, 'exam_schedules', scheduleToDelete));
-      fetchSchedules();
-      setScheduleToDelete(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, 'exam_schedules');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const fetchExamTypes = async () => {
     try {
@@ -901,7 +1290,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       pdf.setFontSize(8);
       pdf.text(`Generated on: ${new Date().toLocaleString()}`, pdfWidth / 2, pdfHeight - 10, { align: 'center' });
 
-      pdf.save(`Date_Sheet_${filterClass}_${filterSubject}_${new Date().toISOString().split('T')[0]}.pdf`);
+      pdf.save(`Date_Sheet_${filterExamType}_${filterClasses.length > 0 ? filterClasses.join('-') : 'All'}_${filterSubject}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error("Error generating date sheet:", error);
       // alert("Failed to generate date sheet PDF.");
@@ -915,11 +1304,13 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
           <h1 className="text-2xl font-bold text-slate-900">
             {activeTab === 'papers' ? 'Paper Generator' : 
              activeTab === 'schedule' ? 'Examination Portal' : 
+             activeTab === 'dateSheet' ? 'Date Sheet' :
              'Student results'}
           </h1>
           <p className="text-slate-500 text-sm">
             {activeTab === 'papers' ? 'Create and manage exam papers with AI' : 
              activeTab === 'schedule' ? 'Manage exam schedules and date sheets' : 
+             activeTab === 'dateSheet' ? 'Manage examination date sheets' :
              'View and manage student exam results'}
           </p>
         </div>
@@ -972,9 +1363,9 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                 <Calendar className="w-5 h-5" />
                 Schedule Exam
               </button>
-            ) : (
+            ) : activeTab === 'dateSheet' || activeTab === 'results' ? null : (
               <button
-                onClick={() => setIsResultsModalOpen(true)}
+                onClick={() => setActiveTab('results')}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
               >
                 <Plus className="w-5 h-5" />
@@ -998,13 +1389,13 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
           )}
         </button>
         <button
-          onClick={() => setActiveTab('schedule')}
+          onClick={() => setActiveTab('dateSheet')}
           className={`pb-4 px-2 text-sm font-medium transition-colors relative ${
-            activeTab === 'schedule' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'
+            activeTab === 'dateSheet' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           Date Sheet
-          {activeTab === 'schedule' && (
+          {activeTab === 'dateSheet' && (
             <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600" />
           )}
         </button>
@@ -1021,536 +1412,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
         </button>
       </div>
 
-      {activeTab === 'papers' ? (
-        <div className="space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm print:hidden">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search papers..."
-                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <select
-                className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
-                value={filterPaperClass}
-                onChange={(e) => {
-                  setFilterPaperClass(e.target.value);
-                  setFilterPaperSubject('All');
-                }}
-              >
-                <option value="All">All Classes</option>
-                {classes.sort((a, b) => a.className.localeCompare(b.className)).map(c => (
-                  <option key={c.id} value={c.className}>{c.className}</option>
-                ))}
-              </select>
-              <select
-                className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
-                value={filterPaperSubject}
-                onChange={(e) => setFilterPaperSubject(e.target.value)}
-              >
-                <option value="All">All Subjects</option>
-                {subjects
-                  .filter(s => filterPaperClass === 'All' || s.class === filterPaperClass)
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map(s => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
-          {examPapers
-            .filter(p => {
-              const matchesClass = filterPaperClass === 'All' || p.class === filterPaperClass;
-              const matchesSubject = filterPaperSubject === 'All' || p.subject === filterPaperSubject;
-              const matchesSearch = (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                   (p.subject || '').toLowerCase().includes(searchQuery.toLowerCase());
-              return matchesClass && matchesSubject && matchesSearch;
-            })
-            .map((p) => (
-          <motion.div
-            key={p.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
-                <FileText className="w-6 h-6" />
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">
-                  {p.class}
-                </span>
-                {p.examTypeId && (
-                  <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                    {examTypes.find(t => t.id === p.examTypeId)?.name || 'Exam'}
-                  </span>
-                )}
-              </div>
-            </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">{p.title}</h3>
-            <p className="text-sm text-slate-500 mb-4">{p.subject}</p>
-            
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Calendar className="w-4 h-4" />
-                {p.date}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Clock className="w-4 h-4" />
-                {p.duration} Minutes
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setViewingPaper(p)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-indigo-600 text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors font-medium"
-              >
-                View
-              </button>
-              <button 
-                onClick={() => {
-                  setViewingPaper(p);
-                  setTimeout(() => window.print(), 500);
-                }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors font-medium"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
-            </div>
-            {(profile?.role === 'admin' || profile?.role === 'staff') && (
-              <div className="flex gap-2 mt-2">
-                <button 
-                  onClick={() => handleEditPaper(p)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors font-medium text-sm"
-                >
-                  Edit
-                </button>
-                <button 
-                  onClick={() => handleDeletePaper(p.id!)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl hover:bg-rose-100 transition-colors font-medium text-sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
-              </div>
-            )}
-          </motion.div>
-        ))}
-        {examPapers.filter(p => {
-          const matchesClass = filterPaperClass === 'All' || p.class === filterPaperClass;
-          const matchesSubject = filterPaperSubject === 'All' || p.subject === filterPaperSubject;
-          const matchesSearch = (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                               (p.subject || '').toLowerCase().includes(searchQuery.toLowerCase());
-          return matchesClass && matchesSubject && matchesSearch;
-        }).length === 0 && (
-          <div className="col-span-full text-center py-20 bg-white rounded-[32px] border-2 border-dashed border-slate-100">
-            <FileText className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-slate-900 mb-2">No Papers Found</h3>
-            <p className="text-slate-500 max-w-xs mx-auto">Try adjusting your filters or search query to find what you're looking for.</p>
-          </div>
-        )}
-      </div>
-    </div>
-    ) : activeTab === 'schedule' ? (
-        <div className="space-y-6 print:hidden">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4 flex-1">
-              <select
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                value={filterClass}
-                onChange={(e) => {
-                  setFilterClass(e.target.value);
-                  setFilterSubject('All');
-                }}
-              >
-                <option value="All">All Classes</option>
-                {classes.sort((a, b) => a.className.localeCompare(b.className)).map(c => (
-                  <option key={c.id} value={c.className}>{c.className}</option>
-                ))}
-              </select>
-              <select
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                value={filterSubject}
-                onChange={(e) => setFilterSubject(e.target.value)}
-              >
-                <option value="All">All Subjects</option>
-                {subjects
-                  .filter(s => filterClass === 'All' || s.class === filterClass)
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map(s => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-              </select>
-              <button
-                onClick={generateDateSheet}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-                <button
-                  onClick={() => setScheduleView('cards')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                    scheduleView === 'cards' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  )}
-                >
-                  Cards
-                </button>
-                <button
-                  onClick={() => setScheduleView('grid')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                    scheduleView === 'grid' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  )}
-                >
-                  Grid
-                </button>
-              </div>
-            </div>
-            {(profile?.role === 'admin' || profile?.role === 'staff') && (
-              <button
-                onClick={() => setIsScheduleModalOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 font-bold uppercase tracking-widest text-xs"
-              >
-                <Plus className="w-4 h-4" />
-                Schedule Exam
-              </button>
-            )}
-          </div>
-
-          {scheduleView === 'grid' ? (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Date / Day</th>
-                      {Array.from(new Set(schedules.map(s => s.class))).sort().map(c => (
-                        <th key={c} className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap min-w-[120px]">
-                          Class {c}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {(Array.from(new Set(schedules.map(s => s.date))) as string[])
-                      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
-                      .map(date => {
-                        const dateObj = new Date(date);
-                        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-                        const formattedDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-                        const uniqueClasses = Array.from(new Set(schedules.map(s => s.class))).sort();
-
-                        return (
-                          <tr key={date} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="p-4 whitespace-nowrap">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-bold text-slate-900">{formattedDate}</span>
-                                <span className="text-[10px] text-slate-500 uppercase font-medium">{dayName}</span>
-                              </div>
-                            </td>
-                            {uniqueClasses.map(c => {
-                              const classSchedules = schedules.filter(s => s.date === date && s.class === c);
-                              return (
-                                <td key={c} className="p-4">
-                                  {classSchedules.length > 0 ? (
-                                    <div className="space-y-2">
-                                      {classSchedules.map((s, idx) => (
-                                        <div key={idx} className="bg-indigo-50/50 border border-indigo-100/50 rounded-lg p-2 text-center">
-                                          <p className="text-xs font-bold text-indigo-700 truncate" title={s.subject}>{s.subject}</p>
-                                          <div className="flex items-center justify-center gap-1 mt-1">
-                                            <Clock className="w-2.5 h-2.5 text-indigo-400" />
-                                            <span className="text-[10px] text-indigo-500 font-medium">{s.time}</span>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="text-center py-2">
-                                      <span className="text-[10px] text-slate-300 font-medium">---</span>
-                                    </div>
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {schedules
-                .filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject))
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .map((s) => (
-                <motion.div
-                  key={s.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group"
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
-                  
-                  <div className="flex items-start justify-between mb-4 relative">
-                    <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl">
-                      <Calendar className="w-6 h-6" />
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="px-3 py-1 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
-                        {examTypes.find(t => t.id === s.examTypeId)?.name || 'Exam'}
-                      </span>
-                      <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">
-                        Class {s.class}
-                      </span>
-                    </div>
-                  </div>
-
-                  <h3 className="text-xl font-black text-slate-900 mb-1">{s.subject}</h3>
-                  <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-                    <MapPin className="w-4 h-4" />
-                    Room: {s.roomNumber || 'TBD'}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</p>
-                      <p className="text-sm font-bold text-slate-700">{s.date}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time</p>
-                      <p className="text-sm font-bold text-slate-700">{s.time}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 mb-6">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Invigilators</p>
-                    <div className="flex flex-wrap gap-2">
-                      {s.invigilatorIds.length > 0 ? (
-                        s.invigilatorIds.map(id => {
-                          const sStaff = staff.find(st => st.id === id);
-                          return (
-                            <span key={id} className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-medium border border-slate-100 flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              {sStaff?.name || 'Unknown'}
-                            </span>
-                          );
-                        })
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">No invigilators assigned</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {(profile?.role === 'admin' || profile?.role === 'staff') && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingScheduleId(s.id!);
-                          setNewSchedule(s);
-                          setIsScheduleModalOpen(true);
-                        }}
-                        className="flex-1 py-2 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors text-xs font-bold uppercase tracking-widest"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSchedule(s.id!)}
-                        className="flex-1 py-2 bg-rose-50 text-rose-700 rounded-xl hover:bg-rose-100 transition-colors text-xs font-bold uppercase tracking-widest"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </div>
-          )}
-          {schedules.length === 0 && (
-            <div className="text-center py-20 bg-white rounded-[32px] border-2 border-dashed border-slate-100">
-              <Calendar className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-slate-900 mb-2">No Exams Scheduled</h3>
-              <p className="text-slate-500 max-w-xs mx-auto">Start by scheduling an upcoming exam for your students.</p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm print:hidden">
-            <div className="flex flex-wrap items-center gap-3 flex-1">
-              <select
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                value={selectedResultClass}
-                onChange={(e) => {
-                  setSelectedResultClass(e.target.value);
-                  setSelectedResultSection('');
-                }}
-              >
-                <option value="">Select Class</option>
-                {classes.sort((a, b) => a.className.localeCompare(b.className)).map(c => (
-                  <option key={c.id} value={c.className}>{c.className}</option>
-                ))}
-              </select>
-              <select
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                value={selectedResultSection}
-                onChange={(e) => setSelectedResultSection(e.target.value)}
-              >
-                <option value="">Select Section</option>
-                {classes.find(c => c.className === selectedResultClass)?.sections.map(s => (
-                  <option key={s.id} value={s.sectionName}>{s.sectionName}</option>
-                ))}
-              </select>
-              <select
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                value={selectedResultExamType}
-                onChange={(e) => setSelectedResultExamType(e.target.value)}
-              >
-                <option value="">Select Exam Type</option>
-                {examTypes.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} ({t.term})</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => window.print()}
-                disabled={!selectedResultClass || !selectedResultExamType}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Printer className="w-4 h-4" />
-                Print All Class
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Student</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Roll No</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Total Marks</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Obtained</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Percentage</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Grade</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Position</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students
-                  .filter(s => 
-                    (!selectedResultClass || s.class === selectedResultClass) && 
-                    (!selectedResultSection || s.section === selectedResultSection)
-                  )
-                  .map((student) => {
-                    const result = examResults.find(r => r.studentId === student.id && r.examTypeId === selectedResultExamType);
-                    return (
-                      <tr key={student.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                              {student.name.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-900">{student.name}</p>
-                              <p className="text-xs text-slate-500">{student.parentName}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-slate-600 font-medium">{student.rollNo}</td>
-                        <td className="px-6 py-4 text-center text-slate-600">{result?.totalMax || '-'}</td>
-                        <td className="px-6 py-4 text-center font-bold text-slate-900">{result?.totalObtained || '-'}</td>
-                        <td className="px-6 py-4 text-center">
-                          {result ? (
-                            <span className={cn(
-                              "px-2 py-1 rounded-lg text-xs font-bold",
-                              result.percentage >= 40 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                            )}>
-                              {result.percentage.toFixed(2)}%
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {result ? (
-                            <span className="font-bold text-slate-900">{result.grade}</span>
-                          ) : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {result ? (
-                            <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">
-                              {result.position || '-'}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {result ? (
-                            <span className={cn(
-                              "px-2 py-1 rounded-lg text-xs font-bold",
-                              result.percentage >= 40 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                            )}>
-                              {result.percentage >= 40 ? 'PASS' : 'FAIL'}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => {
-                                setViewingResultCard(student);
-                              }}
-                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                              title="View Result Card"
-                            >
-                              <Award className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleEnterMarks(student);
-                              }}
-                              className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
-                              title="Enter Marks"
-                            >
-                              <FilePlus className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-            {students.filter(s => (!selectedResultClass || s.class === selectedResultClass) && (!selectedResultSection || s.section === selectedResultSection)).length === 0 && (
-              <div className="py-20 text-center">
-                <Users className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                <p className="text-slate-500">No students found for the selected filters.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {renderContent()}
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -1686,6 +1548,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
                     value={schoolSettings?.schoolName || ''}
                     disabled
+                    readOnly
                   />
                 </div>
                 <div>
@@ -2824,47 +2687,55 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       <div className="fixed -left-[9999px] top-0">
         <div 
           ref={dateSheetRef}
-          className="w-[1000px] bg-white p-8"
+          className="w-[1050px] bg-white p-8 font-serif"
         >
           {/* Header */}
           <div className="flex items-center justify-center gap-6 mb-6">
-            <div className="w-20 h-20 flex items-center justify-center">
-              <GraduationCap className="w-16 h-16 text-[#1e3a8a]" />
+            <div className="w-24 h-24 flex items-center justify-center">
+              {schoolSettings?.logoUrl ? (
+                <img src={schoolSettings.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+              ) : (
+                <GraduationCap className="w-20 h-20 text-[#1e3a8a]" />
+              )}
             </div>
-            <div className="text-center">
-              <h1 className="text-4xl font-normal text-slate-900 tracking-tight mb-1">Chenab College Shorkot</h1>
-              <p className="text-slate-900 border-b border-slate-900 inline-block pb-0.5 text-lg">Date Sheet for Final Term Exam Feb. 2026</p>
+            <div className="text-center font-serif">
+              <h1 className="text-5xl font-bold text-slate-900 tracking-tight mb-2 uppercase">
+                {schoolSettings?.schoolName || 'Chenab College Shorkot'}
+              </h1>
+              <p className="text-slate-900 border-b border-slate-900 inline-block pb-0.5 text-xl font-bold">
+                Date Sheet for {examTypes.find(t => t.id === filterExamType)?.name || 'Combined'} Exam {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              </p>
             </div>
           </div>
 
           {/* Table */}
-          <table className="w-full border-collapse border border-slate-800 text-center">
+          <table className="w-full border-collapse border-2 border-slate-900 text-center font-sans text-sm">
             <thead>
-              <tr className="bg-[#4a6b8c] text-white">
-                <th className="p-2 border border-slate-800 font-normal">Date:</th>
-                <th className="p-2 border border-slate-800 font-normal">Day:</th>
-                {Array.from(new Set(schedules.filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject)).map(s => s.class))).sort().map(c => (
-                  <th key={c} className="p-2 border border-slate-800 font-normal">{c}</th>
+              <tr className="bg-slate-600 text-white font-black uppercase text-[15px]">
+                <th className="p-2 border-2 border-slate-900 w-24 tracking-widest bg-slate-700">DATE:</th>
+                <th className="p-2 border-2 border-slate-900 w-32 tracking-widest bg-slate-700">DAY:</th>
+                {Array.from(new Set(schedules.filter(s => (filterClasses.length === 0 || filterClasses.includes(s.class)) && (filterSubject === 'All' || s.subject === filterSubject) && (filterExamType === 'All' || s.examTypeId === filterExamType)).map(s => s.class))).sort().map(c => (
+                  <th key={c} className="p-2 border-2 border-slate-900 tracking-widest">{c}</th>
                 ))}
               </tr>
             </thead>
-            <tbody>
-              {Array.from(new Set(schedules.filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject)).map(s => s.date))).sort((a, b) => new Date(a as string).getTime() - new Date(b as string).getTime()).map(date => {
+            <tbody className="font-bold text-slate-800">
+              {Array.from(new Set(schedules.filter(s => (filterClasses.length === 0 || filterClasses.includes(s.class)) && (filterSubject === 'All' || s.subject === filterSubject) && (filterExamType === 'All' || s.examTypeId === filterExamType)).map(s => s.date))).sort((a, b) => new Date(a as string).getTime() - new Date(b as string).getTime()).map(date => {
                 const dateObj = new Date(date as string);
                 const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
                 const formattedDate = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
-                const filteredSchedules = schedules.filter(s => (filterClass === 'All' || s.class === filterClass) && (filterSubject === 'All' || s.subject === filterSubject));
+                const filteredSchedules = schedules.filter(s => (filterClasses.length === 0 || filterClasses.includes(s.class)) && (filterSubject === 'All' || s.subject === filterSubject) && (filterExamType === 'All' || s.examTypeId === filterExamType));
                 const uniqueClasses = Array.from(new Set(filteredSchedules.map(s => s.class))).sort();
                 
                 return (
                   <tr key={date}>
-                    <td className="p-2 border border-slate-800 font-bold bg-slate-200/50">{formattedDate}</td>
-                    <td className="p-2 border border-slate-800">{dayName}</td>
+                    <td className="py-2 px-1 border-2 border-slate-900 bg-slate-300 tracking-wider whitespace-nowrap">{formattedDate}</td>
+                    <td className="py-2 px-1 border-2 border-slate-900 bg-white">{dayName}</td>
                     {uniqueClasses.map(c => {
                       const schedule = filteredSchedules.find(s => s.date === date && s.class === c);
                       return (
-                        <td key={c} className="p-2 border border-slate-800">
-                          {schedule ? schedule.subject : '---'}
+                        <td key={c} className="py-2 px-1 border-2 border-slate-900 bg-white text-[13px]">
+                          {schedule ? schedule.subject : '-'}
                         </td>
                       );
                     })}
@@ -2875,24 +2746,56 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
           </table>
 
           {/* Footer Notes */}
-          <div className="mt-4 text-left">
-            <p className="font-bold text-lg mb-2">NOTES:-</p>
-            <ul className="space-y-1 pl-4">
+          <div className="mt-4 text-left font-serif">
+            <p className="font-bold text-xl mb-2 uppercase tracking-wide">NOTES:-</p>
+            <ul className="space-y-1.5 pl-4 text-sm font-semibold">
               <li className="flex items-start gap-2">
-                <span className="mt-1">➤</span>
+                <span className="mt-0.5">➤</span>
                 <span>Fee defaulters will not be allowed to sit in the examination.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1">➤</span>
-                <span>Parents / Teacher meeting will be held on <span className="bg-black text-white px-1">Wednesday the 11th of March 2026</span>.</span>
+                <span className="mt-0.5">➤</span>
+                <span>After the Examination, Vehicles will leave the Campus at <span className="underline">12:00 Noon</span></span>
               </li>
             </ul>
+          </div>
+
+          {/* Signatures */}
+          <div className="mt-16 text-sm font-bold font-serif flex items-start justify-between px-8">
+            <div className="space-y-12">
+              <div className="relative">
+                <span>Section Head (Pre-Primary Wing)</span>
+                <div className="absolute -top-8 left-0 right-0 h-12 border-b border-black"></div>
+              </div>
+              <div className="relative">
+                <span>Section Head (Middle Boys Wing)</span>
+                <div className="absolute -top-8 left-0 right-0 h-12 border-b border-black"></div>
+              </div>
+            </div>
+
+            <div className="space-y-12 pl-12 text-center">
+              <div className="relative inline-block min-w-48">
+                <span className="bg-white px-2 relative z-10">Section Head (Middle Girls Wing)</span>
+                <div className="absolute bottom-3 left-0 right-0 border-b border-black"></div>
+              </div>
+              <div className="relative mt-8 inline-block min-w-48 text-left">
+                <span>Exams Head</span>
+                <div className="absolute -top-4 left-24 right-0 h-8 border-b border-black"></div>
+              </div>
+            </div>
+
+            <div className="mt-20">
+              <div className="relative inline-block min-w-32 text-center">
+                <span>Principal</span>
+                <div className="absolute -top-12 left-0 right-0 h-12 border-b border-black"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <AnimatePresence>
-        {isScheduleModalOpen && (
+        {false && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 no-print">
             <motion.div
               initial={{ opacity: 0 }}
@@ -2920,62 +2823,31 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               <form onSubmit={handleSaveSchedule} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">Exam Type</label>
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">EXAM TYPE</label>
                     <select
                       required
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
                       value={newSchedule.examTypeId}
                       onChange={e => setNewSchedule({...newSchedule, examTypeId: e.target.value})}
                     >
-                      <option value="">Select Exam Type</option>
+                      <option value="">SELECT EXAM TYPE</option>
                       {examTypes.map(t => (
-                        <option key={t.id} value={t.id}>{t.name} ({t.term})</option>
+                        <option key={t.id} value={t.id}>{t.name.toUpperCase()} ({t.term.toUpperCase()})</option>
                       ))}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">Class</label>
-                    <select
-                      required
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
-                      value={newSchedule.class}
-                      onChange={e => setNewSchedule({...newSchedule, class: e.target.value, subject: ''})}
-                    >
-                      <option value="">Select Class</option>
-                      {classes.sort((a, b) => a.className.localeCompare(b.className)).map(c => (
-                        <option key={c.id} value={c.className}>{c.className}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">Subject</label>
-                    <select
-                      required
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
-                      value={newSchedule.subject}
-                      onChange={e => setNewSchedule({...newSchedule, subject: e.target.value})}
-                    >
-                      <option value="">Select Subject</option>
-                      {subjects
-                        .filter(s => s.class === newSchedule.class)
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map(s => (
-                          <option key={s.id} value={s.name}>{s.name}</option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">Room Number</label>
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">ROOM NUMBER</label>
                     <input
                       type="text"
-                      placeholder="e.g. Hall A"
+                      placeholder="E.G. HALL A"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
                       value={newSchedule.roomNumber}
                       onChange={e => setNewSchedule({...newSchedule, roomNumber: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">Date</label>
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">DATE</label>
                     <input
                       required
                       type="date"
@@ -2985,7 +2857,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">Time</label>
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">TIME</label>
                     <input
                       required
                       type="time"
@@ -2995,7 +2867,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">Duration (Min)</label>
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">DURATION (MIN)</label>
                     <input
                       required
                       type="number"
@@ -3006,60 +2878,34 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest">Assign Invigilators</label>
-                    <div className="relative w-48">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Search staff..."
-                        className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
-                        value={staffSearch}
-                        onChange={e => setStaffSearch(e.target.value)}
-                      />
+                {!editingScheduleId && (
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-widest leading-relaxed">
+                      ASSIGN SUBJECTS TO CLASSES FOR {new Date(newSchedule.date!).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
+                    </label>
+                    <p className="text-xs text-slate-500 font-medium">Select a subject to schedule an exam for that class on this date. Leave as "-- OFF --" if no exam.</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      {Array.from(new Set(classes.map(c => c.className))).sort().map(className => (
+                        <div key={className} className="space-y-1">
+                          <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">CLASS {className}</label>
+                          <select
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+                            value={bulkClassSubjects[className] || ''}
+                            onChange={e => setBulkClassSubjects({...bulkClassSubjects, [String(className)]: e.target.value})}
+                          >
+                            <option value="">-- OFF --</option>
+                            {subjects
+                              .filter(s => s.class === className)
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .map(s => (
+                                <option key={s.id} value={s.name}>{s.name}</option>
+                              ))}
+                          </select>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                    {staff
-                      .filter(member => (member.name || '').toLowerCase().includes(staffSearch.toLowerCase()))
-                      .map(member => (
-                      <label 
-                        key={member.id} 
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer",
-                          newSchedule.invigilatorIds?.includes(member.id!)
-                            ? "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200"
-                            : "bg-slate-50 border-slate-100 hover:bg-slate-100"
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          className="w-5 h-5 rounded-lg text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                          checked={newSchedule.invigilatorIds?.includes(member.id!)}
-                          onChange={e => {
-                            const ids = newSchedule.invigilatorIds || [];
-                            if (e.target.checked) {
-                              setNewSchedule({...newSchedule, invigilatorIds: [...ids, member.id!]});
-                            } else {
-                              setNewSchedule({...newSchedule, invigilatorIds: ids.filter(id => id !== member.id)});
-                            }
-                          }}
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-bold text-slate-900">{member.name}</p>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-widest">{member.role}</p>
-                        </div>
-                      </label>
-                    ))}
-                    {staff.filter(member => (member.name || '').toLowerCase().includes(staffSearch.toLowerCase())).length === 0 && (
-                      <div className="col-span-full py-8 text-center text-slate-400 text-sm italic">
-                        No staff members found matching your search.
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
 
                 <div className="flex gap-4 pt-4">
                   <button
@@ -3067,13 +2913,13 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                     onClick={() => setIsScheduleModalOpen(false)}
                     className="flex-1 py-4 border border-slate-200 rounded-2xl text-slate-600 font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors"
                   >
-                    Cancel
+                    CANCEL
                   </button>
                   <button
                     type="submit"
                     className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
                   >
-                    {editingScheduleId ? 'Update Schedule' : 'Schedule Exam'}
+                    {editingScheduleId ? 'UPDATE SCHEDULE' : 'SCHEDULE EXAM'}
                   </button>
                 </div>
               </form>
@@ -3118,14 +2964,14 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                         <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Obtained Marks</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-50">
                       {Object.entries(marksEntryData).map(([subject, m]: [string, any]) => (
-                        <tr key={subject} className="border-b border-slate-50">
+                        <tr key={subject} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-4 font-bold text-slate-900">{subject}</td>
                           <td className="px-6 py-4 text-center">
                             <input
                               type="number"
-                              className="w-20 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center outline-none focus:ring-2 focus:ring-indigo-500"
+                              className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center outline-none focus:ring-2 focus:ring-amber-500 text-sm"
                               value={m.total}
                               onChange={e => setMarksEntryData({...marksEntryData, [subject]: {...m, total: Number(e.target.value)}})}
                             />
@@ -3133,7 +2979,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                           <td className="px-6 py-4 text-center">
                             <input
                               type="number"
-                              className="w-20 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center outline-none focus:ring-2 focus:ring-indigo-500"
+                              className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center outline-none focus:ring-2 focus:ring-amber-500 text-sm"
                               value={m.pass}
                               onChange={e => setMarksEntryData({...marksEntryData, [subject]: {...m, pass: Number(e.target.value)}})}
                             />
@@ -3142,15 +2988,81 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                             <input
                               type="number"
                               required
-                              className="w-24 px-4 py-2 bg-white border-2 border-indigo-100 rounded-xl text-center font-bold text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                              className="w-20 px-3 py-1.5 bg-white border-2 border-amber-100 rounded-xl text-center font-bold text-amber-600 outline-none focus:ring-2 focus:ring-amber-500"
                               value={m.obtained}
                               onChange={e => setMarksEntryData({...marksEntryData, [subject]: {...m, obtained: Number(e.target.value)}})}
                             />
                           </td>
                         </tr>
                       ))}
+                      {Object.keys(marksEntryData).length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-12 text-center text-slate-500 italic bg-slate-50/30">
+                            No subjects to display. Add one below.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-6 items-start md:items-center py-6 border-y border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const subName = prompt("Enter Subject Name:");
+                      if (subName && !marksEntryData[subName]) {
+                        setMarksEntryData({
+                          ...marksEntryData,
+                          [subName]: { obtained: 0, total: 100, pass: 40 }
+                        });
+                      }
+                    }}
+                    className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg shadow-slate-200"
+                  >
+                    <Plus className="w-5 h-5" /> Add Subject
+                  </button>
+
+                  <div className="flex-1 w-full grid grid-cols-3 gap-3">
+                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
+                      <p className="text-xl font-black text-slate-900">
+                        {(() => {
+                          const totalObtained = Object.values(marksEntryData).reduce((sum: number, m: any) => sum + (Number(m.obtained) || 0), 0) as number;
+                          const totalMax = Object.values(marksEntryData).reduce((sum: number, m: any) => sum + (Number(m.total) || 0), 0) as number;
+                          return `${totalObtained} / ${totalMax}`;
+                        })()}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">%age</p>
+                      <p className="text-xl font-black text-amber-600">
+                        {(() => {
+                          const totalObtained = Object.values(marksEntryData).reduce((sum: number, m: any) => sum + (Number(m.obtained) || 0), 0) as number;
+                          const totalMax = Object.values(marksEntryData).reduce((sum: number, m: any) => sum + (Number(m.total) || 0), 0) as number;
+                          const percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
+                          return percentage.toFixed(1);
+                        })()}%
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Grade</p>
+                      {(() => {
+                        const totalObtained = Object.values(marksEntryData).reduce((sum: number, m: any) => sum + (Number(m.obtained) || 0), 0) as number;
+                        const totalMax = Object.values(marksEntryData).reduce((sum: number, m: any) => sum + (Number(m.total) || 0), 0) as number;
+                        const percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
+                        const grade = calculateGrade(percentage);
+                        return (
+                          <p className={cn(
+                            "text-xl font-black",
+                            grade === 'F' ? 'text-rose-600' : 'text-emerald-600'
+                          )}>
+                            {grade}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -3167,22 +3079,22 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                   <button
                     type="button"
                     onClick={() => setIsMarksEntryModalOpen(false)}
-                    className="flex-1 py-4 border border-slate-200 rounded-2xl text-slate-600 font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                    className="flex-1 py-4 border-2 border-slate-100 rounded-2xl text-slate-500 font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
                   >
-                    Cancel
+                    CANCEL
                   </button>
                   <button
                     type="submit"
                     disabled={savingResults}
-                    className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
+                    className="flex-1 py-4 bg-[#4f46e5] text-white rounded-2xl font-black uppercase tracking-widest hover:bg-[#4338ca] transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 disabled:opacity-50"
                   >
                     {savingResults ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Saving...
+                        SAVING...
                       </>
                     ) : (
-                      'Save Results'
+                      'SAVE RESULTS'
                     )}
                   </button>
                 </div>
@@ -3400,7 +3312,76 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       </AnimatePresence>
 
       {/* Printable All Result Cards */}
-      <div className="hidden print:block">
+      <div className="hidden print:block px-10 pt-10">
+        {selectedResultClass && selectedResultExamType && (
+          <div className="mb-12 break-after-page">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Result Summary Sheet</h1>
+              <p className="text-lg font-bold text-slate-600">
+                {examTypes.find(et => et.id === selectedResultExamType)?.name} - Class: {selectedResultClass} {selectedResultSection && `(Section: ${selectedResultSection})`}
+              </p>
+              <div className="w-32 h-1 bg-indigo-600 mx-auto mt-4 rounded-full"></div>
+            </div>
+
+            <table className="w-full border-collapse border-2 border-slate-900">
+              <thead>
+                <tr className="bg-slate-900 text-white">
+                  <th className="border-2 border-slate-900 p-2 text-left text-xs font-bold uppercase tracking-widest">Roll No</th>
+                  <th className="border-2 border-slate-900 p-2 text-left text-xs font-bold uppercase tracking-widest">Student Name</th>
+                  <th className="border-2 border-slate-900 p-2 text-center text-xs font-bold uppercase tracking-widest">Obtained</th>
+                  <th className="border-2 border-slate-900 p-2 text-center text-xs font-bold uppercase tracking-widest">Total</th>
+                  <th className="border-2 border-slate-900 p-2 text-center text-xs font-bold uppercase tracking-widest">Percentage</th>
+                  <th className="border-2 border-slate-900 p-2 text-center text-xs font-bold uppercase tracking-widest">Grade</th>
+                  <th className="border-2 border-slate-900 p-2 text-left text-xs font-bold uppercase tracking-widest">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students
+                  .filter(s => 
+                    s.class === selectedResultClass && 
+                    (!selectedResultSection || s.section === selectedResultSection)
+                  )
+                  .map(student => {
+                    const result = examResults.find(r => r.studentId === student.id && r.examTypeId === selectedResultExamType);
+                    return (
+                      <tr key={student.id} className="border-2 border-slate-900">
+                        <td className="border-2 border-slate-900 p-2 font-bold text-sm">{student.rollNumber || student.rollNo}</td>
+                        <td className="border-2 border-slate-900 p-2 font-black text-sm uppercase">{student.name}</td>
+                        <td className="border-2 border-slate-900 p-2 text-center font-black text-sm">{result?.totalObtained || '-'}</td>
+                        <td className="border-2 border-slate-900 p-2 text-center font-bold text-sm text-slate-600">{result?.totalMax || '-'}</td>
+                        <td className="border-2 border-slate-900 p-2 text-center font-black text-sm">
+                          {result ? `${result.percentage.toFixed(1)}%` : '-'}
+                        </td>
+                        <td className="border-2 border-slate-900 p-2 text-center">
+                          {result ? (
+                            <span className="font-black text-sm px-2 py-1 border border-slate-400 rounded">
+                              {result.grade}
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td className="border-2 border-slate-900 p-2 text-xs italic text-slate-700 min-w-[150px]">
+                          {result?.remarks || '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+            
+            <div className="mt-16 grid grid-cols-3 gap-12 text-center">
+              <div className="border-t-2 border-slate-900 pt-2">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">Class Teacher</p>
+              </div>
+              <div className="border-t-2 border-slate-900 pt-2">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">Exam Controller</p>
+              </div>
+              <div className="border-t-2 border-slate-900 pt-2">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">Principal</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {students
           .filter(s => 
             (!selectedResultClass || s.class === selectedResultClass) && 
@@ -3425,4 +3406,4 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       </div>
     </div>
   );
-}
+};

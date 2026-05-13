@@ -2,114 +2,190 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper Functions
-    function isAuthenticated() {
+    // Global safety net - Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
       return request.auth != null;
     }
-    
-    function userExists() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
     }
 
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-    
-    function isAdmin() {
-      return isAuthenticated() && 
-        ( request.auth.token.email == "qaisarabbas6496@gmail.com" || 
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') );
+
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
-    
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "qaisarabbas6496@gmail.com" || 
+        (userExists() && getUserData().role == 'admin')
+      );
+    }
+
     function isStaff() {
-      return isAuthenticated() && ( isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff') );
+      return isSignedIn() && (
+        isAdmin() || 
+        (userExists() && getUserData().role == 'staff')
+      );
     }
 
     function isParent() {
-      return isAuthenticated() && userExists() && getUserData().role == 'parent';
+      return isSignedIn() && userExists() && getUserData().role == 'parent';
     }
 
     function isStudent() {
-      return isAuthenticated() && userExists() && getUserData().role == 'student';
+      return isSignedIn() && userExists() && getUserData().role == 'student';
     }
 
-    // Rules
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // --- Core Entities ---
+
+    match /test/connection {
+      allow read: if true;
+    }
+
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     match /campuses/{campusId} {
-      allow read: if isAuthenticated();
+      allow read: if isSignedIn() || true; 
+      allow write: if isAdmin();
+    }
+
+    match /schools/{id} {
+      allow read: if true;                
+      allow write: if isAdmin();
+    }
+
+    match /website_slugs/{slugId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /school_websites/{siteId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /school_settings/{settingId} {
+      allow read: if true; 
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true; 
       allow write: if isAdmin();
     }
 
     match /students/{studentId} {
-      allow read: if isStaff() || (isParent() && getUserData().studentId == studentId) || (isStudent() && getUserData().studentId == studentId);
+      allow read, list: if true; 
       allow write: if isAdmin();
     }
 
     match /staff/{staffId} {
-      allow read: if isStaff() || (isAuthenticated() && request.auth.uid == staffId);
+      allow read, list: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    match /tasks/{taskId} {
-      allow read: if isStaff() || (isAuthenticated() && request.auth.uid == resource.data.assignedTo);
-      allow create: if isStaff();
-      allow update: if isStaff() || (isAuthenticated() && request.auth.uid == resource.data.assignedTo);
-      allow delete: if isAdmin();
+    match /staff_credentials/{id} {
+      allow read: if true; // Needed for login lookup
+      allow write: if isAdmin();
     }
 
     match /attendance/{id} {
-      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.targetId) || (isStudent() && getUserData().studentId == resource.data.targetId);
+      allow read, list: if isStaff() || 
+                    (isParent() && getUserData().studentId == resource.data.targetId) || 
+                    (isStudent() && getUserData().studentId == resource.data.targetId);
       allow write: if isStaff();
     }
 
-    match /exam_results/{id} {
-      allow read, write: if isAdmin() || isStaff();
-      allow read: if isAuthenticated() && ( (userExists() && getUserData().studentId == resource.data.studentId) );
-    }
-
-    match /results/{id} {
-      allow read, write: if isAdmin() || isStaff();
-      allow read: if isAuthenticated() && ( (userExists() && getUserData().studentId == resource.data.studentId) );
-    }
-
-    match /fee_types/{id} {
-      allow read: if isAuthenticated();
+    match /exam_types/{id} {
+      allow read, list: if true;
       allow write: if isAdmin();
     }
 
+    match /exam_results/{id} {
+      allow read, list: if true;
+      allow write: if isStaff();
+    }
+
+    match /public_admissions/{id} {
+      allow create: if true;
+      allow read, update, delete: if isStaff();
+    }
+
+    match /timetables/{id} {
+      allow read, list: if true;
+      allow write: if isStaff();
+    }
+
+    match /dateSheets/{id} {
+      allow read, list: if true;
+      allow write: if isStaff();
+    }
+
+    match /fees/{id} {
+      allow read, list: if isStaff() || 
+                    (isParent() && getUserData().studentId == resource.data.studentId) || 
+                    (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isStaff();
+    }
+
     match /fee_records/{id} {
-      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
-      allow write: if isAdmin() || isStaff();
+      allow read, list: if isStaff() || 
+                    (isParent() && getUserData().studentId == resource.data.studentId) || 
+                    (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isStaff();
+    }
+
+    match /fee_types/{id} {
+      allow read, list: if isStaff();
+      allow write: if isStaff();
     }
 
     match /payment_history/{id} {
-      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
-      allow write: if isAdmin() || isStaff();
+      allow read, list: if isStaff() || 
+                    (isParent() && getUserData().studentId == resource.data.studentId) || 
+                    (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow write: if isStaff();
     }
 
     match /expenses/{id} {
-      allow read: if isStaff();
+      allow read, list: if isStaff();
       allow write: if isAdmin();
     }
 
     match /payroll/{id} {
-      allow read: if isStaff();
+      allow read, list: if isStaff();
       allow write: if isAdmin();
     }
 
     match /inventory/{id} {
-      allow read: if isStaff();
+      allow read, list: if isStaff();
       allow write: if isAdmin();
     }
 
     match /notices/{id} {
-      allow read: if isAuthenticated();
+      allow read, list: if true;
       allow write: if isAdmin();
     }
 
@@ -117,116 +193,90 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    match /staff_credentials/{staffId} {
-      allow read, write: if isAdmin();
-      allow read: if isAuthenticated() && request.auth.uid == staffId;
-    }
-
     match /syllabus/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isStaff();
-    }
-
-    match /daily_diary/{id} {
-      allow read: if isAuthenticated();
+      allow read, list: if true; 
       allow write: if isStaff();
     }
 
     match /certificates/{id} {
-      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow read, list: if true;
       allow write: if isAdmin();
     }
 
     match /exam_papers/{id} {
-      allow read: if isStaff() || (isStudent() && getUserData().class == resource.data.class);
-      allow write: if isStaff();
-    }
-
-    match /exam_types/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isStaff();
-    }
-
-    match /exam_schedules/{id} {
-      allow read: if isAuthenticated();
+      allow read, list: if isStaff() || (isStudent() && getUserData().class == resource.data.class);
       allow write: if isStaff();
     }
 
     match /library_loans/{id} {
-      allow read: if isStaff() || (isParent() && getUserData().studentId == resource.data.studentId) || (isStudent() && getUserData().studentId == resource.data.studentId);
+      allow read, list: if isStaff() || 
+                    (isParent() && getUserData().studentId == resource.data.studentId) || 
+                    (isStudent() && getUserData().studentId == resource.data.studentId);
       allow write: if isStaff();
     }
 
     match /events/{id} {
-      allow read: if isAuthenticated();
+      allow read, list: if true;
       allow write: if isAdmin();
     }
 
     match /transport_vehicles/{id} {
-      allow read: if isStaff();
+      allow read, list: if isStaff();
       allow write: if isAdmin();
     }
 
     match /transport_routes/{id} {
-      allow read: if isStaff();
+      allow read, list: if isStaff();
       allow write: if isAdmin();
     }
 
     match /transport_fees/{id} {
-      allow read: if isStaff();
-      allow write: if isAdmin();
-    }
-
-    match /subjects/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /classes/{id} {
-      allow read: if isAuthenticated();
+      allow read, list: if isStaff();
       allow write: if isAdmin();
     }
 
     match /leave_requests/{id} {
-      allow read: if isStaff();
+      allow read, list: if isStaff();
       allow create: if isStaff();
       allow update: if isAdmin() || (isStaff() && resource.data.staffId == request.auth.uid);
       allow delete: if isAdmin();
     }
 
     match /leave_balances/{id} {
-      allow read: if isStaff();
+      allow read, list: if isStaff();
       allow write: if isAdmin();
     }
 
-    match /settings/{id} {
-      allow read: if isAuthenticated();
+    match /subjects/{id} {
+      allow read, list: if true;
       allow write: if isAdmin();
     }
 
-    match /school_settings/{id} {
-      allow read: if isAuthenticated();
+    match /classes/{id} {
+      allow read, list: if true;
       allow write: if isAdmin();
     }
 
     match /shop_items/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isStaff();
+      allow read, list: if true;
+      allow write: if isStaff();
     }
 
     match /shop_sales/{id} {
-      allow read: if isStaff();
-      allow write: if isAdmin();
+      allow read, list: if isStaff();
+      allow write: if isStaff();
+    }
+
+    match /tasks/{taskId} {
+      allow read, list: if isStaff() || (isSignedIn() && (request.auth.uid == resource.data.assignedTo || request.auth.uid in resource.data.assignedToIds));
+      allow create: if isStaff();
+      allow update: if isStaff() || (isSignedIn() && (request.auth.uid == resource.data.assignedTo || request.auth.uid in resource.data.assignedToIds));
+      allow delete: if isAdmin();
     }
 
     match /school_applications/{id} {
       allow create: if true;
-      allow read, update, delete: if isAdmin();
-    }
-
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
+      allow read, list, update, delete: if isAdmin();
     }
   }
 }

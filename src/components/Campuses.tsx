@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Campus, UserProfile } from '../types';
 import { School, Plus, Search, MapPin, Phone, Building2 } from 'lucide-react';
@@ -9,10 +9,13 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
   const [campuses, setCampuses] = useState<Campus[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeCampus, setActiveCampus] = useState<Campus | null>(null);
   const [newCampus, setNewCampus] = useState<Partial<Campus>>({
     name: '',
     location: '',
     contact: '',
+    headOfCampusName: '',
+    headOfCampusContact: '',
   });
 
   useEffect(() => {
@@ -31,15 +34,37 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
     }
   };
 
-  const handleAddCampus = async (e: React.FormEvent) => {
+  const handleSaveCampus = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'campuses'), newCampus);
+      if (activeCampus?.id) {
+        await updateDoc(doc(db, 'campuses', activeCampus.id), newCampus);
+      } else {
+        await addDoc(collection(db, 'campuses'), newCampus);
+      }
       setIsModalOpen(false);
+      setActiveCampus(null);
+      setNewCampus({ name: '', location: '', contact: '', headOfCampusName: '', headOfCampusContact: '' });
       fetchCampuses();
     } catch (error) {
-      console.error("Error adding campus:", error);
+      console.error("Error saving campus:", error);
     }
+  };
+
+  const handleDeleteCampus = async (id: string | undefined) => {
+    if (!id || !confirm("Are you sure you want to delete this campus?")) return;
+    try {
+      await deleteDoc(doc(db, 'campuses', id));
+      fetchCampuses();
+    } catch (error) {
+      console.error("Error deleting campus:", error);
+    }
+  };
+
+  const startEdit = (campus: Campus) => {
+    setActiveCampus(campus);
+    setNewCampus(campus);
+    setIsModalOpen(true);
   };
 
   return (
@@ -72,6 +97,12 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
               <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
                 <Building2 className="w-6 h-6" />
               </div>
+              {profile?.role === 'admin' && (
+                <div className="flex gap-2">
+                  <button onClick={() => startEdit(c)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">Edit</button>
+                  <button onClick={() => handleDeleteCampus(c.id)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors">Delete</button>
+                </div>
+              )}
               {profile?.campusId === c.id && (
                 <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold">
                   Current
@@ -88,6 +119,12 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
                 <Phone className="w-4 h-4" />
                 {c.contact}
               </div>
+              {c.headOfCampusName && (
+                <div className="text-xs text-slate-500 pt-2 border-t mt-2">
+                  <p>Head: {c.headOfCampusName}</p>
+                  <p>{c.headOfCampusContact}</p>
+                </div>
+              )}
             </div>
           </motion.div>
         ))}
@@ -100,15 +137,15 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
           >
-            <h2 className="text-xl font-bold mb-4">Add New Campus</h2>
-            <form onSubmit={handleAddCampus} className="space-y-4">
+            <h2 className="text-xl font-bold mb-4">{activeCampus ? 'Edit Campus' : 'Add New Campus'}</h2>
+            <form onSubmit={handleSaveCampus} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Campus Name</label>
                 <input
                   type="text"
                   required
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={newCampus.name}
+                  value={newCampus.name || ''}
                   onChange={e => setNewCampus({...newCampus, name: e.target.value})}
                 />
               </div>
@@ -118,7 +155,7 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
                   type="text"
                   required
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={newCampus.location}
+                  value={newCampus.location || ''}
                   onChange={e => setNewCampus({...newCampus, location: e.target.value})}
                 />
               </div>
@@ -128,14 +165,36 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
                   type="text"
                   required
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={newCampus.contact}
+                  value={newCampus.contact || ''}
                   onChange={e => setNewCampus({...newCampus, contact: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Head of Campus Name</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={newCampus.headOfCampusName || ''}
+                  onChange={e => setNewCampus({...newCampus, headOfCampusName: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Head of Campus Contact</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={newCampus.headOfCampusContact || ''}
+                  onChange={e => setNewCampus({...newCampus, headOfCampusContact: e.target.value})}
                 />
               </div>
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setActiveCampus(null);
+                    setNewCampus({ name: '', location: '', contact: '', headOfCampusName: '', headOfCampusContact: '' });
+                  }}
                   className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   Cancel
@@ -144,7 +203,7 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors"
                 >
-                  Save Campus
+                  {activeCampus ? 'Update Campus' : 'Save Campus'}
                 </button>
               </div>
             </form>

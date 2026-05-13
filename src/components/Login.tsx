@@ -8,16 +8,43 @@ import { Link } from 'react-router-dom';
 
 export default function Login() {
   const [loginType, setLoginType] = useState<'google' | 'staff'>('google');
+  const [domain, setDomain] = useState('');
+  const [brandName, setBrandName] = useState('EduManage Pro');
   const [staffCreds, setStaffCreds] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const handleDomainChange = async (val: string) => {
+    setDomain(val);
+    if (!val) {
+      setBrandName('EduManage Pro');
+      return;
+    }
+    try {
+      const q = query(collection(db, 'schools'), where('domain', '==', val));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setBrandName(snap.docs[0].data().name);
+      } else {
+        setBrandName('EduManage Pro');
+      }
+    } catch (e) {
+      console.error(e);
+      setBrandName('EduManage Pro');
+    }
+  };
+
   const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError('');
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error);
+      setError('Login failed: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,9 +94,21 @@ export default function Login() {
         <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-6">
           <School className="w-8 h-8 text-indigo-600" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">EduManage Pro</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{brandName}</h1>
         <p className="text-gray-600 mb-8">Your complete digital school management partner.</p>
         
+        <div className="mb-6 text-left">
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Your school web address</label>
+          <div className="flex bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+            <div className="px-4 py-3 bg-white text-slate-400 font-medium text-sm flex items-center border-r border-slate-200">pakeducate.com/</div>
+            <input 
+              className="flex-1 px-4 py-3 bg-transparent outline-none text-sm text-gray-900"
+              placeholder="e.g. wali, tcsl-lahore"
+              value={domain}
+              onChange={e => handleDomainChange(e.target.value)}
+            />
+          </div>
+        </div>
         <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
           <button
             onClick={() => setLoginType('google')}
@@ -100,11 +139,17 @@ export default function Login() {
             >
               <button
                 onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+                disabled={loading || !domain}
+                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
               >
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                Sign in with Google
+                {loading ? 'Signing in...' : 'Sign in with Google'}
               </button>
+
+              {error && loginType === 'google' && (
+                <p className="text-rose-500 text-xs font-bold text-center mt-2">{error}</p>
+              )}
+
 
               <Link
                 to="/register"

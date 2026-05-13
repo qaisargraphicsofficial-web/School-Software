@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, writeBatch, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, Student, Staff, ClassGroup, ClassSection } from '../types';
-import { FileText, Users, UserPlus, ArrowUp, Plus, Edit2, Trash2, X, LayoutGrid, Loader2, CheckCircle2, User, ChevronDown, ChevronRight, GraduationCap, UserCheck } from 'lucide-react';
+import { FileText, Users, UserPlus, ArrowUp, Plus, Edit2, Trash2, X, LayoutGrid, Loader2, CheckCircle2, User, ChevronDown, ChevronRight, GraduationCap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -57,52 +57,97 @@ export default function Classes({ profile }: ClassesProps) {
       const campusId = profile?.campusId || 'main';
       
       // 1. Fetch Class Definitions
-      const classesQ = query(collection(db, 'classes'), where('campusId', '==', campusId));
-      const classesSnap = await getDocs(classesQ);
+      let classesQ = query(collection(db, 'classes'), where('campusId', '==', campusId));
+      let classesSnap = await getDocs(classesQ);
       let classDefs = classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup));
+      
+      // Fallback
+      if (classDefs.length === 0) {
+        classesSnap = await getDocs(query(collection(db, 'classes')));
+        classDefs = classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup));
+      }
 
       // 2. Fetch Students for counts
-      const studentsQ = query(collection(db, 'students'), where('campusId', '==', campusId));
-      const studentsSnap = await getDocs(studentsQ);
-      const students = studentsSnap.docs.map(doc => doc.data() as Student);
+      let studentsQ = query(collection(db, 'students'), where('campusId', '==', campusId));
+      let studentsSnap = await getDocs(studentsQ);
+      let students = studentsSnap.docs.map(doc => doc.data() as Student);
+      
+      // Fallback
+      if (students.length === 0) {
+        studentsSnap = await getDocs(query(collection(db, 'students')));
+        students = studentsSnap.docs.map(doc => doc.data() as Student);
+      }
 
       // 3. Fetch Staff for teacher names
-      const staffQ = query(collection(db, 'staff'), where('campusId', '==', campusId));
-      const staffSnap = await getDocs(staffQ);
-      const staffList = staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
+      let staffQ = query(collection(db, 'staff'), where('campusId', '==', campusId));
+      let staffSnap = await getDocs(staffQ);
+      let staffList = staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
+      
+      // Fallback
+      if (staffList.length === 0) {
+        staffSnap = await getDocs(query(collection(db, 'staff')));
+        staffList = staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
+      }
       setStaff(staffList);
 
-      // 4. If no classes exist, initialize from students
-      if (classDefs.length === 0 && students.length > 0) {
-        const initialGroups: Record<string, ClassGroup> = {};
+      // 4. Initialize missing classes/sections from students
+      if (students.length > 0) {
+        let hasChanges = false;
+        const missingGroups: Record<string, ClassGroup> = {};
+
         students.forEach(s => {
-          if (!initialGroups[s.class]) {
-            initialGroups[s.class] = {
+          if (!s.class) return;
+          
+          const existingDef = classDefs.find(c => c.className === s.class) || missingGroups[s.class];
+          
+          if (!existingDef) {
+            missingGroups[s.class] = {
               className: s.class,
-              sections: [],
+              sections: s.section ? [{
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                name: s.section,
+                teacherIds: []
+              }] : [],
               campusId
             };
-          }
-          if (!initialGroups[s.class].sections.find(sec => sec.name === s.section)) {
-            initialGroups[s.class].sections.push({
-              id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-              name: s.section,
-              teacherIds: []
-            });
+            hasChanges = true;
+          } else if (s.section && !existingDef.sections.find(sec => sec.name === s.section)) {
+            // Class exists but section is missing
+            if (missingGroups[s.class]) {
+              missingGroups[s.class].sections.push({
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                name: s.section,
+                teacherIds: []
+              });
+            } else {
+              // Need to update the existing class document in Firestore
+              existingDef.sections.push({
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                name: s.section,
+                teacherIds: []
+              });
+              // We'll update it directly 
+              updateDoc(doc(db, 'classes', existingDef.id!), { sections: existingDef.sections });
+              hasChanges = true; // Not technically a new doc, just an update, but we'll refetch just in case
+            }
           }
         });
         
-        // Save these initial classes to Firestore
-        const batch = writeBatch(db);
-        Object.values(initialGroups).forEach(group => {
-          const newDocRef = doc(collection(db, 'classes'));
-          batch.set(newDocRef, group);
-        });
-        await batch.commit();
-        
-        // Refetch
-        const newClassesSnap = await getDocs(classesQ);
-        classDefs = newClassesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup));
+        if (Object.keys(missingGroups).length > 0) {
+          const batch = writeBatch(db);
+          Object.values(missingGroups).forEach(group => {
+            const newDocRef = doc(collection(db, 'classes'));
+            batch.set(newDocRef, group);
+          });
+          await batch.commit();
+          hasChanges = true;
+        }
+
+        if (hasChanges) {
+          // Refetch
+          const newClassesSnap = await getDocs(classesQ);
+          classDefs = newClassesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup));
+        }
       }
 
       // 5. Merge data
@@ -121,7 +166,13 @@ export default function Classes({ profile }: ClassesProps) {
 
       // Sort classes
       const sortedGroups = mergedGroups.sort((a, b) => {
-        return classes.indexOf(a.className) - classes.indexOf(b.className);
+        const indexA = classes.indexOf(a.className);
+        const indexB = classes.indexOf(b.className);
+        
+        if (indexA === -1 && indexB === -1) return a.className.localeCompare(b.className);
+        if (indexA === -1) return 1; // Put custom classes at the end
+        if (indexB === -1) return -1;
+        return indexA - indexB;
       });
 
       setClassGroups(sortedGroups);
@@ -345,57 +396,6 @@ export default function Classes({ profile }: ClassesProps) {
     }
   };
 
-  const assignJohnDoeToClass10A = async () => {
-    try {
-      // 1. Find John Doe
-      const staffQ = query(collection(db, 'staff'), where('name', '==', 'John Doe'));
-      const staffSnap = await getDocs(staffQ);
-      if (staffSnap.empty) {
-        alert("John Doe not found in staff records.");
-        return;
-      }
-      const johnDoeId = staffSnap.docs[0].id;
-
-      // 2. Find Class 10
-      const classQ = query(collection(db, 'classes'), where('className', '==', 'Class 10'));
-      const classSnap = await getDocs(classQ);
-      if (classSnap.empty) {
-        alert("Class 10 not found.");
-        return;
-      }
-      const classDoc = classSnap.docs[0];
-      const classData = classDoc.data() as ClassGroup;
-
-      // 3. Find Section A and update
-      let sectionFound = false;
-      const updatedSections = classData.sections.map(section => {
-        if (section.name === 'A') {
-          sectionFound = true;
-          const teacherIds = section.teacherIds.includes(johnDoeId)
-            ? section.teacherIds
-            : [...section.teacherIds, johnDoeId];
-          return { ...section, teacherIds };
-        }
-        return section;
-      });
-
-      if (!sectionFound) {
-        alert("Section A not found in Class 10.");
-        return;
-      }
-
-      await updateDoc(doc(db, 'classes', classDoc.id), {
-        sections: updatedSections
-      });
-
-      alert("Successfully assigned John Doe to Class 10 Section A!");
-      fetchClasses();
-    } catch (error) {
-      console.error("Error assigning John Doe:", error);
-      alert("Failed to assign John Doe.");
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -406,15 +406,7 @@ export default function Classes({ profile }: ClassesProps) {
           </p>
         </div>
         <div className="flex gap-3">
-          {profile?.role === 'admin' && (
-            <button 
-              onClick={assignJohnDoeToClass10A}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-bold text-sm shadow-sm"
-            >
-              <UserCheck className="w-4 h-4" />
-              Assign John Doe (10A)
-            </button>
-          )}
+
           <button 
             onClick={() => setIsPromoteModalOpen(true)}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-[#00a669] text-white rounded-lg hover:bg-[#008f5a] transition-colors font-bold text-sm shadow-sm"

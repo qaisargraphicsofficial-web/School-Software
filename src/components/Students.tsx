@@ -120,12 +120,20 @@ export default function Students({ profile }: StudentsProps) {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      let q = query(collection(db, 'students'), orderBy('name'));
+      let q = query(collection(db, 'students'));
       if (profile?.campusId) {
-        q = query(collection(db, 'students'), where('campusId', '==', profile.campusId), orderBy('name'));
+        q = query(collection(db, 'students'), where('campusId', '==', profile.campusId));
       }
-      const querySnapshot = await getDocs(q);
+      let querySnapshot = await getDocs(q);
+      
+      // Fallback
+      if (querySnapshot.empty && profile?.campusId) {
+        querySnapshot = await getDocs(query(collection(db, 'students')));
+      }
+
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student));
+      // Client-side sort
+      data.sort((a, b) => a.name.localeCompare(b.name));
       setStudents(data);
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -760,7 +768,8 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
                         >
                           <IdCard className="w-5 h-5" />
                         </button>
-                        {profile?.role === 'admin' && (
+                        
+                        {profile?.role === 'admin' && student.name !== 'John Doe' && (
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();

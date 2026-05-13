@@ -142,42 +142,9 @@ export const ReportCard: React.FC<ReportCardProps> = ({
   );
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
-      {/* Sidebar Inputs */}
-      <div className="w-1/3 bg-white p-6 overflow-y-auto border-r border-slate-200 hidden-print">
-        <h2 className="text-xl font-bold mb-6">Enter Student Marks</h2>
-        <div className="space-y-4">
-          <input 
-            value={studentName} 
-            onChange={(e) => setStudentName(e.target.value)}
-            className="w-full p-2 border rounded"
-            placeholder="Student Name"
-          />
-          {Object.entries(editedResult.marks).map(([subject, m]: [string, any]) => (
-            <div key={subject} className="grid grid-cols-2 gap-2">
-              <label className="text-sm font-medium">{subject}</label>
-              <input 
-                type="number"
-                value={m.obtained}
-                onChange={(e) => handleMarkChange(subject, 'obtained', Number(e.target.value))}
-                className="w-full p-1 border rounded"
-              />
-            </div>
-          ))}
-        </div>
-        <button 
-          onClick={() => window.print()}
-          className="mt-8 w-full bg-indigo-600 text-white p-3 rounded-lg flex items-center justify-center gap-2"
-        >
-          <Printer size={18} /> Print Report
-        </button>
-      </div>
-
-      {/* Preview Area */}
-      <div className="w-2/3 p-6 overflow-y-auto print:w-full print:p-0">
-        <div className="print:block">
-          <PreviewContent />
-        </div>
+    <div className="bg-slate-50 p-0 md:p-8 flex justify-center items-center min-h-screen print:bg-white print:block print:p-0">
+      <div className="print:block">
+        <PreviewContent />
       </div>
     </div>
   );

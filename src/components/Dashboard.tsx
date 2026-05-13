@@ -83,13 +83,17 @@ export default function Dashboard({ profile }: DashboardProps) {
       q = query(
         collection(db, 'tasks'),
         where('assignedToIds', 'array-contains', profile.uid),
-        orderBy('createdAt', 'desc'),
-        limit(5)
+        limit(20)
       );
     }
 
     const unsubscribeTasks = onSnapshot(q, (snap) => {
-      setRecentTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
+      let fetchedTasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+      if (profile.role !== 'admin' && profile.role !== 'staff') {
+        fetchedTasks.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+        fetchedTasks = fetchedTasks.slice(0, 5);
+      }
+      setRecentTasks(fetchedTasks);
     }, (error) => {
       console.error("Error in task listener:", error);
       if (error.code === 'permission-denied') {

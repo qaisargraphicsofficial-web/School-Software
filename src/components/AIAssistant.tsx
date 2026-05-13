@@ -299,25 +299,6 @@ const getSyllabus = {
   },
 };
 
-const getDailyDiary = {
-  name: "get_daily_diary",
-  description: "Get daily diary entries (homework/tasks) for a specific class and date.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      className: {
-        type: Type.STRING,
-        description: "The name of the class.",
-      },
-      date: {
-        type: Type.STRING,
-        description: "The date (YYYY-MM-DD).",
-      },
-    },
-    required: ["className", "date"],
-  },
-};
-
 const getCertificates = {
   name: "get_certificates",
   description: "Get digital certificates issued to a specific student.",
@@ -727,13 +708,6 @@ const tools = {
       .filter((s: any) => s.class === className);
     return { class: className, syllabus: results };
   },
-  get_daily_diary: async ({ className, date }: any) => {
-    const snap = await getDocs(collection(db, 'daily_diary'));
-    const results = snap.docs
-      .map(doc => doc.data())
-      .filter((d: any) => d.class === className && d.date === date);
-    return { class: className, date, entries: results };
-  },
   get_certificates: async ({ studentId }: any) => {
     const snap = await getDocs(collection(db, 'certificates'));
     const results = snap.docs
@@ -990,7 +964,6 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
             getSubjectPerformance,
             getCampuses,
             getSyllabus,
-            getDailyDiary,
             getCertificates,
             getExamPapers,
             sendBulkMessage,

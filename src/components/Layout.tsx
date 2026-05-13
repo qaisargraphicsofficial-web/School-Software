@@ -222,7 +222,6 @@ export default function Layout({ profile }: LayoutProps) {
     { name: 'Library', icon: Library, path: '/library', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
     { name: 'Inventory', icon: Package, path: '/inventory', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
     { name: 'Curriculum', icon: BookText, path: '/curriculum', roles: ['admin', 'staff'], category: 'ACADEMICS' },
-    { name: 'Diary', icon: BookOpen, path: '/diary', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
     { name: 'Certificates', icon: Award, path: '/certificates', roles: ['admin', 'staff'], category: 'ACADEMICS' },
     { name: 'School Shop', icon: Package, path: '/school-shop', roles: ['admin'], category: 'STAFF & OPS' },
     { name: 'Transport', icon: Bus, path: '/transport', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
@@ -255,10 +254,10 @@ export default function Layout({ profile }: LayoutProps) {
   const categoryOrder = ['OVERVIEW', 'ACADEMICS', 'EXAMINATIONS', 'FINANCE', 'STAFF & OPS', 'COMMUNICATION', 'AI & SETTINGS', 'OTHER'];
 
   return (
-    <div className="h-screen bg-slate-50 flex overflow-hidden">
+    <div className="h-screen print:h-auto bg-slate-50 flex overflow-hidden print:overflow-visible">
       {/* Sidebar for Desktop */}
       <aside className={cn(
-        "h-screen overflow-y-auto fixed left-0 z-50 w-72 bg-white border-r border-slate-200 transition-transform duration-300 lg:translate-x-0 lg:static no-print",
+        "h-screen print:hidden overflow-y-auto fixed left-0 z-50 w-72 bg-white border-r border-slate-200 transition-transform duration-300 lg:translate-x-0 lg:static no-print",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="min-h-full flex flex-col">
@@ -353,9 +352,9 @@ export default function Layout({ profile }: LayoutProps) {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-screen print:h-auto overflow-hidden print:overflow-visible">
         {/* Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-40 no-print shrink-0">
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 lg:px-10 sticky top-0 z-40 no-print shrink-0 print:hidden">
           <div className="flex items-center gap-8 flex-1">
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -484,7 +483,7 @@ export default function Layout({ profile }: LayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+        <main className="flex-1 overflow-y-auto print:overflow-visible p-4 lg:p-8 print:p-0">
           <Outlet />
         </main>
       </div>

@@ -126,16 +126,6 @@ export const seedData = async (campusId: string = 'main') => {
       campusId,
       createdAt: new Date().toISOString()
     });
-
-    const diaryRef = doc(collection(db, 'daily_diary'));
-    batch.set(diaryRef, {
-      class: className,
-      section: 'A',
-      subject: 'Math',
-      date: new Date().toISOString().split('T')[0],
-      homework: 'Solve exercise 2.1 on notebook.',
-      campusId
-    });
   }
 
   await batch.commit();

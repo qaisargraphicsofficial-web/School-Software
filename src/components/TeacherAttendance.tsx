@@ -33,11 +33,11 @@ export default function TeacherAttendance({ profile }: TeacherAttendanceProps) {
       const q = query(
         collection(db, 'attendance'),
         where('targetId', '==', profile.uid),
-        where('targetType', '==', 'staff'),
-        orderBy('date', 'desc')
+        where('targetType', '==', 'staff')
       );
       const snapshot = await getDocs(q);
       const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance));
+      records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setHistory(records);
     } catch (error) {
       console.error('Error fetching attendance:', error);

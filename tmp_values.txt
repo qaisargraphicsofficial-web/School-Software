@@ -1,0 +1,1503 @@
+src/components/AIAssistant.tsx-1315-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/AIAssistant.tsx:1316:                  value={input}
+src/components/AIAssistant.tsx-1317-                  onChange={(e) => setInput(e.target.value)}
+--
+src/components/Academic.tsx-420-            <select 
+src/components/Academic.tsx:421:            value={selectedClass}
+src/components/Academic.tsx-422-            onChange={(e) => setSelectedClass(e.target.value)}
+--
+src/components/Academic.tsx-424-          >
+src/components/Academic.tsx:425:            <option value="All">All Classes</option>
+src/components/Academic.tsx-426-            {classGroups.map(group => (
+src/components/Academic.tsx:427:              <option key={group.id} value={group.className}>{group.className}</option>
+src/components/Academic.tsx-428-            ))}
+--
+src/components/Academic.tsx-434-            type="date"
+src/components/Academic.tsx:435:            value={selectedDate}
+src/components/Academic.tsx-436-            onChange={(e) => setSelectedDate(e.target.value)}
+--
+src/components/Academic.tsx-501-                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 mb-4">
+src/components/Academic.tsx:502:                          <QRCodeSVG value={student.id || student.rollNumber} size={100} />
+src/components/Academic.tsx-503-                        </div>
+--
+src/components/Campuses.tsx-110-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Campuses.tsx:111:                  value={newCampus.name}
+src/components/Campuses.tsx-112-                  onChange={e => setNewCampus({...newCampus, name: e.target.value})}
+--
+src/components/Campuses.tsx-120-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Campuses.tsx:121:                  value={newCampus.location}
+src/components/Campuses.tsx-122-                  onChange={e => setNewCampus({...newCampus, location: e.target.value})}
+--
+src/components/Campuses.tsx-130-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Campuses.tsx:131:                  value={newCampus.contact}
+src/components/Campuses.tsx-132-                  onChange={e => setNewCampus({...newCampus, contact: e.target.value})}
+--
+src/components/Certificates.tsx-230-              placeholder="Search certificates..."
+src/components/Certificates.tsx:231:              value={searchQuery}
+src/components/Certificates.tsx-232-              onChange={(e) => setSearchQuery(e.target.value)}
+--
+src/components/Certificates.tsx-415-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+src/components/Certificates.tsx:416:                        value={formData.studentId}
+src/components/Certificates.tsx-417-                        onChange={e => handleStudentChange(e.target.value)}
+src/components/Certificates.tsx-418-                      >
+src/components/Certificates.tsx:419:                        <option value="">Select a student</option>
+src/components/Certificates.tsx-420-                        {students.map(s => (
+src/components/Certificates.tsx:421:                          <option key={s.id} value={s.id}>{s.name} ({s.rollNumber})</option>
+src/components/Certificates.tsx-422-                        ))}
+--
+src/components/Certificates.tsx-430-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+src/components/Certificates.tsx:431:                        value={formData.type}
+src/components/Certificates.tsx-432-                        onChange={e => setFormData({...formData, type: e.target.value as any})}
+src/components/Certificates.tsx-433-                      >
+src/components/Certificates.tsx:434:                        <option value="achievement">Achievement</option>
+src/components/Certificates.tsx:435:                        <option value="completion">Completion</option>
+src/components/Certificates.tsx:436:                        <option value="participation">Participation</option>
+src/components/Certificates.tsx:437:                        <option value="excellence">Excellence</option>
+src/components/Certificates.tsx:438:                        <option value="custom">Custom</option>
+src/components/Certificates.tsx-439-                      </select>
+--
+src/components/Certificates.tsx-447-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+src/components/Certificates.tsx:448:                        value={formData.date}
+src/components/Certificates.tsx-449-                        onChange={e => setFormData({...formData, date: e.target.value})}
+--
+src/components/Certificates.tsx-460-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+src/components/Certificates.tsx:461:                        value={formData.title}
+src/components/Certificates.tsx-462-                        onChange={e => setFormData({...formData, title: e.target.value})}
+--
+src/components/Certificates.tsx-471-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+src/components/Certificates.tsx:472:                        value={formData.subTitle}
+src/components/Certificates.tsx-473-                        onChange={e => setFormData({...formData, subTitle: e.target.value})}
+--
+src/components/Certificates.tsx-482-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none"
+src/components/Certificates.tsx:483:                        value={formData.content}
+src/components/Certificates.tsx-484-                        onChange={e => setFormData({...formData, content: e.target.value})}
+--
+src/components/Certificates.tsx-493-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+src/components/Certificates.tsx:494:                          value={formData.signature1Label}
+src/components/Certificates.tsx-495-                          onChange={e => setFormData({...formData, signature1Label: e.target.value})}
+--
+src/components/Certificates.tsx-502-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+src/components/Certificates.tsx:503:                          value={formData.signature2Label}
+src/components/Certificates.tsx-504-                          onChange={e => setFormData({...formData, signature2Label: e.target.value})}
+--
+src/components/Classes.tsx-708-                    placeholder="e.g., Class 10"
+src/components/Classes.tsx:709:                    value={newClassName}
+src/components/Classes.tsx-710-                    onChange={(e) => setNewClassName(e.target.value)}
+--
+src/components/Classes.tsx-720-                      placeholder="e.g., Section A"
+src/components/Classes.tsx:721:                      value={newSectionName}
+src/components/Classes.tsx-722-                      onChange={(e) => setNewSectionName(e.target.value)}
+--
+src/components/Classes.tsx-843-                      <select 
+src/components/Classes.tsx:844:                        value={promotionData.fromClass}
+src/components/Classes.tsx-845-                        onChange={(e) => setPromotionData({ ...promotionData, fromClass: e.target.value })}
+--
+src/components/Classes.tsx-847-                      >
+src/components/Classes.tsx:848:                        <option value="">Select Source Class</option>
+src/components/Classes.tsx-849-                        {classes.map(c => (
+src/components/Classes.tsx:850:                          <option key={c} value={c}>{c}</option>
+src/components/Classes.tsx-851-                        ))}
+--
+src/components/Classes.tsx-856-                      <select 
+src/components/Classes.tsx:857:                        value={promotionData.toClass}
+src/components/Classes.tsx-858-                        onChange={(e) => setPromotionData({ ...promotionData, toClass: e.target.value })}
+--
+src/components/Classes.tsx-860-                      >
+src/components/Classes.tsx:861:                        <option value="">Select Target Class</option>
+src/components/Classes.tsx-862-                        {classes.map(c => (
+src/components/Classes.tsx:863:                          <option key={c} value={c}>{c}</option>
+src/components/Classes.tsx-864-                        ))}
+--
+src/components/Communication.tsx-809-                  type="date"
+src/components/Communication.tsx:810:                  value={selectedAbsentDate}
+src/components/Communication.tsx-811-                  onChange={(e) => handleDateChange(e.target.value)}
+--
+src/components/Communication.tsx-818-                <select
+src/components/Communication.tsx:819:                  value={selectedAbsentClass}
+src/components/Communication.tsx-820-                  onChange={(e) => setSelectedAbsentClass(e.target.value)}
+--
+src/components/Communication.tsx-822-                >
+src/components/Communication.tsx:823:                  <option value="All">All Classes</option>
+src/components/Communication.tsx-824-                  {classes.map(c => {
+--
+src/components/Communication.tsx-826-                    return (
+src/components/Communication.tsx:827:                      <option key={c.id} value={name}>{name}</option>
+src/components/Communication.tsx-828-                    );
+--
+src/components/Communication.tsx-1108-                        className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-lg text-center"
+src/components/Communication.tsx:1109:                        value={linkingRollNumber}
+src/components/Communication.tsx-1110-                        onChange={(e) => setLinkingRollNumber(e.target.value)}
+--
+src/components/Communication.tsx-1491-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Communication.tsx:1492:                    value={formData.title}
+src/components/Communication.tsx-1493-                    onChange={e => setFormData({...formData, title: e.target.value})}
+--
+src/components/Communication.tsx-1500-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Communication.tsx:1501:                    value={formData.targetAudience}
+src/components/Communication.tsx-1502-                    onChange={e => setFormData({...formData, targetAudience: e.target.value as any})}
+src/components/Communication.tsx-1503-                  >
+src/components/Communication.tsx:1504:                    <option value="all">All</option>
+src/components/Communication.tsx:1505:                    <option value="parents">Parents Only</option>
+src/components/Communication.tsx:1506:                    <option value="staff">Staff Only</option>
+src/components/Communication.tsx-1507-                  </select>
+--
+src/components/Communication.tsx-1514-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Communication.tsx:1515:                    value={formData.content}
+src/components/Communication.tsx-1516-                    onChange={e => setFormData({...formData, content: e.target.value})}
+--
+src/components/Communication.tsx-1603-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Communication.tsx:1604:                    value={selectedTemplate}
+src/components/Communication.tsx-1605-                    onChange={e => handleTemplateSelect(e.target.value)}
+src/components/Communication.tsx-1606-                  >
+src/components/Communication.tsx:1607:                    <option value="">Select a template...</option>
+src/components/Communication.tsx-1608-                    {templates.map(t => (
+src/components/Communication.tsx:1609:                      <option key={t.id} value={t.id}>{t.name}</option>
+src/components/Communication.tsx-1610-                    ))}
+--
+src/components/Communication.tsx-1618-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Communication.tsx:1619:                    value={bulkFormData.targetClass}
+src/components/Communication.tsx-1620-                    onChange={e => setBulkFormData({...bulkFormData, targetClass: e.target.value})}
+src/components/Communication.tsx-1621-                  >
+src/components/Communication.tsx:1622:                    <option value="All">All Parents</option>
+src/components/Communication.tsx-1623-                    {classes.map(c => {
+--
+src/components/Communication.tsx-1625-                      return (
+src/components/Communication.tsx:1626:                        <option key={c.id} value={name}>Class {name}</option>
+src/components/Communication.tsx-1627-                      );
+--
+src/components/Communication.tsx-1638-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Communication.tsx:1639:                      value={bulkFormData.subject}
+src/components/Communication.tsx-1640-                      onChange={e => setBulkFormData({...bulkFormData, subject: e.target.value})}
+--
+src/components/Communication.tsx-1651-                    placeholder="Type your message here..."
+src/components/Communication.tsx:1652:                    value={bulkFormData.content}
+src/components/Communication.tsx-1653-                    onChange={e => setBulkFormData({...bulkFormData, content: e.target.value})}
+--
+src/components/Curriculum.tsx-167-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Curriculum.tsx:168:                  value={newSyllabus.class}
+src/components/Curriculum.tsx-169-                  onChange={e => setNewSyllabus({...newSyllabus, class: e.target.value})}
+--
+src/components/Curriculum.tsx-177-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Curriculum.tsx:178:                  value={newSyllabus.subject}
+src/components/Curriculum.tsx-179-                  onChange={e => setNewSyllabus({...newSyllabus, subject: e.target.value})}
+--
+src/components/Curriculum.tsx-185-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Curriculum.tsx:186:                  value={newSyllabus.term}
+src/components/Curriculum.tsx-187-                  onChange={e => setNewSyllabus({...newSyllabus, term: e.target.value})}
+--
+src/components/Curriculum.tsx-199-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Curriculum.tsx:200:                  value={newSyllabus.content}
+src/components/Curriculum.tsx-201-                  onChange={e => setNewSyllabus({...newSyllabus, content: e.target.value})}
+--
+src/components/Curriculum.tsx-209-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Curriculum.tsx:210:                  value={linkedExamsInput}
+src/components/Curriculum.tsx-211-                  onChange={e => setLinkedExamsInput(e.target.value)}
+--
+src/components/Dashboard.tsx-186-          title="Total Students" 
+src/components/Dashboard.tsx:187:          value={stats.totalStudents} 
+src/components/Dashboard.tsx-188-          icon={Users} 
+--
+src/components/Dashboard.tsx-193-          title="Total Staff" 
+src/components/Dashboard.tsx:194:          value={stats.totalStaff} 
+src/components/Dashboard.tsx-195-          icon={GraduationCap} 
+--
+src/components/Dashboard.tsx-200-          title="Total Fees Collected" 
+src/components/Dashboard.tsx:201:          value={`$${stats.totalFees.toLocaleString()}`} 
+src/components/Dashboard.tsx-202-          icon={Wallet} 
+--
+src/components/Dashboard.tsx-207-          title="Avg. Attendance" 
+src/components/Dashboard.tsx:208:          value={`${stats.attendanceRate}%`} 
+src/components/Dashboard.tsx-209-          icon={TrendingUp} 
+--
+src/components/DateSheetModule.tsx-45-      <div className="mb-4">
+src/components/DateSheetModule.tsx:46:        <input className="text-2xl font-bold w-full border-b border-dashed border-slate-300 outline-none" value={dateSheet.title} onChange={e => setDateSheet({...dateSheet, title: e.target.value})} />
+src/components/DateSheetModule.tsx-47-      </div>
+--
+src/components/DateSheetModule.tsx-63-                        type="date" 
+src/components/DateSheetModule.tsx:64:                        value={row.date} 
+src/components/DateSheetModule.tsx-65-                        className="w-full outline-none" 
+--
+src/components/DateSheetModule.tsx-73-                      <input 
+src/components/DateSheetModule.tsx:74:                        value={row.day} 
+src/components/DateSheetModule.tsx-75-                        className="w-full outline-none"
+--
+src/components/DateSheetModule.tsx-84-                          <input 
+src/components/DateSheetModule.tsx:85:                            value={row.subjects[c] || ''} 
+src/components/DateSheetModule.tsx-86-                            className="w-full outline-none"
+--
+src/components/Exams.tsx-194-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+src/components/Exams.tsx:195:                    value={searchQuery}
+src/components/Exams.tsx-196-                    onChange={(e) => setSearchQuery(e.target.value)}
+--
+src/components/Exams.tsx-202-                  className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+src/components/Exams.tsx:203:                  value={filterPaperClass}
+src/components/Exams.tsx-204-                  onChange={(e) => {
+--
+src/components/Exams.tsx-208-                >
+src/components/Exams.tsx:209:                  <option value="All">All Classes</option>
+src/components/Exams.tsx-210-                  {classes.sort((a, b) => a.className.localeCompare(b.className)).map(c => (
+src/components/Exams.tsx:211:                    <option key={c.id} value={c.className}>{c.className}</option>
+src/components/Exams.tsx-212-                  ))}
+--
+src/components/Exams.tsx-215-                  className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+src/components/Exams.tsx:216:                  value={filterPaperSubject}
+src/components/Exams.tsx-217-                  onChange={(e) => setFilterPaperSubject(e.target.value)}
+src/components/Exams.tsx-218-                >
+src/components/Exams.tsx:219:                  <option value="All">All Subjects</option>
+src/components/Exams.tsx-220-                  {subjects
+--
+src/components/Exams.tsx-223-                    .map(s => (
+src/components/Exams.tsx:224:                      <option key={s.id} value={s.name}>{s.name}</option>
+src/components/Exams.tsx-225-                    ))}
+--
+src/components/Exams.tsx-1130-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1131:                    value={newPaper.examTypeId || ''}
+src/components/Exams.tsx-1132-                    onChange={e => {
+--
+src/components/Exams.tsx-1136-                  >
+src/components/Exams.tsx:1137:                    <option value="">Select Type</option>
+src/components/Exams.tsx-1138-                    {examTypes.map(t => (
+src/components/Exams.tsx:1139:                      <option key={t.id} value={t.id}>{t.name} ({t.term})</option>
+src/components/Exams.tsx-1140-                    ))}
+--
+src/components/Exams.tsx-1149-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1150:                    value={schoolSettings?.schoolName || ''}
+src/components/Exams.tsx-1151-                    disabled
+--
+src/components/Exams.tsx-1161-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1162:                    value={newPaper.title}
+src/components/Exams.tsx-1163-                    onChange={e => setNewPaper({...newPaper, title: e.target.value})}
+--
+src/components/Exams.tsx-1170-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1171:                    value={newPaper.class}
+src/components/Exams.tsx-1172-                    onChange={e => setNewPaper({...newPaper, class: e.target.value, subject: ''})}
+src/components/Exams.tsx-1173-                  >
+src/components/Exams.tsx:1174:                    <option value="">Select Class</option>
+src/components/Exams.tsx-1175-                    {classes.sort((a, b) => a.className.localeCompare(b.className)).map(c => (
+src/components/Exams.tsx:1176:                      <option key={c.id} value={c.className}>{c.className}</option>
+src/components/Exams.tsx-1177-                    ))}
+--
+src/components/Exams.tsx-1184-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1185:                    value={newPaper.subject}
+src/components/Exams.tsx-1186-                    onChange={e => setNewPaper({...newPaper, subject: e.target.value})}
+src/components/Exams.tsx-1187-                  >
+src/components/Exams.tsx:1188:                    <option value="">Select Subject</option>
+src/components/Exams.tsx-1189-                    {(() => {
+--
+src/components/Exams.tsx-1193-                      return filtered.map(s => (
+src/components/Exams.tsx:1194:                        <option key={s.id} value={s.name}>{s.name}</option>
+src/components/Exams.tsx-1195-                      ));
+--
+src/components/Exams.tsx-1204-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1205:                    value={newPaper.date}
+src/components/Exams.tsx-1206-                    onChange={e => setNewPaper({...newPaper, date: e.target.value})}
+--
+src/components/Exams.tsx-1214-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1215:                    value={newPaper.duration}
+src/components/Exams.tsx-1216-                    onChange={e => setNewPaper({...newPaper, duration: parseInt(e.target.value)})}
+--
+src/components/Exams.tsx-1255-                            <textarea
+src/components/Exams.tsx:1256:                              value={q.question}
+src/components/Exams.tsx-1257-                              onChange={(e) => handleManualQuestionEdit(index, 'question', e.target.value)}
+--
+src/components/Exams.tsx-1272-                                <select
+src/components/Exams.tsx:1273:                                  value={q.type}
+src/components/Exams.tsx-1274-                                  onChange={(e) => {
+--
+src/components/Exams.tsx-1284-                                >
+src/components/Exams.tsx:1285:                                  <option value="multiple_choice">Multiple Choice</option>
+src/components/Exams.tsx:1286:                                  <option value="short_answer">Short Answer</option>
+src/components/Exams.tsx:1287:                                  <option value="long_answer">Long Answer</option>
+src/components/Exams.tsx-1288-                                </select>
+--
+src/components/Exams.tsx-1292-                                <select
+src/components/Exams.tsx:1293:                                  value={q.difficulty}
+src/components/Exams.tsx-1294-                                  onChange={(e) => handleManualQuestionEdit(index, 'difficulty', e.target.value)}
+--
+src/components/Exams.tsx-1296-                                >
+src/components/Exams.tsx:1297:                                  <option value="Easy">Easy</option>
+src/components/Exams.tsx:1298:                                  <option value="Medium">Medium</option>
+src/components/Exams.tsx:1299:                                  <option value="Hard">Hard</option>
+src/components/Exams.tsx-1300-                                </select>
+--
+src/components/Exams.tsx-1305-                                  type="number"
+src/components/Exams.tsx:1306:                                  value={q.marks}
+src/components/Exams.tsx-1307-                                  onChange={(e) => handleManualQuestionEdit(index, 'marks', parseInt(e.target.value))}
+--
+src/components/Exams.tsx-1332-                                        type="text"
+src/components/Exams.tsx:1333:                                        value={opt}
+src/components/Exams.tsx-1334-                                        onChange={(e) => {
+--
+src/components/Exams.tsx-1360-                          <textarea
+src/components/Exams.tsx:1361:                            value={q.answer}
+src/components/Exams.tsx-1362-                            onChange={(e) => handleManualQuestionEdit(index, 'answer', e.target.value)}
+--
+src/components/Exams.tsx-1447-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1448:                  value={aiPrompt.examTypeId || ''}
+src/components/Exams.tsx-1449-                  onChange={e => setAiPrompt({...aiPrompt, examTypeId: e.target.value})}
+src/components/Exams.tsx-1450-                >
+src/components/Exams.tsx:1451:                  <option value="">Select Type (Optional)</option>
+src/components/Exams.tsx-1452-                  {examTypes.map(t => (
+src/components/Exams.tsx:1453:                    <option key={t.id} value={t.id}>{t.name} ({t.term})</option>
+src/components/Exams.tsx-1454-                  ))}
+--
+src/components/Exams.tsx-1462-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1463:                    value={aiPrompt.class}
+src/components/Exams.tsx-1464-                    onChange={e => setAiPrompt({...aiPrompt, class: e.target.value, subject: ''})}
+src/components/Exams.tsx-1465-                  >
+src/components/Exams.tsx:1466:                    <option value="">Select Class</option>
+src/components/Exams.tsx-1467-                    {classes.sort((a, b) => a.className.localeCompare(b.className)).map(c => (
+src/components/Exams.tsx:1468:                      <option key={c.id} value={c.className}>{c.className}</option>
+src/components/Exams.tsx-1469-                    ))}
+--
+src/components/Exams.tsx-1476-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1477:                    value={aiPrompt.subject}
+src/components/Exams.tsx-1478-                    onChange={e => setAiPrompt({...aiPrompt, subject: e.target.value})}
+src/components/Exams.tsx-1479-                  >
+src/components/Exams.tsx:1480:                    <option value="">Select Subject</option>
+src/components/Exams.tsx-1481-                    {subjects
+--
+src/components/Exams.tsx-1484-                      .map(s => (
+src/components/Exams.tsx:1485:                        <option key={s.id} value={s.name}>{s.name}</option>
+src/components/Exams.tsx-1486-                      ))}
+--
+src/components/Exams.tsx-1496-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1497:                  value={aiPrompt.topic}
+src/components/Exams.tsx-1498-                  onChange={e => setAiPrompt({...aiPrompt, topic: e.target.value})}
+--
+src/components/Exams.tsx-1511-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:1512:                      value={aiPrompt.easyCount}
+src/components/Exams.tsx-1513-                      onChange={e => setAiPrompt({...aiPrompt, easyCount: parseInt(e.target.value) || 0})}
+--
+src/components/Exams.tsx-1521-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:1522:                      value={aiPrompt.mediumCount}
+src/components/Exams.tsx-1523-                      onChange={e => setAiPrompt({...aiPrompt, mediumCount: parseInt(e.target.value) || 0})}
+--
+src/components/Exams.tsx-1531-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:1532:                      value={aiPrompt.hardCount}
+src/components/Exams.tsx-1533-                      onChange={e => setAiPrompt({...aiPrompt, hardCount: parseInt(e.target.value) || 0})}
+--
+src/components/Exams.tsx-1546-                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:1547:                        value={aiPrompt.mcqCount}
+src/components/Exams.tsx-1548-                        onChange={e => setAiPrompt({...aiPrompt, mcqCount: parseInt(e.target.value) || 0})}
+--
+src/components/Exams.tsx-1555-                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-bold"
+src/components/Exams.tsx:1556:                        value={aiPrompt.mcqMarks}
+src/components/Exams.tsx-1557-                        onChange={e => setAiPrompt({...aiPrompt, mcqMarks: parseInt(e.target.value) || 1})}
+--
+src/components/Exams.tsx-1568-                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:1569:                        value={aiPrompt.shortCount}
+src/components/Exams.tsx-1570-                        onChange={e => setAiPrompt({...aiPrompt, shortCount: parseInt(e.target.value) || 0})}
+--
+src/components/Exams.tsx-1577-                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-bold"
+src/components/Exams.tsx:1578:                        value={aiPrompt.shortMarks}
+src/components/Exams.tsx-1579-                        onChange={e => setAiPrompt({...aiPrompt, shortMarks: parseInt(e.target.value) || 1})}
+--
+src/components/Exams.tsx-1590-                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:1591:                        value={aiPrompt.longCount}
+src/components/Exams.tsx-1592-                        onChange={e => setAiPrompt({...aiPrompt, longCount: parseInt(e.target.value) || 0})}
+--
+src/components/Exams.tsx-1599-                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-bold"
+src/components/Exams.tsx:1600:                        value={aiPrompt.longMarks}
+src/components/Exams.tsx-1601-                        onChange={e => setAiPrompt({...aiPrompt, longMarks: parseInt(e.target.value) || 1})}
+--
+src/components/Exams.tsx-1611-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:1612:                      value={aiPrompt.language}
+src/components/Exams.tsx-1613-                      onChange={e => setAiPrompt({...aiPrompt, language: e.target.value as any})}
+src/components/Exams.tsx-1614-                    >
+src/components/Exams.tsx:1615:                      <option value="English">English</option>
+src/components/Exams.tsx:1616:                      <option value="Urdu">Urdu</option>
+src/components/Exams.tsx:1617:                      <option value="Bilingual">Bilingual</option>
+src/components/Exams.tsx-1618-                    </select>
+--
+src/components/Exams.tsx-1648-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Exams.tsx:1649:                    value={aiPrompt.duration}
+src/components/Exams.tsx-1650-                    onChange={e => setAiPrompt({...aiPrompt, duration: parseInt(e.target.value)})}
+--
+src/components/Exams.tsx-1750-                        type="text" 
+src/components/Exams.tsx:1751:                        value={aiPrompt.class}
+src/components/Exams.tsx-1752-                        onChange={(e) => setAiPrompt({...aiPrompt, class: e.target.value})}
+--
+src/components/Exams.tsx-1759-                        type="text" 
+src/components/Exams.tsx:1760:                        value={aiPrompt.subject}
+src/components/Exams.tsx-1761-                        onChange={(e) => setAiPrompt({...aiPrompt, subject: e.target.value})}
+--
+src/components/Exams.tsx-1768-                        type="text" 
+src/components/Exams.tsx:1769:                        value={aiPrompt.topic}
+src/components/Exams.tsx-1770-                        onChange={(e) => setAiPrompt({...aiPrompt, topic: e.target.value})}
+--
+src/components/Exams.tsx-1778-                        <div className="flex gap-1">
+src/components/Exams.tsx:1779:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.easyCount} onChange={e => setAiPrompt({...aiPrompt, easyCount: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx:1780:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.mediumCount} onChange={e => setAiPrompt({...aiPrompt, mediumCount: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx:1781:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.hardCount} onChange={e => setAiPrompt({...aiPrompt, hardCount: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx-1782-                        </div>
+--
+src/components/Exams.tsx-1786-                        <div className="flex gap-1">
+src/components/Exams.tsx:1787:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.mcqCount} onChange={e => setAiPrompt({...aiPrompt, mcqCount: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx:1788:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.shortCount} onChange={e => setAiPrompt({...aiPrompt, shortCount: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx:1789:                          <input type="number" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded" value={aiPrompt.longCount} onChange={e => setAiPrompt({...aiPrompt, longCount: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx-1790-                        </div>
+--
+src/components/Exams.tsx-1794-                        <div className="flex gap-1">
+src/components/Exams.tsx:1795:                          <input type="number" title="MCQ Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.mcqMarks} onChange={e => setAiPrompt({...aiPrompt, mcqMarks: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx:1796:                          <input type="number" title="Short Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.shortMarks} onChange={e => setAiPrompt({...aiPrompt, shortMarks: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx:1797:                          <input type="number" title="Long Marks" className="w-full px-2 py-1 text-xs border border-indigo-100 rounded font-bold text-indigo-600" value={aiPrompt.longMarks} onChange={e => setAiPrompt({...aiPrompt, longMarks: parseInt(e.target.value) || 0})} />
+src/components/Exams.tsx-1798-                        </div>
+--
+src/components/Exams.tsx-1804-                             className="w-full px-2 py-1 text-xs border border-indigo-100 rounded"
+src/components/Exams.tsx:1805:                             value={aiPrompt.language}
+src/components/Exams.tsx-1806-                             onChange={e => setAiPrompt({...aiPrompt, language: e.target.value as any})}
+src/components/Exams.tsx-1807-                           >
+src/components/Exams.tsx:1808:                             <option value="English">English</option>
+src/components/Exams.tsx:1809:                             <option value="Urdu">Urdu</option>
+src/components/Exams.tsx:1810:                             <option value="Bilingual">Bilingual</option>
+src/components/Exams.tsx-1811-                           </select>
+--
+src/components/Exams.tsx-1842-                    type="text" 
+src/components/Exams.tsx:1843:                    value={generatedPaperData.title}
+src/components/Exams.tsx-1844-                    onChange={(e) => setGeneratedPaperData({...generatedPaperData, title: e.target.value})}
+--
+src/components/Exams.tsx-1851-                    type="text" 
+src/components/Exams.tsx:1852:                    value={generatedPaperData.class}
+src/components/Exams.tsx-1853-                    onChange={(e) => setGeneratedPaperData({...generatedPaperData, class: e.target.value})}
+--
+src/components/Exams.tsx-1860-                    type="text" 
+src/components/Exams.tsx:1861:                    value={generatedPaperData.subject}
+src/components/Exams.tsx-1862-                    onChange={(e) => setGeneratedPaperData({...generatedPaperData, subject: e.target.value})}
+--
+src/components/Exams.tsx-1869-                    type="number" 
+src/components/Exams.tsx:1870:                    value={generatedPaperData.duration}
+src/components/Exams.tsx-1871-                    onChange={(e) => setGeneratedPaperData({...generatedPaperData, duration: parseInt(e.target.value)})}
+--
+src/components/Exams.tsx-1903-                            <textarea
+src/components/Exams.tsx:1904:                              value={q.question}
+src/components/Exams.tsx-1905-                              onChange={(e) => handleQuestionEdit(index, 'question', e.target.value)}
+--
+src/components/Exams.tsx-1912-                                <select
+src/components/Exams.tsx:1913:                                  value={q.type}
+src/components/Exams.tsx-1914-                                  onChange={(e) => {
+--
+src/components/Exams.tsx-1924-                                >
+src/components/Exams.tsx:1925:                                  <option value="multiple_choice">Multiple Choice</option>
+src/components/Exams.tsx:1926:                                  <option value="short_answer">Short Answer</option>
+src/components/Exams.tsx:1927:                                  <option value="long_answer">Long Answer</option>
+src/components/Exams.tsx-1928-                                </select>
+--
+src/components/Exams.tsx-1932-                                <select
+src/components/Exams.tsx:1933:                                  value={q.difficulty}
+src/components/Exams.tsx-1934-                                  onChange={(e) => handleQuestionEdit(index, 'difficulty', e.target.value)}
+--
+src/components/Exams.tsx-1936-                                >
+src/components/Exams.tsx:1937:                                  <option value="Easy">Easy</option>
+src/components/Exams.tsx:1938:                                  <option value="Medium">Medium</option>
+src/components/Exams.tsx:1939:                                  <option value="Hard">Hard</option>
+src/components/Exams.tsx-1940-                                </select>
+--
+src/components/Exams.tsx-1945-                                  type="number"
+src/components/Exams.tsx:1946:                                  value={q.marks}
+src/components/Exams.tsx-1947-                                  onChange={(e) => handleQuestionEdit(index, 'marks', parseInt(e.target.value))}
+--
+src/components/Exams.tsx-1962-                                  type="text"
+src/components/Exams.tsx:1963:                                  value={opt}
+src/components/Exams.tsx-1964-                                  onChange={(e) => {
+--
+src/components/Exams.tsx-1978-                          <textarea
+src/components/Exams.tsx:1979:                            value={q.answer}
+src/components/Exams.tsx-1980-                            onChange={(e) => handleQuestionEdit(index, 'answer', e.target.value)}
+--
+src/components/Exams.tsx-2036-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+src/components/Exams.tsx:2037:                  value={newExamType.name}
+src/components/Exams.tsx-2038-                  onChange={e => setNewExamType({...newExamType, name: e.target.value})}
+--
+src/components/Exams.tsx-2046-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+src/components/Exams.tsx:2047:                  value={newExamType.term}
+src/components/Exams.tsx-2048-                  onChange={e => setNewExamType({...newExamType, term: e.target.value})}
+--
+src/components/Exams.tsx-2074-                      className="text-2xl font-bold text-slate-900 border-b border-slate-300 outline-none"
+src/components/Exams.tsx:2075:                      value={editingPaper?.title || ''}
+src/components/Exams.tsx-2076-                      onChange={e => setEditingPaper({...editingPaper!, title: e.target.value})}
+--
+src/components/Exams.tsx-2131-              <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-slate-50 rounded-2xl print:hidden">
+src/components/Exams.tsx:2132:                <input className="px-3 py-2 rounded-lg border border-slate-200" value={editingPaper?.class} onChange={e => setEditingPaper({...editingPaper!, class: e.target.value})} placeholder="Class" />
+src/components/Exams.tsx:2133:                <input className="px-3 py-2 rounded-lg border border-slate-200" value={editingPaper?.subject} onChange={e => setEditingPaper({...editingPaper!, subject: e.target.value})} placeholder="Subject" />
+src/components/Exams.tsx:2134:                <input type="date" className="px-3 py-2 rounded-lg border border-slate-200" value={editingPaper?.date} onChange={e => setEditingPaper({...editingPaper!, date: e.target.value})} />
+src/components/Exams.tsx:2135:                <input type="number" className="px-3 py-2 rounded-lg border border-slate-200" value={editingPaper?.duration} onChange={e => setEditingPaper({...editingPaper!, duration: parseInt(e.target.value)})} placeholder="Duration (min)" />
+src/components/Exams.tsx-2136-              </div>
+--
+src/components/Exams.tsx-2161-                        <div className="space-y-4">
+src/components/Exams.tsx:2162:                          <textarea className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={q.question} onChange={e => updateQuestion(index, {...q, question: e.target.value})} placeholder="Question text" />
+src/components/Exams.tsx-2163-                          <div className="grid grid-cols-2 gap-4">
+src/components/Exams.tsx:2164:                            <input type="number" className="p-3 border border-slate-200 rounded-xl" value={q.marks} onChange={e => updateQuestion(index, {...q, marks: parseInt(e.target.value)})} placeholder="Marks" />
+src/components/Exams.tsx:2165:                            <select className="p-3 border border-slate-200 rounded-xl" value={q.difficulty} onChange={e => updateQuestion(index, {...q, difficulty: e.target.value})}>
+src/components/Exams.tsx-2166-                              <option>Easy</option>
+--
+src/components/Exams.tsx-2170-                          </div>
+src/components/Exams.tsx:2171:                          <select className="w-full p-3 border border-slate-200 rounded-xl" value={q.type} onChange={e => updateQuestion(index, {...q, type: e.target.value})}>
+src/components/Exams.tsx:2172:                            <option value="long_answer">Long Answer</option>
+src/components/Exams.tsx:2173:                            <option value="multiple_choice">Multiple Choice</option>
+src/components/Exams.tsx-2174-                          </select>
+--
+src/components/Exams.tsx-2193-                                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+src/components/Exams.tsx:2194:                                      value={opt}
+src/components/Exams.tsx-2195-                                      onChange={(e) => {
+--
+src/components/Exams.tsx-2215-                          )}
+src/components/Exams.tsx:2216:                          <textarea className="w-full p-3 border border-slate-200 rounded-xl" value={q.answer} onChange={e => updateQuestion(index, {...q, answer: e.target.value})} placeholder="Answer" />
+src/components/Exams.tsx-2217-                        </div>
+--
+src/components/Exams.tsx-2430-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Exams.tsx:2431:                      value={newSchedule.examTypeId}
+src/components/Exams.tsx-2432-                      onChange={e => setNewSchedule({...newSchedule, examTypeId: e.target.value})}
+src/components/Exams.tsx-2433-                    >
+src/components/Exams.tsx:2434:                      <option value="">SELECT EXAM TYPE</option>
+src/components/Exams.tsx-2435-                      {examTypes.map(t => (
+src/components/Exams.tsx:2436:                        <option key={t.id} value={t.id}>{t.name.toUpperCase()} ({t.term.toUpperCase()})</option>
+src/components/Exams.tsx-2437-                      ))}
+--
+src/components/Exams.tsx-2445-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Exams.tsx:2446:                      value={newSchedule.roomNumber}
+src/components/Exams.tsx-2447-                      onChange={e => setNewSchedule({...newSchedule, roomNumber: e.target.value})}
+--
+src/components/Exams.tsx-2455-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Exams.tsx:2456:                      value={newSchedule.date}
+src/components/Exams.tsx-2457-                      onChange={e => setNewSchedule({...newSchedule, date: e.target.value})}
+--
+src/components/Exams.tsx-2465-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Exams.tsx:2466:                      value={newSchedule.time}
+src/components/Exams.tsx-2467-                      onChange={e => setNewSchedule({...newSchedule, time: e.target.value})}
+--
+src/components/Exams.tsx-2475-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Exams.tsx:2476:                      value={newSchedule.duration}
+src/components/Exams.tsx-2477-                      onChange={e => setNewSchedule({...newSchedule, duration: parseInt(e.target.value)})}
+--
+src/components/Exams.tsx-2493-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+src/components/Exams.tsx:2494:                            value={bulkClassSubjects[className] || ''}
+src/components/Exams.tsx-2495-                            onChange={e => setBulkClassSubjects({...bulkClassSubjects, [String(className)]: e.target.value})}
+src/components/Exams.tsx-2496-                          >
+src/components/Exams.tsx:2497:                            <option value="">-- OFF --</option>
+src/components/Exams.tsx-2498-                            {subjects
+--
+src/components/Exams.tsx-2501-                              .map(s => (
+src/components/Exams.tsx:2502:                                <option key={s.id} value={s.name}>{s.name}</option>
+src/components/Exams.tsx-2503-                              ))}
+--
+src/components/Exams.tsx-2575-                              className="w-20 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:2576:                              value={m.total}
+src/components/Exams.tsx-2577-                              onChange={e => setMarksEntryData({...marksEntryData, [subject]: {...m, total: Number(e.target.value)}})}
+--
+src/components/Exams.tsx-2583-                              className="w-20 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:2584:                              value={m.pass}
+src/components/Exams.tsx-2585-                              onChange={e => setMarksEntryData({...marksEntryData, [subject]: {...m, pass: Number(e.target.value)}})}
+--
+src/components/Exams.tsx-2592-                              className="w-24 px-4 py-2 bg-white border-2 border-indigo-100 rounded-xl text-center font-bold text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Exams.tsx:2593:                              value={m.obtained}
+src/components/Exams.tsx-2594-                              onChange={e => setMarksEntryData({...marksEntryData, [subject]: {...m, obtained: Number(e.target.value)}})}
+--
+src/components/Exams.tsx-2607-                    placeholder="Enter teacher's remarks..."
+src/components/Exams.tsx:2608:                    value={resultRemarks}
+src/components/Exams.tsx-2609-                    onChange={e => setResultRemarks(e.target.value)}
+--
+src/components/ExpensesManagement.tsx-377-              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+src/components/ExpensesManagement.tsx:378:              value={searchQuery}
+src/components/ExpensesManagement.tsx-379-              onChange={e => setSearchQuery(e.target.value)}
+--
+src/components/ExpensesManagement.tsx-389-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all font-mono"
+src/components/ExpensesManagement.tsx:390:            value={filterInvoiceNumber}
+src/components/ExpensesManagement.tsx-391-            onChange={e => setFilterInvoiceNumber(e.target.value)}
+--
+src/components/ExpensesManagement.tsx-399-            className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all" 
+src/components/ExpensesManagement.tsx:400:            value={filterStartDate} 
+src/components/ExpensesManagement.tsx-401-            onChange={e => setFilterStartDate(e.target.value)} 
+--
+src/components/ExpensesManagement.tsx-409-            className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all" 
+src/components/ExpensesManagement.tsx:410:            value={filterEndDate} 
+src/components/ExpensesManagement.tsx-411-            onChange={e => setFilterEndDate(e.target.value)} 
+--
+src/components/ExpensesManagement.tsx-418-            className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all" 
+src/components/ExpensesManagement.tsx:419:            value={filterCategory} 
+src/components/ExpensesManagement.tsx-420-            onChange={e => setFilterCategory(e.target.value)}
+--
+src/components/ExpensesManagement.tsx-448-                  type="text" 
+src/components/ExpensesManagement.tsx:449:                  value={editingCategory.new} 
+src/components/ExpensesManagement.tsx-450-                  onChange={e => setEditingCategory({...editingCategory, new: e.target.value})} 
+--
+src/components/ExpensesManagement.tsx-460-          <div className="flex gap-2">
+src/components/ExpensesManagement.tsx:461:            <input type="text" value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="New Category" className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm" />
+src/components/ExpensesManagement.tsx-462-            <button onClick={addCategory} className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm">Add</button>
+--
+src/components/ExpensesManagement.tsx-556-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+src/components/ExpensesManagement.tsx:557:                      value={newExpense.date}
+src/components/ExpensesManagement.tsx-558-                      onChange={e => setNewExpense({...newExpense, date: e.target.value})}
+--
+src/components/ExpensesManagement.tsx-566-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none transition-all font-mono"
+src/components/ExpensesManagement.tsx:567:                      value={newExpense.invoiceNumber}
+src/components/ExpensesManagement.tsx-568-                      onChange={e => setNewExpense({...newExpense, invoiceNumber: e.target.value})}
+--
+src/components/ExpensesManagement.tsx-576-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+src/components/ExpensesManagement.tsx:577:                    value={newExpense.category}
+src/components/ExpensesManagement.tsx-578-                    onChange={e => setNewExpense({...newExpense, category: e.target.value})}
+--
+src/components/ExpensesManagement.tsx-580-                    {expenseCategories.map(cat => (
+src/components/ExpensesManagement.tsx:581:                      <option key={cat} value={cat}>{cat}</option>
+src/components/ExpensesManagement.tsx-582-                    ))}
+--
+src/components/ExpensesManagement.tsx-593-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+src/components/ExpensesManagement.tsx:594:                    value={newExpense.amount}
+src/components/ExpensesManagement.tsx-595-                    onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})}
+--
+src/components/ExpensesManagement.tsx-604-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none transition-all resize-none"
+src/components/ExpensesManagement.tsx:605:                    value={newExpense.description}
+src/components/ExpensesManagement.tsx-606-                    onChange={e => setNewExpense({...newExpense, description: e.target.value})}
+--
+src/components/FeesManagement.tsx-890-                        placeholder="Search student by name or roll number..."
+src/components/FeesManagement.tsx:891:                        value={studentSearch}
+src/components/FeesManagement.tsx-892-                        onChange={(e) => setStudentSearch(e.target.value)}
+--
+src/components/FeesManagement.tsx-983-                            placeholder="Search records..."
+src/components/FeesManagement.tsx:984:                            value={feeRecordSearch}
+src/components/FeesManagement.tsx-985-                            onChange={(e) => setFeeRecordSearch(e.target.value)}
+--
+src/components/FeesManagement.tsx-989-                        <select
+src/components/FeesManagement.tsx:990:                          value={feeRecordStatusFilter}
+src/components/FeesManagement.tsx-991-                          onChange={(e) => setFeeRecordStatusFilter(e.target.value)}
+--
+src/components/FeesManagement.tsx-993-                        >
+src/components/FeesManagement.tsx:994:                          <option value="all">All Status</option>
+src/components/FeesManagement.tsx:995:                          <option value="paid">Paid</option>
+src/components/FeesManagement.tsx:996:                          <option value="pending">Pending</option>
+src/components/FeesManagement.tsx:997:                          <option value="partial">Partial</option>
+src/components/FeesManagement.tsx:998:                          <option value="overdue">Overdue</option>
+src/components/FeesManagement.tsx-999-                        </select>
+--
+src/components/FeesManagement.tsx-1220-                    placeholder="e.g., Fall 2026, 2026-2027"
+src/components/FeesManagement.tsx:1221:                    value={generateForm.termOrYear}
+src/components/FeesManagement.tsx-1222-                    onChange={(e) => setGenerateForm({...generateForm, termOrYear: e.target.value})}
+--
+src/components/FeesManagement.tsx-1230-                    required
+src/components/FeesManagement.tsx:1231:                    value={generateForm.dueDate}
+src/components/FeesManagement.tsx-1232-                    onChange={(e) => setGenerateForm({...generateForm, dueDate: e.target.value})}
+--
+src/components/FeesManagement.tsx-1338-                  placeholder="e.g., Tuition Fee"
+src/components/FeesManagement.tsx:1339:                  value={feeTypeForm.name}
+src/components/FeesManagement.tsx-1340-                  onChange={(e) => setFeeTypeForm({...feeTypeForm, name: e.target.value})}
+--
+src/components/FeesManagement.tsx-1349-                  min="0"
+src/components/FeesManagement.tsx:1350:                  value={feeTypeForm.defaultAmount}
+src/components/FeesManagement.tsx-1351-                  onChange={(e) => setFeeTypeForm({...feeTypeForm, defaultAmount: Number(e.target.value)})}
+--
+src/components/FeesManagement.tsx-1359-                  placeholder="e.g., 5th of every month"
+src/components/FeesManagement.tsx:1360:                  value={feeTypeForm.defaultDueDate}
+src/components/FeesManagement.tsx-1361-                  onChange={(e) => setFeeTypeForm({...feeTypeForm, defaultDueDate: e.target.value})}
+--
+src/components/FeesManagement.tsx-1418-                  max={selectedRecordForWaiver.amount - selectedRecordForWaiver.paidAmount}
+src/components/FeesManagement.tsx:1419:                  value={waiverForm.amount}
+src/components/FeesManagement.tsx-1420-                  onChange={(e) => setWaiverForm({...waiverForm, amount: Number(e.target.value)})}
+--
+src/components/FeesManagement.tsx-1428-                  placeholder="e.g. Merit scholarship, financial hardship, etc."
+src/components/FeesManagement.tsx:1429:                  value={waiverForm.reason}
+src/components/FeesManagement.tsx-1430-                  onChange={(e) => setWaiverForm({...waiverForm, reason: e.target.value})}
+--
+src/components/FeesManagement.tsx-1472-                  min="0"
+src/components/FeesManagement.tsx:1473:                  value={recordForm.amount}
+src/components/FeesManagement.tsx-1474-                  onChange={(e) => setRecordForm({...recordForm, amount: Number(e.target.value)})}
+--
+src/components/FeesManagement.tsx-1482-                  required
+src/components/FeesManagement.tsx:1483:                  value={recordForm.dueDate}
+src/components/FeesManagement.tsx-1484-                  onChange={(e) => setRecordForm({...recordForm, dueDate: e.target.value})}
+--
+src/components/FeesManagement.tsx-1492-                  required
+src/components/FeesManagement.tsx:1493:                  value={recordForm.termOrYear}
+src/components/FeesManagement.tsx-1494-                  onChange={(e) => setRecordForm({...recordForm, termOrYear: e.target.value})}
+--
+src/components/FeesManagement.tsx-1501-                  required
+src/components/FeesManagement.tsx:1502:                  value={recordForm.status}
+src/components/FeesManagement.tsx-1503-                  onChange={(e) => setRecordForm({...recordForm, status: e.target.value as FeeRecord['status']})}
+--
+src/components/FeesManagement.tsx-1505-                >
+src/components/FeesManagement.tsx:1506:                  <option value="pending">Pending</option>
+src/components/FeesManagement.tsx:1507:                  <option value="partial">Partial</option>
+src/components/FeesManagement.tsx:1508:                  <option value="paid">Paid</option>
+src/components/FeesManagement.tsx:1509:                  <option value="overdue">Overdue</option>
+src/components/FeesManagement.tsx-1510-                </select>
+--
+src/components/FeesManagement.tsx-1565-                  max={selectedFeeRecord.amount - selectedFeeRecord.paidAmount}
+src/components/FeesManagement.tsx:1566:                  value={paymentForm.amount}
+src/components/FeesManagement.tsx-1567-                  onChange={(e) => setPaymentForm({...paymentForm, amount: Number(e.target.value)})}
+--
+src/components/FeesManagement.tsx-1576-                  required
+src/components/FeesManagement.tsx:1577:                  value={paymentForm.date}
+src/components/FeesManagement.tsx-1578-                  onChange={(e) => setPaymentForm({...paymentForm, date: e.target.value})}
+--
+src/components/Inventory.tsx-130-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+src/components/Inventory.tsx:131:            value={searchQuery}
+src/components/Inventory.tsx-132-            onChange={(e) => setSearchQuery(e.target.value)}
+--
+src/components/Inventory.tsx-247-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Inventory.tsx:248:                    value={formData.name}
+src/components/Inventory.tsx-249-                    onChange={e => setFormData({...formData, name: e.target.value})}
+--
+src/components/Inventory.tsx-258-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Inventory.tsx:259:                      value={formData.quantity}
+src/components/Inventory.tsx-260-                      onChange={e => setFormData({...formData, quantity: Number(e.target.value)})}
+--
+src/components/Inventory.tsx-268-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Inventory.tsx:269:                      value={formData.price}
+src/components/Inventory.tsx-270-                      onChange={e => setFormData({...formData, price: Number(e.target.value)})}
+--
+src/components/Inventory.tsx-277-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Inventory.tsx:278:                      value={formData.category}
+src/components/Inventory.tsx-279-                      onChange={e => setFormData({...formData, category: e.target.value})}
+--
+src/components/Inventory.tsx-293-                    rows={4}
+src/components/Inventory.tsx:294:                    value={formData.details || ''}
+src/components/Inventory.tsx-295-                    onChange={e => setFormData({...formData, details: e.target.value})}
+--
+src/components/Layout.tsx-392-                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+src/components/Layout.tsx:393:                value={searchQuery}
+src/components/Layout.tsx-394-                onChange={(e) => setSearchQuery(e.target.value)}
+--
+src/components/Layout.tsx-532-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Layout.tsx:533:                    value={profileName}
+src/components/Layout.tsx-534-                    onChange={e => setProfileName(e.target.value)}
+--
+src/components/Leave.tsx-255-              <span className="flex-1 font-medium text-slate-900">{lt.name}</span>
+src/components/Leave.tsx:256:              <input type="number" value={lt.allocated} onChange={e => setLeaveTypes(prev => prev.map(t => t.name === lt.name ? {...t, allocated: parseInt(e.target.value)} : t))} className="w-20 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" />
+src/components/Leave.tsx-257-            </div>
+--
+src/components/Leave.tsx-268-              <div className="space-y-4">
+src/components/Leave.tsx:269:                <select value={newRequest.type} onChange={e => setNewRequest({...newRequest, type: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+src/components/Leave.tsx:270:                  {leaveTypes.map(lt => <option key={lt.name} value={lt.name}>{lt.name}</option>)}
+src/components/Leave.tsx-271-                </select>
+--
+src/components/Library.tsx-165-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Library.tsx:166:                  value={newLoan.studentId}
+src/components/Library.tsx-167-                  onChange={e => setNewLoan({...newLoan, studentId: e.target.value})}
+src/components/Library.tsx-168-                >
+src/components/Library.tsx:169:                  <option value="">Select a student</option>
+src/components/Library.tsx-170-                  {students.map(s => (
+src/components/Library.tsx:171:                    <option key={s.id} value={s.id}>{s.name} ({s.rollNumber})</option>
+src/components/Library.tsx-172-                  ))}
+--
+src/components/Library.tsx-180-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Library.tsx:181:                  value={newLoan.bookTitle}
+src/components/Library.tsx-182-                  onChange={e => setNewLoan({...newLoan, bookTitle: e.target.value})}
+--
+src/components/Library.tsx-191-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Library.tsx:192:                    value={newLoan.loanDate}
+src/components/Library.tsx-193-                    onChange={e => setNewLoan({...newLoan, loanDate: e.target.value})}
+--
+src/components/Library.tsx-201-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Library.tsx:202:                    value={newLoan.dueDate}
+src/components/Library.tsx-203-                    onChange={e => setNewLoan({...newLoan, dueDate: e.target.value})}
+--
+src/components/Login.tsx-134-                    placeholder="e.g. STF-001"
+src/components/Login.tsx:135:                    value={staffCreds.username}
+src/components/Login.tsx-136-                    onChange={e => setStaffCreds({...staffCreds, username: e.target.value})}
+--
+src/components/Login.tsx-148-                    placeholder="••••••••"
+src/components/Login.tsx:149:                    value={staffCreds.password}
+src/components/Login.tsx-150-                    onChange={e => setStaffCreds({...staffCreds, password: e.target.value})}
+--
+src/components/PayrollManagement.tsx-75-      <div className="flex gap-4">
+src/components/PayrollManagement.tsx:76:        <input type="text" placeholder="Search by staff name or month..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm" />
+src/components/PayrollManagement.tsx:77:        <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm">
+src/components/PayrollManagement.tsx:78:          <option value="staffName">Staff Name</option>
+src/components/PayrollManagement.tsx:79:          <option value="month">Month</option>
+src/components/PayrollManagement.tsx:80:          <option value="paymentDate">Payment Date</option>
+src/components/PayrollManagement.tsx:81:          <option value="status">Status</option>
+src/components/PayrollManagement.tsx-82-        </select>
+--
+src/components/PayrollManagement.tsx-164-            <h2 className="text-lg font-bold text-slate-900">Add Payroll Record</h2>
+src/components/PayrollManagement.tsx:165:            <select value={newPayroll.staffId} onChange={e => setNewPayroll({...newPayroll, staffId: e.target.value})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+src/components/PayrollManagement.tsx:166:              <option value="">Select Staff</option>
+src/components/PayrollManagement.tsx:167:              {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+src/components/PayrollManagement.tsx-168-            </select>
+--
+src/components/Registration.tsx-107-                  placeholder="e.g. Green Valley High"
+src/components/Registration.tsx:108:                  value={formData.schoolName}
+src/components/Registration.tsx-109-                  onChange={e => setFormData({...formData, schoolName: e.target.value})}
+--
+src/components/Registration.tsx-123-                    placeholder="Principal Name"
+src/components/Registration.tsx:124:                    value={formData.adminName}
+src/components/Registration.tsx-125-                    onChange={e => setFormData({...formData, adminName: e.target.value})}
+--
+src/components/Registration.tsx-137-                    placeholder="+1 234 567 890"
+src/components/Registration.tsx:138:                    value={formData.phone}
+src/components/Registration.tsx-139-                    onChange={e => setFormData({...formData, phone: e.target.value})}
+--
+src/components/Registration.tsx-153-                  placeholder="admin@school.com"
+src/components/Registration.tsx:154:                  value={formData.email}
+src/components/Registration.tsx-155-                  onChange={e => setFormData({...formData, email: e.target.value})}
+--
+src/components/Registration.tsx-168-                  placeholder="Full physical address"
+src/components/Registration.tsx:169:                  value={formData.address}
+src/components/Registration.tsx-170-                  onChange={e => setFormData({...formData, address: e.target.value})}
+--
+src/components/ReportCard.tsx-150-          <input 
+src/components/ReportCard.tsx:151:            value={studentName} 
+src/components/ReportCard.tsx-152-            onChange={(e) => setStudentName(e.target.value)}
+--
+src/components/ReportCard.tsx-160-                type="number"
+src/components/ReportCard.tsx:161:                value={m.obtained}
+src/components/ReportCard.tsx-162-                onChange={(e) => handleMarkChange(subject, 'obtained', Number(e.target.value))}
+--
+src/components/Results.tsx-309-          <select
+src/components/Results.tsx:310:            value={resultFilters.studentId}
+src/components/Results.tsx-311-            onChange={(e) => setResultFilters({...resultFilters, studentId: e.target.value})}
+--
+src/components/Results.tsx-313-          >
+src/components/Results.tsx:314:            <option value="">All Students</option>
+src/components/Results.tsx-315-            {students.map(s => (
+src/components/Results.tsx:316:              <option key={s.id} value={s.id}>{s.name} S/O {s.parentName} ({s.class})</option>
+src/components/Results.tsx-317-            ))}
+--
+src/components/Results.tsx-322-          <select
+src/components/Results.tsx:323:            value={resultFilters.examTypeId}
+src/components/Results.tsx-324-            onChange={(e) => setResultFilters({...resultFilters, examTypeId: e.target.value})}
+--
+src/components/Results.tsx-326-          >
+src/components/Results.tsx:327:            <option value="">All Exam Types</option>
+src/components/Results.tsx-328-            {examTypes.map(type => (
+src/components/Results.tsx:329:              <option key={type.id} value={type.id}>{type.name}</option>
+src/components/Results.tsx-330-            ))}
+--
+src/components/Results.tsx-335-          <select
+src/components/Results.tsx:336:            value={resultFilters.class}
+src/components/Results.tsx-337-            onChange={(e) => setResultFilters({...resultFilters, class: e.target.value, section: ''})}
+--
+src/components/Results.tsx-339-          >
+src/components/Results.tsx:340:            <option value="">All Classes</option>
+src/components/Results.tsx-341-            {classes.map(c => (
+src/components/Results.tsx:342:              <option key={c.id} value={c.className}>{c.className}</option>
+src/components/Results.tsx-343-            ))}
+--
+src/components/Results.tsx-348-          <select
+src/components/Results.tsx:349:            value={resultFilters.section}
+src/components/Results.tsx-350-            onChange={(e) => setResultFilters({...resultFilters, section: e.target.value})}
+--
+src/components/Results.tsx-352-          >
+src/components/Results.tsx:353:            <option value="">All Sections</option>
+src/components/Results.tsx-354-            {classes.find(c => c.className === resultFilters.class)?.sections.map(s => (
+src/components/Results.tsx:355:              <option key={s.id} value={s.name}>{s.name}</option>
+src/components/Results.tsx-356-            ))}
+--
+src/components/Results.tsx-562-                          <select
+src/components/Results.tsx:563:                            value={columnMapping[field]}
+src/components/Results.tsx-564-                            onChange={(e) => setColumnMapping({ ...columnMapping, [field]: e.target.value })}
+--
+src/components/Results.tsx-566-                          >
+src/components/Results.tsx:567:                            <option value="">Select Column</option>
+src/components/Results.tsx-568-                            {csvHeaders.map(header => (
+src/components/Results.tsx:569:                              <option key={header} value={header}>{header}</option>
+src/components/Results.tsx-570-                            ))}
+--
+src/components/Schedule.tsx-293-                  <select 
+src/components/Schedule.tsx:294:                    value={editForm.subject}
+src/components/Schedule.tsx-295-                    onChange={(e) => setEditForm(prev => ({ ...prev, subject: e.target.value }))}
+--
+src/components/Schedule.tsx-297-                  >
+src/components/Schedule.tsx:298:                    <option value="">Select Subject</option>
+src/components/Schedule.tsx:299:                    {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+src/components/Schedule.tsx-300-                  </select>
+--
+src/components/Schedule.tsx-305-                  <select 
+src/components/Schedule.tsx:306:                    value={editForm.teacher}
+src/components/Schedule.tsx-307-                    onChange={(e) => setEditForm(prev => ({ ...prev, teacher: e.target.value }))}
+--
+src/components/Schedule.tsx-309-                  >
+src/components/Schedule.tsx:310:                    <option value="">Select Teacher</option>
+src/components/Schedule.tsx:311:                    {teachers.map(t => <option key={t} value={t}>{t}</option>)}
+src/components/Schedule.tsx-312-                  </select>
+--
+src/components/SchoolShop.tsx-516-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Item Name</label>
+src/components/SchoolShop.tsx:517:                <input type="text" placeholder="e.g. Notebook" value={newItem.name} onChange={e => { setNewItem({...newItem, name: e.target.value}); setErrors({...errors, name: ''}); }} className={`w-full px-4 py-2 bg-slate-50 border ${errors.name ? 'border-red-500' : 'border-slate-200'} rounded-lg`} />
+src/components/SchoolShop.tsx-518-                {errors.name && <p className="text-red-500 text-xs mb-4">{errors.name}</p>}
+--
+src/components/SchoolShop.tsx-521-                <select
+src/components/SchoolShop.tsx:522:                    value={showCustomCategory ? 'custom' : newItem.category}
+src/components/SchoolShop.tsx-523-                    onChange={e => {
+--
+src/components/SchoolShop.tsx-534-                >
+src/components/SchoolShop.tsx:535:                    <option value="">Select Category</option>
+src/components/SchoolShop.tsx-536-                    {Array.from(new Set(items.map(i => i.category))).filter(Boolean).map(cat => (
+src/components/SchoolShop.tsx:537:                        <option key={cat} value={cat}>{cat}</option>
+src/components/SchoolShop.tsx-538-                    ))}
+src/components/SchoolShop.tsx:539:                    <option value="Uniforms">Uniforms</option>
+src/components/SchoolShop.tsx:540:                    <option value="Stationery">Stationery</option>
+src/components/SchoolShop.tsx:541:                    <option value="Books">Books</option>
+src/components/SchoolShop.tsx:542:                    <option value="Canteen">Canteen</option>
+src/components/SchoolShop.tsx:543:                    <option value="Other">Other</option>
+src/components/SchoolShop.tsx:544:                    <option value="custom">+ Add New Category</option>
+src/components/SchoolShop.tsx-545-                </select>
+--
+src/components/SchoolShop.tsx-550-                        placeholder="Enter New Category"
+src/components/SchoolShop.tsx:551:                        value={newItem.category}
+src/components/SchoolShop.tsx-552-                        onChange={e => setNewItem({...newItem, category: e.target.value})}
+--
+src/components/SchoolShop.tsx-557-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sale Price (PKR)</label>
+src/components/SchoolShop.tsx:558:                <input type="number" placeholder="0" value={newItem.price} onChange={e => { setNewItem({...newItem, price: Number(e.target.value)}); setErrors({...errors, price: ''}); }} className={`w-full px-4 py-2 bg-slate-50 border ${errors.price ? 'border-red-500' : 'border-slate-200'} rounded-lg`} />
+src/components/SchoolShop.tsx-559-                {errors.price && <p className="text-red-500 text-xs mb-4">{errors.price}</p>}
+--
+src/components/SchoolShop.tsx-561-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Buying Price (PKR)</label>
+src/components/SchoolShop.tsx:562:                <input type="number" placeholder="0" value={newItem.cost} onChange={e => { setNewItem({...newItem, cost: Number(e.target.value)}); setErrors({...errors, cost: ''}); }} className={`w-full px-4 py-2 bg-slate-50 border ${errors.cost ? 'border-red-500' : 'border-slate-200'} rounded-lg`} />
+src/components/SchoolShop.tsx-563-                {errors.cost && <p className="text-red-500 text-xs mb-4">{errors.cost}</p>}
+--
+src/components/SchoolShop.tsx-565-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Initial Quantity (Stock)</label>
+src/components/SchoolShop.tsx:566:                <input type="number" placeholder="0" value={newItem.stock} onChange={e => { setNewItem({...newItem, stock: Number(e.target.value)}); setErrors({...errors, stock: ''}); }} className={`w-full px-4 py-2 bg-slate-50 border ${errors.stock ? 'border-red-500' : 'border-slate-200'} rounded-lg mb-6`} />
+src/components/SchoolShop.tsx-567-                {errors.stock && <p className="text-red-500 text-xs mb-6">{errors.stock}</p>}
+--
+src/components/SchoolShop.tsx-584-                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Class</label>
+src/components/SchoolShop.tsx:585:                        <select value={newSale.studentClass} onChange={e => handleClassChange(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+src/components/SchoolShop.tsx:586:                            <option value="">Select Class</option>
+src/components/SchoolShop.tsx:587:                            {allAvailableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+src/components/SchoolShop.tsx-588-                        </select>
+--
+src/components/SchoolShop.tsx-591-                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Student</label>
+src/components/SchoolShop.tsx:592:                        <select value={newSale.studentId} onChange={e => handleStudentChange(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+src/components/SchoolShop.tsx:593:                            <option value="">Select Student</option>
+src/components/SchoolShop.tsx-594-                            {students
+--
+src/components/SchoolShop.tsx-603-                                })
+src/components/SchoolShop.tsx:604:                                .map(s => <option key={s.id} value={s.id}>{s.name} {s.rollNumber ? `(${s.rollNumber})` : ''}</option>)}
+src/components/SchoolShop.tsx-605-                        </select>
+--
+src/components/SchoolShop.tsx-608-                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Status</label>
+src/components/SchoolShop.tsx:609:                        <select value={newSale.paymentStatus} onChange={e => setNewSale({...newSale, paymentStatus: e.target.value as 'paid' | 'unpaid'})} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+src/components/SchoolShop.tsx:610:                            <option value="paid">Paid</option>
+src/components/SchoolShop.tsx:611:                            <option value="unpaid">Unpaid</option>
+src/components/SchoolShop.tsx-612-                        </select>
+--
+src/components/SchoolShop.tsx-617-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Father's Name</label>
+src/components/SchoolShop.tsx:618:                    <input disabled type="text" placeholder="Auto-populated" value={newSale.fatherName} className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg font-medium text-slate-700" />
+src/components/SchoolShop.tsx-619-                </div>
+--
+src/components/SchoolShop.tsx-623-                    <div className="flex gap-2 mb-4">
+src/components/SchoolShop.tsx:624:                        <select value={cartItem.itemId} onChange={e => setCartItem({...cartItem, itemId: e.target.value})} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm">
+src/components/SchoolShop.tsx:625:                            <option value="">Select Item</option>
+src/components/SchoolShop.tsx:626:                            {items.map(i => <option key={i.id} value={i.id}>{i.name} (PKR {i.price})</option>)}
+src/components/SchoolShop.tsx-627-                        </select>
+src/components/SchoolShop.tsx:628:                        <input type="number" value={cartItem.quantity} onChange={e => setCartItem({...cartItem, quantity: Number(e.target.value)})} min="1" className="w-20 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" />
+src/components/SchoolShop.tsx-629-                        <button onClick={addToCart} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">+</button>
+--
+src/components/SchoolShop.tsx-670-                </div>
+src/components/SchoolShop.tsx:671:                <select value={stockAdj.itemId} onChange={e => setStockAdj({...stockAdj, itemId: e.target.value})} className="w-full p-2 border rounded mb-2">
+src/components/SchoolShop.tsx:672:                    <option value="">Select Item</option>
+src/components/SchoolShop.tsx:673:                    {items.map(i => <option key={i.id} value={i.id}>{i.name} (Current: {i.stock})</option>)}
+src/components/SchoolShop.tsx-674-                </select>
+src/components/SchoolShop.tsx:675:                <input type="number" placeholder="Adjustment (+/-)" value={stockAdj.adjustment} onChange={e => setStockAdj({...stockAdj, adjustment: Number(e.target.value)})} className="w-full p-2 border rounded mb-4" />
+src/components/SchoolShop.tsx-676-                <button onClick={handleStockAdjustment} className="w-full bg-indigo-600 text-white p-2 rounded">Save Adjustment</button>
+--
+src/components/SchoolShop.tsx-799-                        <div className="flex gap-2">
+src/components/SchoolShop.tsx:800:                             <input type="text" placeholder="Filter by name..." value={filterName} onChange={e => setFilterName(e.target.value)} className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"/>
+src/components/SchoolShop.tsx:801:                             <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+src/components/SchoolShop.tsx:802:                                <option value="">All Categories</option>
+src/components/SchoolShop.tsx:803:                                <option value="Uniforms">Uniforms</option>
+src/components/SchoolShop.tsx:804:                                <option value="Stationery">Stationery</option>
+src/components/SchoolShop.tsx:805:                                <option value="Books">Books</option>
+src/components/SchoolShop.tsx:806:                                <option value="Canteen">Canteen</option>
+src/components/SchoolShop.tsx:807:                                <option value="Other">Other</option>
+src/components/SchoolShop.tsx-808-                             </select>
+--
+src/components/SchoolWebsite.tsx-49-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+src/components/SchoolWebsite.tsx:50:            <input placeholder="School Web Address (slug)" value={data.schoolWebAddress} onChange={e => setData({...data, schoolWebAddress: e.target.value})} className="p-3 border rounded-xl" />
+src/components/SchoolWebsite.tsx:51:            <input placeholder="Tagline" value={data.tagline} onChange={e => setData({...data, tagline: e.target.value})} className="p-3 border rounded-xl" />
+src/components/SchoolWebsite.tsx:52:            <input placeholder="Announcement" value={data.announcement} onChange={e => setData({...data, announcement: e.target.value})} className="p-3 border rounded-xl md:col-span-2" />
+src/components/SchoolWebsite.tsx:53:            <textarea placeholder="About Your School" value={data.about} onChange={e => setData({...data, about: e.target.value})} className="p-3 border rounded-xl md:col-span-2" rows={4} />
+src/components/SchoolWebsite.tsx-54-          </div>
+--
+src/components/Settings.tsx-380-                                className="input-field"
+src/components/Settings.tsx:381:                                value={settings.logoUrl}
+src/components/Settings.tsx-382-                                onChange={e => setSettings({...settings, logoUrl: e.target.value})}
+--
+src/components/Settings.tsx-415-                            className="input-field pl-11"
+src/components/Settings.tsx:416:                            value={settings.schoolName}
+src/components/Settings.tsx-417-                            onChange={e => setSettings({...settings, schoolName: e.target.value})}
+--
+src/components/Settings.tsx-432-                            className="input-field pl-11"
+src/components/Settings.tsx:433:                            value={settings.schoolEmail}
+src/components/Settings.tsx-434-                            onChange={e => setSettings({...settings, schoolEmail: e.target.value})}
+--
+src/components/Settings.tsx-451-                            className="input-field pl-11"
+src/components/Settings.tsx:452:                            value={settings.schoolContact}
+src/components/Settings.tsx-453-                            onChange={e => setSettings({...settings, schoolContact: e.target.value})}
+--
+src/components/Settings.tsx-467-                            className="input-field pl-11"
+src/components/Settings.tsx:468:                            value={settings.currency}
+src/components/Settings.tsx-469-                            onChange={e => setSettings({...settings, currency: e.target.value})}
+src/components/Settings.tsx-470-                          >
+src/components/Settings.tsx:471:                            <option value="USD">USD ($)</option>
+src/components/Settings.tsx:472:                            <option value="EUR">EUR (€)</option>
+src/components/Settings.tsx:473:                            <option value="GBP">GBP (£)</option>
+src/components/Settings.tsx:474:                            <option value="PKR">PKR (Rs)</option>
+src/components/Settings.tsx:475:                            <option value="INR">INR (₹)</option>
+src/components/Settings.tsx-476-                          </select>
+--
+src/components/Settings.tsx-491-                            className="input-field pl-11 pt-3"
+src/components/Settings.tsx:492:                            value={settings.schoolAddress}
+src/components/Settings.tsx-493-                            onChange={e => setSettings({...settings, schoolAddress: e.target.value})}
+--
+src/components/Settings.tsx-527-                            className="input-field pl-11"
+src/components/Settings.tsx:528:                            value={settings.voucherSettings?.vouchersPerPage || 3}
+src/components/Settings.tsx-529-                            onChange={e => setSettings({
+--
+src/components/Settings.tsx-533-                          >
+src/components/Settings.tsx:534:                            <option value={1}>1 Voucher per page</option>
+src/components/Settings.tsx:535:                            <option value={2}>2 Vouchers per page</option>
+src/components/Settings.tsx:536:                            <option value={3}>3 Vouchers per page</option>
+src/components/Settings.tsx:537:                            <option value={4}>4 Vouchers per page</option>
+src/components/Settings.tsx-538-                          </select>
+--
+src/components/Settings.tsx-550-                            className="input-field pl-11"
+src/components/Settings.tsx:551:                            value={settings.voucherSettings?.fontFamily || 'monospace'}
+src/components/Settings.tsx-552-                            onChange={e => setSettings({
+--
+src/components/Settings.tsx-556-                          >
+src/components/Settings.tsx:557:                            <option value="monospace">Default Monospace (Technical)</option>
+src/components/Settings.tsx:558:                            <option value="ui-sans-serif, system-ui, sans-serif">Modern Sans-serif (Clean)</option>
+src/components/Settings.tsx:559:                            <option value="ui-serif, Georgia, serif">Classic Serif (Formal)</option>
+src/components/Settings.tsx-560-                          </select>
+--
+src/components/Settings.tsx-573-                            className="input-field pl-11 pt-3"
+src/components/Settings.tsx:574:                            value={settings.voucherSettings?.customNote || ''}
+src/components/Settings.tsx-575-                            onChange={e => setSettings({
+--
+src/components/Settings.tsx-615-                                className="w-full text-sm font-bold bg-transparent border-none p-0 focus:ring-0 text-slate-800"
+src/components/Settings.tsx:616:                                value={account.bankName}
+src/components/Settings.tsx-617-                                onChange={e => {
+--
+src/components/Settings.tsx-622-                              >
+src/components/Settings.tsx:623:                                <option value="HBL">HBL - Habib Bank Limited</option>
+src/components/Settings.tsx:624:                                <option value="Meezan Bank">Meezan Bank</option>
+src/components/Settings.tsx:625:                                <option value="Allied Bank">Allied Bank</option>
+src/components/Settings.tsx:626:                                <option value="MCB">MCB Bank</option>
+src/components/Settings.tsx:627:                                <option value="UBL">UBL</option>
+src/components/Settings.tsx:628:                                <option value="Bank Alfalah">Bank Alfalah</option>
+src/components/Settings.tsx:629:                                <option value="Standard Chartered">Standard Chartered</option>
+src/components/Settings.tsx:630:                                <option value="JazzCash">JazzCash (Mobile Wallet)</option>
+src/components/Settings.tsx:631:                                <option value="EasyPaisa">EasyPaisa (Mobile Wallet)</option>
+src/components/Settings.tsx:632:                                <option value="Nayapay">Nayapay (Mobile Wallet)</option>
+src/components/Settings.tsx:633:                                <option value="SadaPay">SadaPay (Mobile Wallet)</option>
+src/components/Settings.tsx-634-                              </select>
+--
+src/components/Settings.tsx-651-                                placeholder="Account Title"
+src/components/Settings.tsx:652:                                value={account.accountTitle}
+src/components/Settings.tsx-653-                                onChange={e => {
+--
+src/components/Settings.tsx-662-                                placeholder="Account Number / IBAN"
+src/components/Settings.tsx:663:                                value={account.accountNumber}
+src/components/Settings.tsx-664-                                onChange={e => {
+--
+src/components/Settings.tsx-709-                            className="input-field pl-11"
+src/components/Settings.tsx:710:                            value={settings.academicSession}
+src/components/Settings.tsx-711-                            onChange={e => setSettings({...settings, academicSession: e.target.value})}
+--
+src/components/Settings.tsx-726-                            className="input-field pl-11"
+src/components/Settings.tsx:727:                            value={settings.defaultAdmissionYear}
+src/components/Settings.tsx-728-                            onChange={e => setSettings({...settings, defaultAdmissionYear: e.target.value})}
+--
+src/components/Settings.tsx-745-                            className="input-field pl-11"
+src/components/Settings.tsx:746:                            value={settings.timezone}
+src/components/Settings.tsx-747-                            onChange={e => setSettings({...settings, timezone: e.target.value})}
+--
+src/components/Settings.tsx-868-                                className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+src/components/Settings.tsx:869:                                value={newRoleName}
+src/components/Settings.tsx-870-                                onChange={e => setNewRoleName(e.target.value)}
+--
+src/components/Staff.tsx-460-                className="input-field pl-12"
+src/components/Staff.tsx:461:                value={searchQuery}
+src/components/Staff.tsx-462-                onChange={(e) => setSearchQuery(e.target.value)}
+--
+src/components/Staff.tsx-465-            <div className="flex gap-2 w-full md:w-auto">
+src/components/Staff.tsx:466:              <input type="date" value={joiningDateStart} onChange={e => setJoiningDateStart(e.target.value)} className="input-field py-2 text-sm w-full md:w-32" title="Start Date" />
+src/components/Staff.tsx:467:              <input type="date" value={joiningDateEnd} onChange={e => setJoiningDateEnd(e.target.value)} className="input-field py-2 text-sm w-full md:w-32" title="End Date" />
+src/components/Staff.tsx-468-              <select 
+src/components/Staff.tsx-469-                className="input-field py-2 text-sm w-full md:w-40"
+src/components/Staff.tsx:470:                value={roleFilter}
+src/components/Staff.tsx-471-                onChange={e => setRoleFilter(e.target.value)}
+--
+src/components/Staff.tsx-473-                {roles.map(role => (
+src/components/Staff.tsx:474:                  <option key={role as string} value={role as string}>{(role as string).charAt(0).toUpperCase() + (role as string).slice(1)}</option>
+src/components/Staff.tsx-475-                ))}
+--
+src/components/Staff.tsx-541-                              <div className="absolute -bottom-1 -right-1 p-0.5 bg-white rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10">
+src/components/Staff.tsx:542:                                <QRCodeSVG value={staff.staffId} size={16} />
+src/components/Staff.tsx-543-                              </div>
+--
+src/components/Staff.tsx-820-                      <div className="flex justify-center mt-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+src/components/Staff.tsx:821:                        <QRCodeSVG value={viewingIdCard.staffId} size={110} />
+src/components/Staff.tsx-822-                      </div>
+--
+src/components/Staff.tsx-1017-                      className="input-field"
+src/components/Staff.tsx:1018:                      value={formData.name}
+src/components/Staff.tsx-1019-                      onChange={e => setFormData({...formData, name: e.target.value})}
+--
+src/components/Staff.tsx-1029-                        className="input-field bg-slate-100"
+src/components/Staff.tsx:1030:                        value={formData.staffId}
+src/components/Staff.tsx-1031-                      />
+--
+src/components/Staff.tsx-1038-                      className="input-field"
+src/components/Staff.tsx:1039:                      value={formData.role}
+src/components/Staff.tsx-1040-                      onChange={e => setFormData({...formData, role: e.target.value})}
+--
+src/components/Staff.tsx-1054-                      className="input-field"
+src/components/Staff.tsx:1055:                      value={formData.classIncharge}
+src/components/Staff.tsx-1056-                      onChange={e => setFormData({...formData, classIncharge: e.target.value})}
+--
+src/components/Staff.tsx-1069-                        className="input-field pl-12"
+src/components/Staff.tsx:1070:                        value={formData.salary}
+src/components/Staff.tsx-1071-                        onChange={e => setFormData({...formData, salary: Number(e.target.value)})}
+--
+src/components/Staff.tsx-1082-                        className="input-field pl-10"
+src/components/Staff.tsx:1083:                        value={formData.whatsappNumber}
+src/components/Staff.tsx-1084-                        onChange={e => setFormData({...formData, whatsappNumber: e.target.value})}
+--
+src/components/Staff.tsx-1095-                        className="input-field pl-10"
+src/components/Staff.tsx:1096:                        value={formData.secondaryContact}
+src/components/Staff.tsx-1097-                        onChange={e => setFormData({...formData, secondaryContact: e.target.value})}
+--
+src/components/Staff.tsx-1107-                      className="input-field"
+src/components/Staff.tsx:1108:                      value={formData.joiningDate}
+src/components/Staff.tsx-1109-                      onChange={e => setFormData({...formData, joiningDate: e.target.value})}
+--
+src/components/Staff.tsx-1116-                      className="input-field"
+src/components/Staff.tsx:1117:                      value={formData.leavingDate}
+src/components/Staff.tsx-1118-                      onChange={e => setFormData({...formData, leavingDate: e.target.value})}
+--
+src/components/Staff.tsx-1125-                      className="input-field"
+src/components/Staff.tsx:1126:                      value={formData.status}
+src/components/Staff.tsx-1127-                      onChange={e => setFormData({...formData, status: e.target.value as 'active' | 'inactive'})}
+src/components/Staff.tsx-1128-                    >
+src/components/Staff.tsx:1129:                      <option value="active">Active</option>
+src/components/Staff.tsx:1130:                      <option value="inactive">Inactive</option>
+src/components/Staff.tsx-1131-                    </select>
+--
+src/components/Staff.tsx-1137-                      className="input-field"
+src/components/Staff.tsx:1138:                      value={formData.remainingDues}
+src/components/Staff.tsx-1139-                      onChange={e => setFormData({...formData, remainingDues: Number(e.target.value)})}
+--
+src/components/Staff.tsx-1148-                          className="input-field"
+src/components/Staff.tsx:1149:                          value={formData.bankDetails?.bankName || ''}
+src/components/Staff.tsx-1150-                          onChange={e => setFormData({
+--
+src/components/Staff.tsx-1154-                        >
+src/components/Staff.tsx:1155:                          <option value="">Select Bank Details</option>
+src/components/Staff.tsx:1156:                          <option value="HBL">🏦 HBL - Habib Bank Limited</option>
+src/components/Staff.tsx:1157:                          <option value="Meezan Bank">🏦 Meezan Bank</option>
+src/components/Staff.tsx:1158:                          <option value="Allied Bank">🏦 Allied Bank</option>
+src/components/Staff.tsx:1159:                          <option value="MCB">🏦 MCB Bank</option>
+src/components/Staff.tsx:1160:                          <option value="UBL">🏦 UBL</option>
+src/components/Staff.tsx:1161:                          <option value="Bank Alfalah">🏦 Bank Alfalah</option>
+src/components/Staff.tsx:1162:                          <option value="Standard Chartered">🏦 Standard Chartered</option>
+src/components/Staff.tsx:1163:                          <option value="JazzCash">📱 JazzCash</option>
+src/components/Staff.tsx:1164:                          <option value="EasyPaisa">📱 EasyPaisa</option>
+src/components/Staff.tsx:1165:                          <option value="Nayapay">📱 Nayapay</option>
+src/components/Staff.tsx:1166:                          <option value="SadaPay">📱 SadaPay</option>
+src/components/Staff.tsx-1167-                        </select>
+--
+src/components/Staff.tsx-1173-                          className="input-field"
+src/components/Staff.tsx:1174:                          value={formData.bankDetails?.accountTitle || ''}
+src/components/Staff.tsx-1175-                          onChange={e => setFormData({
+--
+src/components/Staff.tsx-1186-                          className="input-field"
+src/components/Staff.tsx:1187:                          value={formData.bankDetails?.accountNumber || formData.bankAccount || ''}
+src/components/Staff.tsx-1188-                          onChange={e => setFormData({
+--
+src/components/Staff.tsx-1339-                      className="input-field"
+src/components/Staff.tsx:1340:                      value={credFormData.username}
+src/components/Staff.tsx-1341-                      onChange={e => setCredFormData({...credFormData, username: e.target.value})}
+--
+src/components/Staff.tsx-1351-                      className="input-field"
+src/components/Staff.tsx:1352:                      value={credFormData.password}
+src/components/Staff.tsx-1353-                      onChange={e => setCredFormData({...credFormData, password: e.target.value})}
+--
+src/components/Students.tsx-363-          <QRCodeSVG 
+src/components/Students.tsx:364:            value={student.id!} 
+src/components/Students.tsx-365-            size={64}
+--
+src/components/Students.tsx-595-            className="input-field pl-12"
+src/components/Students.tsx:596:            value={searchQuery}
+src/components/Students.tsx-597-            onChange={(e) => setSearchQuery(e.target.value)}
+--
+src/components/Students.tsx-624-            <select 
+src/components/Students.tsx:625:              value={classFilter}
+src/components/Students.tsx-626-              onChange={(e) => setClassFilter(e.target.value)}
+--
+src/components/Students.tsx-628-            >
+src/components/Students.tsx:629:              <option value="all">All Classes</option>
+src/components/Students.tsx-630-              {classes.map(c => (
+src/components/Students.tsx:631:                <option key={c} value={c}>{c}</option>
+src/components/Students.tsx-632-              ))}
+--
+src/components/Students.tsx-638-              type="date"
+src/components/Students.tsx:639:              value={dateFilter.start}
+src/components/Students.tsx-640-              onChange={(e) => setDateFilter({...dateFilter, start: e.target.value})}
+--
+src/components/Students.tsx-645-              type="date"
+src/components/Students.tsx:646:              value={dateFilter.end}
+src/components/Students.tsx-647-              onChange={(e) => setDateFilter({...dateFilter, end: e.target.value})}
+--
+src/components/Students.tsx-1191-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1192:                      value={formData.name}
+src/components/Students.tsx-1193-                      onChange={e => setFormData({...formData, name: e.target.value})}
+--
+src/components/Students.tsx-1201-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1202:                      value={formData.rollNumber}
+src/components/Students.tsx-1203-                      onChange={e => setFormData({...formData, rollNumber: e.target.value})}
+--
+src/components/Students.tsx-1211-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1212:                      value={formData.class}
+src/components/Students.tsx-1213-                      onChange={e => setFormData({...formData, class: e.target.value})}
+--
+src/components/Students.tsx-1221-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1222:                      value={formData.section}
+src/components/Students.tsx-1223-                      onChange={e => setFormData({...formData, section: e.target.value})}
+--
+src/components/Students.tsx-1231-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1232:                      value={formData.parentName}
+src/components/Students.tsx-1233-                      onChange={e => setFormData({...formData, parentName: e.target.value})}
+--
+src/components/Students.tsx-1241-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1242:                      value={formData.contact}
+src/components/Students.tsx-1243-                      onChange={e => setFormData({...formData, contact: e.target.value})}
+--
+src/components/Students.tsx-1251-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1252:                      value={formData.email}
+src/components/Students.tsx-1253-                      onChange={e => setFormData({...formData, email: e.target.value})}
+--
+src/components/Students.tsx-1260-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1261:                      value={formData.dateOfBirth}
+src/components/Students.tsx-1262-                      onChange={e => setFormData({...formData, dateOfBirth: e.target.value})}
+--
+src/components/Students.tsx-1268-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1269:                      value={formData.gender}
+src/components/Students.tsx-1270-                      onChange={e => setFormData({...formData, gender: e.target.value as any})}
+src/components/Students.tsx-1271-                    >
+src/components/Students.tsx:1272:                      <option value="male">Male</option>
+src/components/Students.tsx:1273:                      <option value="female">Female</option>
+src/components/Students.tsx:1274:                      <option value="other">Other</option>
+src/components/Students.tsx-1275-                    </select>
+--
+src/components/Students.tsx-1282-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1283:                      value={formData.bloodGroup}
+src/components/Students.tsx-1284-                      onChange={e => setFormData({...formData, bloodGroup: e.target.value})}
+--
+src/components/Students.tsx-1291-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1292:                      value={formData.contactPerson}
+src/components/Students.tsx-1293-                      onChange={e => setFormData({...formData, contactPerson: e.target.value})}
+--
+src/components/Students.tsx-1300-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1301:                      value={formData.emergencyContact}
+src/components/Students.tsx-1302-                      onChange={e => setFormData({...formData, emergencyContact: e.target.value})}
+--
+src/components/Students.tsx-1309-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1310:                      value={formData.previousSchool}
+src/components/Students.tsx-1311-                      onChange={e => setFormData({...formData, previousSchool: e.target.value})}
+--
+src/components/Students.tsx-1318-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1319:                      value={formData.whatsappNumber}
+src/components/Students.tsx-1320-                      onChange={e => setFormData({...formData, whatsappNumber: e.target.value})}
+--
+src/components/Students.tsx-1327-                      className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1328:                      value={formData.caste}
+src/components/Students.tsx-1329-                      onChange={e => setFormData({...formData, caste: e.target.value})}
+--
+src/components/Students.tsx-1361-                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1362:                          value={formData.busNumber}
+src/components/Students.tsx-1363-                          onChange={e => setFormData({...formData, busNumber: e.target.value})}
+--
+src/components/Students.tsx-1370-                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1371:                          value={formData.route}
+src/components/Students.tsx-1372-                          onChange={e => setFormData({...formData, route: e.target.value})}
+--
+src/components/Students.tsx-1379-                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1380:                          value={formData.pickupPoint}
+src/components/Students.tsx-1381-                          onChange={e => setFormData({...formData, pickupPoint: e.target.value})}
+--
+src/components/Students.tsx-1410-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+src/components/Students.tsx:1411:                    value={formData.address}
+src/components/Students.tsx-1412-                    onChange={e => setFormData({...formData, address: e.target.value})}
+--
+src/components/Students.tsx-1487-                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+src/components/Students.tsx:1488:                          value={columnMapping[field.key] || ''}
+src/components/Students.tsx-1489-                          onChange={(e) => setColumnMapping({ ...columnMapping, [field.key]: e.target.value })}
+src/components/Students.tsx-1490-                        >
+src/components/Students.tsx:1491:                          <option value="">-- Skip this field --</option>
+src/components/Students.tsx-1492-                          {csvHeaders.map(header => (
+src/components/Students.tsx:1493:                            <option key={header} value={header}>{header}</option>
+src/components/Students.tsx-1494-                          ))}
+--
+src/components/Students.tsx-1692-                <QRCodeSVG 
+src/components/Students.tsx:1693:                  value={selectedStudent.id} 
+src/components/Students.tsx-1694-                  size={64}
+--
+src/components/Subjects.tsx-205-                  placeholder="e.g. Mathematics" 
+src/components/Subjects.tsx:206:                  value={formData.name} 
+src/components/Subjects.tsx-207-                  onChange={e => setFormData({...formData, name: e.target.value})} 
+--
+src/components/Subjects.tsx-217-                    placeholder="e.g. MATH-101" 
+src/components/Subjects.tsx:218:                    value={formData.code} 
+src/components/Subjects.tsx-219-                    onChange={e => setFormData({...formData, code: e.target.value})} 
+--
+src/components/Subjects.tsx-225-                  <select 
+src/components/Subjects.tsx:226:                    value={formData.class}
+src/components/Subjects.tsx-227-                    onChange={e => setFormData({...formData, class: e.target.value})}
+--
+src/components/Subjects.tsx-229-                  >
+src/components/Subjects.tsx:230:                    <option value="">-- Select Class --</option>
+src/components/Subjects.tsx-231-                    {['Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'].map(c => (
+src/components/Subjects.tsx:232:                      <option key={c} value={c}>{c}</option>
+src/components/Subjects.tsx-233-                    ))}
+--
+src/components/Subjects.tsx-241-                  <select 
+src/components/Subjects.tsx:242:                    value={formData.teacherId} 
+src/components/Subjects.tsx-243-                    onChange={e => setFormData({...formData, teacherId: e.target.value})}
+--
+src/components/Subjects.tsx-245-                  >
+src/components/Subjects.tsx:246:                    <option value="">-- Select Teacher --</option>
+src/components/Subjects.tsx-247-                    {staff.map(st => (
+src/components/Subjects.tsx:248:                      <option key={st.id} value={st.id}>{st.name} ({st.role})</option>
+src/components/Subjects.tsx-249-                    ))}
+--
+src/components/Tasks.tsx-347-            className="w-full pl-12 pr-6 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm"
+src/components/Tasks.tsx:348:            value={searchQuery}
+src/components/Tasks.tsx-349-            onChange={(e) => setSearchQuery(e.target.value)}
+--
+src/components/Tasks.tsx-355-            className="w-full pl-12 pr-6 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 appearance-none text-sm"
+src/components/Tasks.tsx:356:            value={filterStatus}
+src/components/Tasks.tsx-357-            onChange={(e) => setFilterStatus(e.target.value as any)}
+src/components/Tasks.tsx-358-          >
+src/components/Tasks.tsx:359:            <option value="all">All Status</option>
+src/components/Tasks.tsx:360:            <option value="pending">Pending</option>
+src/components/Tasks.tsx:361:            <option value="in-progress">In Progress</option>
+src/components/Tasks.tsx:362:            <option value="completed">Completed</option>
+src/components/Tasks.tsx-363-          </select>
+--
+src/components/Tasks.tsx-368-            className="w-full pl-12 pr-6 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 appearance-none text-sm"
+src/components/Tasks.tsx:369:            value={filterAssignee}
+src/components/Tasks.tsx-370-            onChange={(e) => setFilterAssignee(e.target.value)}
+src/components/Tasks.tsx-371-          >
+src/components/Tasks.tsx:372:            <option value="all">All Assignees</option>
+src/components/Tasks.tsx-373-            {staff.map(s => (
+src/components/Tasks.tsx:374:              <option key={s.id} value={s.id}>{s.name}</option>
+src/components/Tasks.tsx-375-            ))}
+--
+src/components/Tasks.tsx-381-            className="w-full pl-12 pr-6 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 appearance-none text-sm"
+src/components/Tasks.tsx:382:            value={sortBy}
+src/components/Tasks.tsx-383-            onChange={(e) => setSortBy(e.target.value as any)}
+src/components/Tasks.tsx-384-          >
+src/components/Tasks.tsx:385:            <option value="dueDate">Due Date</option>
+src/components/Tasks.tsx:386:            <option value="priority">Priority</option>
+src/components/Tasks.tsx-387-          </select>
+--
+src/components/Tasks.tsx-599-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Tasks.tsx:600:                    value={bulkTasksText}
+src/components/Tasks.tsx-601-                    onChange={e => setBulkTasksText(e.target.value)}
+--
+src/components/Tasks.tsx-662-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+src/components/Tasks.tsx:663:                    value={formData.title}
+src/components/Tasks.tsx-664-                    onChange={e => setFormData({...formData, title: e.target.value})}
+--
+src/components/Tasks.tsx-674-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+src/components/Tasks.tsx:675:                      value={formData.dueDate}
+src/components/Tasks.tsx-676-                      onChange={e => setFormData({...formData, dueDate: e.target.value})}
+--
+src/components/Tasks.tsx-683-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold appearance-none"
+src/components/Tasks.tsx:684:                      value={formData.priority}
+src/components/Tasks.tsx-685-                      onChange={e => setFormData({...formData, priority: e.target.value as any})}
+src/components/Tasks.tsx-686-                    >
+src/components/Tasks.tsx:687:                      <option value="low">Low</option>
+src/components/Tasks.tsx:688:                      <option value="medium">Medium</option>
+src/components/Tasks.tsx:689:                      <option value="high">High</option>
+src/components/Tasks.tsx-690-                    </select>
+--
+src/components/Tasks.tsx-698-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold appearance-none"
+src/components/Tasks.tsx:699:                      value={formData.status}
+src/components/Tasks.tsx-700-                      onChange={e => setFormData({...formData, status: e.target.value as any})}
+src/components/Tasks.tsx-701-                    >
+src/components/Tasks.tsx:702:                      <option value="pending">Pending</option>
+src/components/Tasks.tsx:703:                      <option value="in-progress">In Progress</option>
+src/components/Tasks.tsx:704:                      <option value="completed">Completed</option>
+src/components/Tasks.tsx-705-                    </select>
+--
+src/components/Tasks.tsx-740-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+src/components/Tasks.tsx:741:                      value={formData.reminderDate}
+src/components/Tasks.tsx-742-                      onChange={e => setFormData({...formData, reminderDate: e.target.value})}
+--
+src/components/Tasks.tsx-749-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+src/components/Tasks.tsx:750:                      value={formData.reminderTime}
+src/components/Tasks.tsx-751-                      onChange={e => setFormData({...formData, reminderTime: e.target.value})}
+--
+src/components/Tasks.tsx-761-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Tasks.tsx:762:                    value={formData.description}
+src/components/Tasks.tsx-763-                    onChange={e => setFormData({...formData, description: e.target.value})}
+--
+src/components/TeacherAttendance.tsx-198-                  <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm mx-auto w-fit">
+src/components/TeacherAttendance.tsx:199:                    <QRCodeSVG value={profile?.uid || ''} size={150} />
+src/components/TeacherAttendance.tsx-200-                  </div>
+--
+src/components/TeacherAttendance.tsx-218-                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+src/components/TeacherAttendance.tsx:219:                     value={manualTime}
+src/components/TeacherAttendance.tsx-220-                     onChange={(e) => setManualTime(e.target.value)}
+--
+src/components/Transport.tsx-341-                  className="input-field py-2 text-xs"
+src/components/Transport.tsx:342:                  value={vehicleSortBy}
+src/components/Transport.tsx-343-                  onChange={e => setVehicleSortBy(e.target.value as any)}
+src/components/Transport.tsx-344-                >
+src/components/Transport.tsx:345:                  <option value="vehicleNumber">Sort by Vehicle No.</option>
+src/components/Transport.tsx:346:                  <option value="driverName">Sort by Driver</option>
+src/components/Transport.tsx:347:                  <option value="status">Sort by Status</option>
+src/components/Transport.tsx-348-                </select>
+--
+src/components/Transport.tsx-603-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Transport.tsx:604:                      value={vehicleFormData.vehicleNumber}
+src/components/Transport.tsx-605-                      onChange={e => setVehicleFormData({...vehicleFormData, vehicleNumber: e.target.value})}
+--
+src/components/Transport.tsx-615-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Transport.tsx:616:                      value={vehicleFormData.capacity || ''}
+src/components/Transport.tsx-617-                      onChange={e => {
+--
+src/components/Transport.tsx-629-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Transport.tsx:630:                      value={vehicleFormData.driverName}
+src/components/Transport.tsx-631-                      onChange={e => setVehicleFormData({...vehicleFormData, driverName: e.target.value})}
+--
+src/components/Transport.tsx-639-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Transport.tsx:640:                      value={vehicleFormData.driverContact}
+src/components/Transport.tsx-641-                      onChange={e => setVehicleFormData({...vehicleFormData, driverContact: e.target.value})}
+--
+src/components/Transport.tsx-647-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+src/components/Transport.tsx:648:                      value={vehicleFormData.status}
+src/components/Transport.tsx-649-                      onChange={e => setVehicleFormData({...vehicleFormData, status: e.target.value as any})}
+src/components/Transport.tsx-650-                    >
+src/components/Transport.tsx:651:                      <option value="active">Active</option>
+src/components/Transport.tsx:652:                      <option value="maintenance">Maintenance</option>
+src/components/Transport.tsx:653:                      <option value="inactive">Inactive</option>
+src/components/Transport.tsx-654-                    </select>
+--
+src/components/Transport.tsx-700-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none font-medium"
+src/components/Transport.tsx:701:                      value={routeFormData.routeName}
+src/components/Transport.tsx-702-                      onChange={e => setRouteFormData({...routeFormData, routeName: e.target.value})}
+--
+src/components/Transport.tsx-710-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none font-medium"
+src/components/Transport.tsx:711:                      value={routeFormData.vehicleId}
+src/components/Transport.tsx-712-                      onChange={e => setRouteFormData({...routeFormData, vehicleId: e.target.value})}
+src/components/Transport.tsx-713-                    >
+src/components/Transport.tsx:714:                      <option value="">Select a vehicle</option>
+src/components/Transport.tsx-715-                      {vehicles.map(v => (
+src/components/Transport.tsx:716:                        <option key={v.id} value={v.id}>{v.vehicleNumber} ({v.driverName})</option>
+src/components/Transport.tsx-717-                      ))}
+--
+src/components/Transport.tsx-725-                        className="flex-1 px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none font-medium"
+src/components/Transport.tsx:726:                        value={newStop}
+src/components/Transport.tsx-727-                        onChange={e => setNewStop(e.target.value)}
+--
+src/components/Transport.tsx-795-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+src/components/Transport.tsx:796:                      value={feeFormData.feeType}
+src/components/Transport.tsx-797-                      onChange={e => setFeeFormData({...feeFormData, feeType: e.target.value})}
+--
+src/components/Transport.tsx-808-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+src/components/Transport.tsx:809:                      value={feeFormData.amount}
+src/components/Transport.tsx-810-                      onChange={e => setFeeFormData({...feeFormData, amount: parseFloat(e.target.value)})}
+--
+src/components/Transport.tsx-819-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+src/components/Transport.tsx:820:                      value={feeFormData.dueDate}
+src/components/Transport.tsx-821-                      onChange={e => setFeeFormData({...feeFormData, dueDate: e.target.value})}

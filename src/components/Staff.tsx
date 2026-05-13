@@ -28,11 +28,14 @@ import {
   Scan,
   Loader2,
   Upload,
-  IdCard
+  IdCard,
+  Printer,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
+import html2canvas from 'html2canvas';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
@@ -102,9 +105,10 @@ export default function StaffManagement({ profile }: StaffProps) {
 
   const fetchPayrollHistory = async (staffId: string) => {
     try {
-      const q = query(collection(db, 'payroll'), where('staffId', '==', staffId), orderBy('paymentDate', 'desc'));
+      const q = query(collection(db, 'payroll'), where('staffId', '==', staffId));
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Payroll));
+      data.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
       setPayrollHistory(data);
     } catch (error) {
       console.error("Error fetching payroll history:", error);
@@ -116,14 +120,11 @@ export default function StaffManagement({ profile }: StaffProps) {
       const q = query(
         collection(db, 'attendance'), 
         where('targetId', '==', staffId),
-        where('targetType', '==', staffId.startsWith('STF') ? 'staff' : 'staff'), // Adjusting for actual implementation if needed, seems to just use staffId in Staff.tsx
-        // Wait, looking at handleGenerateCredentials/onScanSuccess, it seems staffId is used as targetId.
-        // The query in fetchAttendanceHistory seems okay: targetType: 'staff'
-        where('targetType', '==', 'staff'),
-        orderBy('date', 'desc')
+        where('targetType', '==', 'staff')
       );
       const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+      data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setAttendanceHistory(data);
     } catch (error) {
       console.error("Error fetching attendance history:", error);
@@ -793,9 +794,23 @@ export default function StaffManagement({ profile }: StaffProps) {
             >
               <div className="p-4 flex items-center justify-between border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><IdCard className="w-5 h-5" /> Staff ID Card</h3>
-                <button onClick={() => setViewingIdCard(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                  <X className="w-5 h-5 text-slate-500" />
-                </button>
+                <div className="flex gap-2">
+                   <button onClick={() => window.print()} className="p-2 hover:bg-indigo-50 text-indigo-600 rounded-xl transition-colors" title="Print"><Printer className="w-5 h-5"/></button>
+                   <button onClick={async () => {
+                     const element = document.getElementById('print-id-card');
+                     if (element) {
+                       const canvas = await html2canvas(element);
+                       const dataUrl = canvas.toDataURL('image/png');
+                       const link = document.createElement('a');
+                       link.href = dataUrl;
+                       link.download = `id-card-${viewingIdCard.staffId}.png`;
+                       link.click();
+                     }
+                   }} className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-xl transition-colors" title="Download"><Download className="w-5 h-5"/></button>
+                   <button onClick={() => setViewingIdCard(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                     <X className="w-5 h-5 text-slate-500" />
+                   </button>
+                </div>
               </div>
               <div className="p-8 pb-10 bg-slate-50">
                 <div id="print-id-card" className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative" style={{ width: '280px', height: '440px', margin: '0 auto' }}>

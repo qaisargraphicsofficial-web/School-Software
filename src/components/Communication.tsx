@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, query, orderBy, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Notice, UserProfile, Student, ExamResult, Attendance, BulkMessage, FeeRecord, FeeType, SchoolSettings } from '../types';
 import { 
   Bell, 
@@ -34,6 +34,14 @@ export default function Communication({ profile }: CommunicationProps) {
   const [bulkMessages, setBulkMessages] = useState<BulkMessage[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [selectedAbsentDate, setSelectedAbsentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedAbsentClass, setSelectedAbsentClass] = useState('All');
+
+  const handleDateChange = (date: string) => {
+    setSelectedAbsentDate(date);
+    fetchAttendance(date);
+  };
+  const [classes, setClasses] = useState<any[]>([]);
   const [settings, setSettings] = useState<SchoolSettings | null>(null);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
@@ -116,13 +124,20 @@ export default function Communication({ profile }: CommunicationProps) {
     if (profile?.role === 'admin' || profile?.role === 'staff') {
       fetchStudents();
       fetchFeeData();
-      fetchAttendance();
+      fetchAttendance(selectedAbsentDate);
       fetchSettings();
+      fetchClasses();
     }
     if (profile?.role === 'parent' && linkedStudentId) {
       fetchChildData(linkedStudentId);
     }
   }, [profile, linkedStudentId]);
+
+  useEffect(() => {
+    if (profile?.role === 'admin' || profile?.role === 'staff') {
+      fetchAttendance(selectedAbsentDate);
+    }
+  }, [selectedAbsentDate]);
 
   const fetchSettings = async () => {
     try {
@@ -135,47 +150,119 @@ export default function Communication({ profile }: CommunicationProps) {
     }
   };
 
-  const fetchAttendance = async () => {
+  const fetchClasses = async () => {
+    const path = 'classes';
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const q = query(collection(db, 'attendance'), where('date', '==', today));
+      let q = query(collection(db, path));
+      if (profile?.campusId) {
+        q = query(collection(db, path), where('campusId', '==', profile.campusId));
+      }
+      let snap = await getDocs(q);
+      let fetchedDocs = snap.docs;
+
+      // If filtered query is empty but campusId exists, try fallback to all classes
+      if (fetchedDocs.length === 0 && profile?.campusId) {
+        const fallbackSnap = await getDocs(query(collection(db, path)));
+        fetchedDocs = fallbackSnap.docs;
+      }
+
+      const classOrder = ['Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'];
+      let fetchedClasses = fetchedDocs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // If no classes exist in the collection, try to derive them from students
+      if (fetchedClasses.length === 0) {
+        let studentQ = query(collection(db, 'students'));
+        if (profile?.campusId) {
+          studentQ = query(collection(db, 'students'), where('campusId', '==', profile.campusId));
+        }
+        let studentSnap = await getDocs(studentQ);
+        
+        // Fallback for students too
+        if (studentSnap.empty && profile?.campusId) {
+          studentSnap = await getDocs(query(collection(db, 'students')));
+        }
+
+        const uniqueClasses = Array.from(new Set(studentSnap.docs.map(d => (d.data() as any).class)));
+        fetchedClasses = uniqueClasses.filter(Boolean).map(c => ({
+          id: `derived-${c}`,
+          className: c,
+          campusId: profile?.campusId || 'main'
+        }));
+      }
+
+      const sorted = fetchedClasses.sort((a: any, b: any) => {
+        const nameA = a.className || a.name || a.class || "";
+        const nameB = b.className || b.name || b.class || "";
+        const indexA = classOrder.indexOf(nameA);
+        const indexB = classOrder.indexOf(nameB);
+        if (indexA === -1 && indexB === -1) return nameA.localeCompare(nameB);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      });
+      
+      setClasses(sorted);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+    }
+  };
+
+  const fetchAttendance = async (date: string) => {
+    const path = 'attendance';
+    try {
+      const q = query(collection(db, path), where('date', '==', date));
       const snap = await getDocs(q);
       setAttendance(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance)));
     } catch (error) {
-      console.error("Error fetching attendance:", error);
+      handleFirestoreError(error, OperationType.GET, path);
     }
   };
 
   const fetchNotices = async () => {
+    const path = 'notices';
     try {
-      const q = query(collection(db, 'notices'), orderBy('date', 'desc'));
+      const q = query(collection(db, path), orderBy('date', 'desc'));
       const snap = await getDocs(q);
       setNotices(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Notice)));
     } catch (error) {
-      console.error("Error fetching notices:", error);
+      handleFirestoreError(error, OperationType.GET, path);
     }
   };
 
   const fetchBulkMessages = async () => {
+    const path = 'bulk_messages';
     try {
-      const q = query(collection(db, 'bulk_messages'), orderBy('date', 'desc'));
+      const q = query(collection(db, path), orderBy('date', 'desc'));
       const snap = await getDocs(q);
       setBulkMessages(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as BulkMessage)));
     } catch (error) {
-      console.error("Error fetching bulk messages:", error);
+      handleFirestoreError(error, OperationType.GET, path);
     }
   };
 
   const fetchStudents = async () => {
+    const path = 'students';
     try {
-      const snap = await getDocs(collection(db, 'students'));
-      setStudents(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student)));
+      let q = query(collection(db, path));
+      if (profile?.campusId) {
+        q = query(collection(db, path), where('campusId', '==', profile.campusId));
+      }
+      let snap = await getDocs(q);
+      let docs = snap.docs;
+
+      if (docs.length === 0 && profile?.campusId) {
+        const fallbackSnap = await getDocs(query(collection(db, path)));
+        docs = fallbackSnap.docs;
+      }
+
+      setStudents(docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student)));
     } catch (error) {
-      console.error("Error fetching students:", error);
+      handleFirestoreError(error, OperationType.GET, path);
     }
   };
 
   const fetchFeeData = async () => {
+    const path = 'fees';
     try {
       const [recordsSnap, typesSnap] = await Promise.all([
         getDocs(collection(db, 'fee_records')),
@@ -184,7 +271,7 @@ export default function Communication({ profile }: CommunicationProps) {
       setFeeRecords(recordsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeeRecord)));
       setFeeTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeeType)));
     } catch (error) {
-      console.error("Error fetching fee data:", error);
+      handleFirestoreError(error, OperationType.GET, path);
     } finally {
       setLoading(false);
     }
@@ -297,7 +384,11 @@ export default function Communication({ profile }: CommunicationProps) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const absentStudents = students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent'));
+    let absentStudents = students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent'));
+    if (selectedAbsentClass !== 'All') {
+      absentStudents = absentStudents.filter(s => s.class === selectedAbsentClass);
+    }
+
     const rows = absentStudents.map(s => `
       <tr>
         <td>${s.rollNumber}</td>
@@ -311,17 +402,19 @@ export default function Communication({ profile }: CommunicationProps) {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Absent Students List - ${new Date().toLocaleDateString()}</title>
+          <title>Absent Students List - ${selectedAbsentDate}</title>
           <style>
             body { font-family: sans-serif; padding: 20px; }
             h1 { text-align: center; color: #e11d48; margin-bottom: 20px; }
+            h2 { text-align: center; color: #64748b; font-size: 16px; margin-bottom: 30px; }
             table { width: 100%; border-collapse: collapse; }
             th { background: #fee2e2; padding: 10px; text-align: left; border-bottom: 2px solid #fecaca; }
             td { padding: 10px; border-bottom: 1px solid #f1f5f9; }
           </style>
         </head>
         <body>
-          <h1>DAILY ABSENT LIST - ${new Date().toLocaleDateString()}</h1>
+          <h1>DAILY ABSENT LIST</h1>
+          <h2>Date: ${selectedAbsentDate} | Class: ${selectedAbsentClass}</h2>
           <table>
             <thead>
               <tr>
@@ -684,8 +777,8 @@ export default function Communication({ profile }: CommunicationProps) {
           </div>
         </section>
       ) : activeTab === 'absent' ? (
-        <section className="space-y-6">
-          <div className="flex items-center justify-between mb-6">
+        <section className="space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-rose-600 rounded-lg shadow-lg shadow-rose-200">
                 <Users className="w-6 h-6 text-white" />
@@ -693,80 +786,235 @@ export default function Communication({ profile }: CommunicationProps) {
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">Absent Students</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Today: {new Date().toLocaleDateString()}
-                  </span>
                   <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Total: {students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent')).length}
+                    Total Absent: {students.filter(s => {
+                      const isAbsent = attendance.some(a => {
+                        const isTarget = a.targetId === s.id || a.targetId === s.rollNumber || String(a.targetId) === String(s.id) || String(a.targetId) === String(s.rollNumber);
+                        return isTarget && a.status === 'absent';
+                      });
+                      const sClass = (s.class || "").trim().toLowerCase();
+                      const filterClass = selectedAbsentClass.trim().toLowerCase();
+                      const inClass = selectedAbsentClass === 'All' || sClass === filterClass;
+                      return isAbsent && inClass;
+                    }).length}
                   </span>
                 </div>
               </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={printAbsentList}
-                className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-100 transition-all border border-indigo-100"
-              >
-                <FileText className="w-5 h-5" />
-                Print List
-              </button>
+
+            <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="flex items-center gap-2 px-3 border-r border-slate-100">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <input 
+                  type="date"
+                  value={selectedAbsentDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  className="text-sm font-bold text-slate-700 bg-transparent border-none focus:ring-0 cursor-pointer"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 px-3">
+                <Users className="w-4 h-4 text-slate-400" />
+                <select
+                  value={selectedAbsentClass}
+                  onChange={(e) => setSelectedAbsentClass(e.target.value)}
+                  className="text-sm font-bold text-slate-700 bg-transparent border-none focus:ring-0 cursor-pointer min-w-[120px]"
+                >
+                  <option value="All">All Classes</option>
+                  {classes.map(c => {
+                    const name = c.className || c.name || c.class;
+                    return (
+                      <option key={c.id} value={name}>{name}</option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div className="pl-3 border-l border-slate-100">
+                <button
+                  onClick={printAbsentList}
+                  className="p-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold hover:bg-indigo-100 transition-all border border-indigo-100"
+                  title="Print List"
+                >
+                  <FileText className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent')).length === 0 ? (
-              <div className="col-span-full py-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                <XCircle className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                <p className="font-bold">No students marked absent today.</p>
-                <p className="text-sm">Great! Everyone is present.</p>
-              </div>
+          <div className="space-y-10">
+            {selectedAbsentClass === 'All' ? (
+              classes.map(cls => {
+                const classAbsentStudents = students.filter(s => {
+                  const sClass = (s.class || "").trim().toLowerCase();
+                  const cClass = (cls.className || cls.name || "").trim().toLowerCase();
+                  if (sClass !== cClass) return false;
+
+                  return attendance.some(a => {
+                    const isTarget = a.targetId === s.id || 
+                                     a.targetId === s.rollNumber || 
+                                     String(a.targetId) === String(s.id) || 
+                                     String(a.targetId) === String(s.rollNumber);
+                    return isTarget && a.status === 'absent';
+                  });
+                });
+                
+                if (classAbsentStudents.length === 0) return null;
+
+                return (
+                  <div key={cls.id} className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+                        <span className="flex items-center justify-center w-10 h-10 bg-rose-100 text-rose-600 rounded-xl font-black shadow-sm">
+                          {cls.className.substring(0, 2)}
+                        </span>
+                        Class {cls.className}
+                      </h3>
+                      <div className="h-px flex-1 bg-slate-100"></div>
+                      <span className="text-sm font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full">
+                        {classAbsentStudents.length} Absent
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {classAbsentStudents.map((student) => (
+                        <div key={student.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
+                           <div className="absolute top-0 right-0 p-4 bg-rose-50 text-rose-600 rounded-bl-2xl">
+                              <Clock className="w-4 h-4" />
+                           </div>
+                           
+                           <div className="flex items-start gap-4 mb-4">
+                              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400">
+                                {student.name[0]}
+                              </div>
+                              <div>
+                                <h4 className="font-black text-slate-900 leading-tight">{student.name}</h4>
+                                <p className="text-xs font-bold text-slate-400 mt-0.5 uppercase tracking-wider">Class {student.class}-{student.section}</p>
+                              </div>
+                           </div>
+
+                           <div className="space-y-3 pt-4 border-t border-slate-50">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-400 font-bold uppercase tracking-wider">Guardian</span>
+                                <span className="text-slate-900 font-black">{student.parentName}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-400 font-bold uppercase tracking-wider">Contact</span>
+                                <span className="text-slate-900 font-black">{student.contact || '-'}</span>
+                              </div>
+                           </div>
+
+                           <div className="grid grid-cols-2 gap-2 mt-6">
+                              <button 
+                                onClick={() => openWhatsApp(student.whatsappNumber || student.contact, student.name)}
+                                className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm shadow-emerald-100"
+                              >
+                                 <MessageSquare size={14} /> WhatsApp
+                              </button>
+                              <button 
+                                onClick={() => window.location.href = `tel:${student.contact}`}
+                                className="flex items-center justify-center gap-2 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm shadow-indigo-100"
+                              >
+                                 <Bell size={14} /> SMS/Call
+                              </button>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
             ) : (
-              students.filter(s => attendance.some(a => a.targetId === s.id && a.status === 'absent')).map((student) => (
-                <div key={student.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 p-4 bg-rose-50 text-rose-600 rounded-bl-2xl">
-                      <Clock className="w-4 h-4" />
-                   </div>
-                   
-                   <div className="flex items-start gap-4 mb-4">
-                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400">
-                        {student.name[0]}
-                      </div>
-                      <div>
-                        <h4 className="font-black text-slate-900 leading-tight">{student.name}</h4>
-                        <p className="text-xs font-bold text-slate-400 mt-0.5 uppercase tracking-wider">Class {student.class}-{student.section}</p>
-                      </div>
-                   </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {students.filter(s => {
+                  const isAbsent = attendance.some(a => {
+                    const isTarget = a.targetId === s.id || a.targetId === s.rollNumber || String(a.targetId) === String(s.id) || String(a.targetId) === String(s.rollNumber);
+                    return isTarget && a.status === 'absent';
+                  });
+                  const sClass = (s.class || "").trim().toLowerCase();
+                  const filterClass = selectedAbsentClass.trim().toLowerCase();
+                  const inClass = sClass === filterClass;
+                  return isAbsent && inClass;
+                }).length === 0 ? (
+                  <div className="col-span-full py-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <XCircle className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                    <p className="font-bold">No students found marked absent for Class {selectedAbsentClass}.</p>
+                    <p className="text-sm">Try changing the date or checking another class.</p>
+                  </div>
+                ) : (
+                  students.filter(s => {
+                    const isAbsent = attendance.some(a => {
+                      const isTarget = a.targetId === s.id || a.targetId === s.rollNumber || String(a.targetId) === String(s.id) || String(a.targetId) === String(s.rollNumber);
+                      return isTarget && a.status === 'absent';
+                    });
+                    const sClass = (s.class || "").trim().toLowerCase();
+                    const filterClass = selectedAbsentClass.trim().toLowerCase();
+                    const inClass = sClass === filterClass;
+                    return isAbsent && inClass;
+                  }).map((student) => (
+                    <div key={student.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group">
+                       <div className="absolute top-0 right-0 p-4 bg-rose-50 text-rose-600 rounded-bl-2xl">
+                          <Clock className="w-4 h-4" />
+                       </div>
+                       
+                       <div className="flex items-start gap-4 mb-4">
+                          <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400">
+                            {student.name[0]}
+                          </div>
+                          <div>
+                            <h4 className="font-black text-slate-900 leading-tight">{student.name}</h4>
+                            <p className="text-xs font-bold text-slate-400 mt-0.5 uppercase tracking-wider">Class {student.class}-{student.section}</p>
+                          </div>
+                       </div>
 
-                   <div className="space-y-3 pt-4 border-t border-slate-50">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-400 font-bold uppercase tracking-wider">Guardian</span>
-                        <span className="text-slate-900 font-black">{student.parentName}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-400 font-bold uppercase tracking-wider">Contact</span>
-                        <span className="text-slate-900 font-black">{student.contact || '-'}</span>
-                      </div>
-                   </div>
+                       <div className="space-y-3 pt-4 border-t border-slate-50">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 font-bold uppercase tracking-wider">Guardian</span>
+                            <span className="text-slate-900 font-black">{student.parentName}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 font-bold uppercase tracking-wider">Contact</span>
+                            <span className="text-slate-900 font-black">{student.contact || '-'}</span>
+                          </div>
+                       </div>
 
-                   <div className="grid grid-cols-2 gap-2 mt-6">
-                      <button 
-                        onClick={() => openWhatsApp(student.whatsappNumber || student.contact, student.name)}
-                        className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm shadow-emerald-100"
-                      >
-                         <MessageSquare size={14} /> WhatsApp
-                      </button>
-                      <button 
-                        onClick={() => window.location.href = `tel:${student.contact}`}
-                        className="flex items-center justify-center gap-2 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm shadow-indigo-100"
-                      >
-                         <Bell size={14} /> SMS/Call
-                      </button>
-                   </div>
+                       <div className="grid grid-cols-2 gap-2 mt-6">
+                          <button 
+                            onClick={() => openWhatsApp(student.whatsappNumber || student.contact, student.name)}
+                            className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm shadow-emerald-100"
+                          >
+                             <MessageSquare size={14} /> WhatsApp
+                          </button>
+                          <button 
+                            onClick={() => window.location.href = `tel:${student.contact}`}
+                            className="flex items-center justify-center gap-2 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm shadow-indigo-100"
+                          >
+                             <Bell size={14} /> SMS/Call
+                          </button>
+                       </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Global Empty State if absolutely no one is absent in any class */}
+            {selectedAbsentClass === 'All' && 
+             students.filter(s => attendance.some(a => {
+               const isTarget = a.targetId === s.id || a.targetId === s.rollNumber || String(a.targetId) === String(s.id) || String(a.targetId) === String(s.rollNumber);
+               return isTarget && a.status === 'absent';
+             })).length === 0 && (
+              <div className="col-span-full py-20 text-center text-slate-500 bg-white rounded-3xl border border-slate-100 shadow-sm">
+                <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <CheckCircle2 className="w-10 h-10 text-rose-500" />
                 </div>
-              ))
+                <h3 className="text-xl font-black text-slate-900 mb-2">No Absents Found</h3>
+                <p className="text-slate-500">Everyone was present on {selectedAbsentDate}! Keep up the great work.</p>
+              </div>
             )}
           </div>
         </section>
+
       ) : activeTab === 'notices' ? (
         <>
           {/* Notice Board Section */}
@@ -1372,9 +1620,12 @@ export default function Communication({ profile }: CommunicationProps) {
                     onChange={e => setBulkFormData({...bulkFormData, targetClass: e.target.value})}
                   >
                     <option value="All">All Parents</option>
-                    {Array.from(new Set(students.map(s => s.class))).sort().map(cls => (
-                      <option key={cls} value={cls}>Class {cls}</option>
-                    ))}
+                    {classes.map(c => {
+                      const name = c.className || c.name || c.class;
+                      return (
+                        <option key={c.id} value={name}>Class {name}</option>
+                      );
+                    })}
                   </select>
                 </div>
 
