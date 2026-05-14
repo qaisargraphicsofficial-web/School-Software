@@ -21,15 +21,20 @@ export default function Login() {
       return;
     }
     try {
-      const q = query(collection(db, 'schools'), where('domain', '==', val));
+      // Use getDocsFromServer to bypass cache and ensure fresh data if possible,
+      // or just handle the potential permission error gracefully if not signed in.
+      const q = query(collection(db, 'schools'), where('domain', '==', val.toLowerCase().trim()));
       const snap = await getDocs(q);
       if (!snap.empty) {
         setBrandName(snap.docs[0].data().name);
       } else {
         setBrandName('EduManage Pro');
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      // Permission denied is expected if not signed in and rules are strict
+      if (!e.message?.includes('permission')) {
+        console.error("Domain lookup failed:", e);
+      }
       setBrandName('EduManage Pro');
     }
   };
@@ -37,35 +42,42 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
+    const normalizedSuperAdmin = "qaisarabbas6496@gmail.com";
+    
     try {
       // 1. Perform Google Sign-In FIRST
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
+      const userEmail = firebaseUser.email?.toLowerCase();
+
+      console.log("Logged in as:", userEmail);
 
       // 2. If super admin, they bypass the domain check
-      if (firebaseUser.email?.toLowerCase() === "qaisarabbas6496@gmail.com") {
+      if (userEmail === normalizedSuperAdmin) {
+        console.log("Super admin detected, bypassing domain check.");
         // App.tsx handles the profile redirection for super admin
         return;
       }
 
       // 3. For regular users, verify the school domain exists
-      if (!domain) {
+      const cleanDomain = domain.toLowerCase().trim();
+      if (!cleanDomain) {
         throw new Error("Please enter your school web address.");
       }
 
-      const schoolQuery = query(collection(db, 'schools'), where('domain', '==', domain));
+      const schoolQuery = query(collection(db, 'schools'), where('domain', '==', cleanDomain));
       const schoolSnap = await getDocs(schoolQuery);
       
       if (schoolSnap.empty) {
-        throw new Error("School not found. Please check the web address.");
+        throw new Error(`School with address "${cleanDomain}" not found. Please register first.`);
       }
       const schoolId = schoolSnap.docs[0].id;
 
       // 4. Verify membership for this specific school
       const authQuery = query(
         collection(db, 'authorized_emails'), 
-        where('email', '==', firebaseUser.email),
+        where('email', '==', userEmail),
         where('schoolId', '==', schoolId)
       );
       const authSnap = await getDocs(authQuery);
@@ -76,7 +88,12 @@ export default function Login() {
       }
     } catch (error: any) {
       console.error("Login failed:", error);
-      setError(error.message || 'Login failed');
+      // Improve error message for specific Firestore permission errors
+      if (error.message?.includes('permission')) {
+        setError("Access denied. Please ensure your school is registered and you are authorized.");
+      } else {
+        setError(error.message || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }

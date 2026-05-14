@@ -18,15 +18,17 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == "qaisarabbas6496@gmail.com" || 
-        getUserData().role == 'admin'
+        (request.auth.token.email != null && request.auth.token.email.toLowerCase() == "qaisarabbas6496@gmail.com") || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
     function isStaff() {
       return isSignedIn() && (
         isAdmin() || 
-        getUserData().role == 'staff'
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff')
       );
     }
 
@@ -50,7 +52,7 @@ service cloud.firestore {
     }
 
     match /authorized_emails/{id} {
-      allow read: if isSignedIn();
+      allow read, list: if isSignedIn();
       allow write: if isAdmin();
     }
 
@@ -151,7 +153,7 @@ service cloud.firestore {
     }
 
     match /schools/{id} {
-      allow read: if isSignedIn();
+      allow read, list: if isSignedIn();
       allow write: if isAdmin();
     }
   }
