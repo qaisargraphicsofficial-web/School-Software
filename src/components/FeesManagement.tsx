@@ -657,36 +657,36 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4 lg:space-y-6 pb-20 lg:pb-0">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Fees Management</h1>
-          <p className="text-slate-500 text-sm">Manage fee types, records, and online payments</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fees Management</h1>
+          <p className="text-slate-500 text-sm font-medium">Manage fee types, records, and payments.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition-all"
+            className="flex-1 lg:flex-none justify-center inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] lg:text-sm font-bold hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm"
           >
-            <Printer className="w-4 h-4" />
-            Print Vouchers
+            <Printer className="w-3.5 h-3.5 lg:w-4 h-4" />
+            <span className="whitespace-nowrap">Print Vouchers</span>
           </button>
           <button
             onClick={handleSendReminders}
             disabled={isSendingReminders}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition-all disabled:opacity-50"
+            className="flex-1 lg:flex-none justify-center inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] lg:text-sm font-bold hover:bg-indigo-100 transition-all disabled:opacity-50 border border-indigo-100 shadow-sm"
           >
             {isSendingReminders ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 lg:w-4 h-4 animate-spin" />
             ) : (
-              <Bell className="w-4 h-4" />
+              <Bell className="w-3.5 h-3.5 lg:w-4 h-4" />
             )}
-            Send Reminders
+            <span className="whitespace-nowrap">Reminders</span>
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2 p-1 bg-slate-100/50 rounded-xl w-fit overflow-x-auto">
+      <div className="flex gap-2 p-1 bg-slate-100/50 rounded-xl overflow-x-auto no-scrollbar scroll-smooth sticky top-0 z-10 backdrop-blur-md">
         <button
           onClick={() => setActiveTab('dashboard')}
           className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap", activeTab === 'dashboard' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}
@@ -725,38 +725,38 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         <>
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-indigo-200 transition-colors">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL EXPECTED</p>
-                  <h3 className="text-3xl font-black text-slate-900 tracking-tight">{formatCurrency(dashboardStats.totalExpected)}</h3>
-                  <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-indigo-500" style={{ width: '100%' }} />
+            <div className="space-y-6 lg:space-y-8">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+                <div className="card p-4 lg:p-6 bg-slate-900 text-white group hover:scale-[1.02] transition-transform">
+                  <p className="text-[8px] lg:text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 lg:mb-2">EXPECTED</p>
+                  <h3 className="text-xl lg:text-3xl font-black tracking-tight">{formatCurrency(dashboardStats.totalExpected)}</h3>
+                  <div className="mt-3 lg:mt-4 h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-400" style={{ width: '100%' }} />
                   </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-emerald-200 transition-colors">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL COLLECTED</p>
-                  <h3 className="text-3xl font-black text-emerald-600 tracking-tight">{formatCurrency(dashboardStats.totalCollected)}</h3>
-                  <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="card p-4 lg:p-6 bg-emerald-600 text-white group hover:scale-[1.02] transition-transform">
+                  <p className="text-[8px] lg:text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 lg:mb-2">COLLECTED</p>
+                  <h3 className="text-xl lg:text-3xl font-black tracking-tight">{formatCurrency(dashboardStats.totalCollected)}</h3>
+                  <div className="mt-3 lg:mt-4 h-1 w-full bg-white/10 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-emerald-500" 
+                      className="h-full bg-white" 
                       style={{ width: `${(dashboardStats.totalCollected / (dashboardStats.totalExpected || 1)) * 100}%` }} 
                     />
                   </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group hover:border-rose-200 transition-colors">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">TOTAL OUTSTANDING</p>
-                  <h3 className="text-3xl font-black text-rose-600 tracking-tight">{formatCurrency(dashboardStats.totalOutstanding)}</h3>
-                  <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="card p-4 lg:p-6 bg-rose-600 text-white group hover:scale-[1.02] transition-transform col-span-2 lg:col-span-1">
+                  <p className="text-[8px] lg:text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 lg:mb-2">OUTSTANDING</p>
+                  <h3 className="text-xl lg:text-3xl font-black tracking-tight">{formatCurrency(dashboardStats.totalOutstanding)}</h3>
+                  <div className="mt-3 lg:mt-4 h-1 w-full bg-white/10 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-rose-500" 
+                      className="h-full bg-white" 
                       style={{ width: `${(dashboardStats.totalOutstanding / (dashboardStats.totalExpected || 1)) * 100}%` }} 
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
                 <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-8">
                     <div>
@@ -887,30 +887,28 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
           {activeTab === 'studentFees' && (
             <div className="space-y-6">
               {!selectedStudent ? (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-4 border-b border-slate-100">
-                    <div className="relative max-w-md">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="p-4 lg:p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="relative w-full lg:max-w-md">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                       <input
                         type="text"
-                        placeholder="Search student by name or roll number..."
+                        placeholder="Search student..."
                         value={studentSearch}
                         onChange={(e) => setStudentSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-inner"
                       />
                     </div>
                   </div>
-                  <div className="overflow-x-auto">
+
+                  {/* Desktop Table */}
+                  <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-left">
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
-                          <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Student</th>
-                          <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Parent/Guardian</th>
-                          <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Class</th>
-                          <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Total Due</th>
-                          <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Paid</th>
-                          <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Outstanding</th>
-                          <th className="p-4 text-xs font-semibold text-slate-500 uppercase text-right">Action</th>
+                          <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Student</th>
+                          <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Outstanding</th>
+                          <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -918,22 +916,29 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                           const studentFees = feeRecords.filter(f => f.studentId === student.id);
                           const totalDue = studentFees.reduce((sum, f) => sum + f.amount, 0);
                           const totalPaid = studentFees.reduce((sum, f) => sum + f.paidAmount, 0);
-                          const outstanding = totalDue - totalPaid;
+                          const totalWaiver = studentFees.reduce((sum, f) => sum + (f.waiverAmount || 0), 0);
+                          const outstanding = Math.max(0, totalDue - totalPaid - totalWaiver);
 
                           return (
-                            <tr key={student.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedStudent(student)}>
-                              <td className="p-4">
-                                <div className="font-medium text-slate-900">{student.name}</div>
-                                <div className="text-xs text-slate-500">{student.rollNumber}</div>
+                            <tr key={student.id} className="hover:bg-slate-50 transition-colors cursor-pointer group" onClick={() => setSelectedStudent(student)}>
+                              <td className="p-6">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                                    {student.name[0]}
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{student.name}</div>
+                                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest">{student.rollNumber} • {student.class}</div>
+                                  </div>
+                                </div>
                               </td>
-                              <td className="p-4 text-sm text-slate-700">{student.parentName || '-'}</td>
-                              <td className="p-4 text-sm text-slate-700">{student.class}</td>
-                              <td className="p-4 text-sm font-medium text-slate-900">${totalDue.toLocaleString()}</td>
-                              <td className="p-4 text-sm font-medium text-emerald-600">${totalPaid.toLocaleString()}</td>
-                              <td className="p-4 text-sm font-medium text-rose-600">${outstanding.toLocaleString()}</td>
-                              <td className="p-4 text-right">
-                                <button className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
-                                  <ChevronRight className="w-5 h-5" />
+                              <td className="p-6 text-right">
+                                <div className="font-black text-slate-900 tracking-tight">{formatCurrency(outstanding)}</div>
+                                <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Paid: {formatCurrency(totalPaid)}</div>
+                              </td>
+                              <td className="p-6 text-right">
+                                <button className="p-2 transition-transform group-hover:translate-x-1">
+                                  <ChevronRight className="w-6 h-6 text-slate-300 group-hover:text-indigo-600" />
                                 </button>
                               </td>
                             </tr>
@@ -942,163 +947,164 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Mobile Cards */}
+                  <div className="lg:hidden divide-y divide-slate-100">
+                    {filteredStudents.map(student => {
+                      const studentFees = feeRecords.filter(f => f.studentId === student.id);
+                      const totalDue = studentFees.reduce((sum, f) => sum + f.amount, 0);
+                      const totalPaid = studentFees.reduce((sum, f) => sum + f.paidAmount, 0);
+                      const totalWaiver = studentFees.reduce((sum, f) => sum + (f.waiverAmount || 0), 0);
+                      const outstanding = Math.max(0, totalDue - totalPaid - totalWaiver);
+
+                      return (
+                        <button 
+                          key={student.id} 
+                          className="w-full p-4 flex items-center gap-4 active:bg-slate-50 text-left"
+                          onClick={() => setSelectedStudent(student)}
+                        >
+                          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black">
+                            {student.name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-black text-slate-900 truncate uppercase tracking-tight leading-none">{student.name}</h4>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{student.rollNumber} • {student.class}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-xs font-black text-emerald-600 tracking-tight">{formatCurrency(totalPaid)} Collected</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-black text-rose-600 tracking-tight leading-none">{formatCurrency(outstanding)}</div>
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Outstanding</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-6">
                   <button 
                     onClick={() => setSelectedStudent(null)}
-                    className="flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+                    className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
                   >
-                    <ArrowLeft className="w-4 h-4 mr-1" />
-                    Back to Students
+                    <ArrowLeft className="w-4 h-4" />
+                    Student List
                   </button>
 
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">{selectedStudent.name} S/O {selectedStudent.parentName}</h2>
-                      <p className="text-slate-500">{selectedStudent.class} | Roll: {selectedStudent.rollNumber}</p>
-                    </div>
-                      <div className="flex gap-4 text-right">
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase">Total Due</p>
-                          <p className="text-lg font-bold text-slate-900">{formatCurrency(studentFeeSummary.totalDue)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase">Waiver</p>
-                          <p className="text-lg font-bold text-indigo-600">{formatCurrency(studentFeeSummary.totalWaiver)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase">Paid</p>
-                          <p className="text-lg font-bold text-emerald-600">{formatCurrency(studentFeeSummary.totalPaid)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase">Outstanding</p>
-                          <p className="text-lg font-bold text-rose-600">{formatCurrency(studentFeeSummary.outstanding)}</p>
-                        </div>
+                  <div className="bg-white p-6 lg:p-8 rounded-[32px] shadow-sm border border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-[24px] bg-slate-900 border border-slate-800 flex items-center justify-center text-white text-2xl font-black">
+                        {selectedStudent.name[0]}
                       </div>
+                      <div>
+                        <h2 className="text-xl lg:text-2xl font-black text-slate-900 uppercase tracking-tight">{selectedStudent.name}</h2>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{selectedStudent.class} • Parent: {selectedStudent.parentName}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 lg:flex gap-4 lg:gap-8">
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Expected</p>
+                        <p className="text-sm lg:text-xl font-black text-slate-900 tracking-tight">{formatCurrency(studentFeeSummary.totalDue)}</p>
+                      </div>
+                      <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                        <p className="text-[8px] lg:text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1 leading-none">Collected</p>
+                        <p className="text-sm lg:text-xl font-black text-emerald-600 tracking-tight">{formatCurrency(studentFeeSummary.totalPaid)}</p>
+                      </div>
+                      <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 flex-1 lg:flex-none">
+                        <p className="text-[8px] lg:text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1 leading-none">Outstanding</p>
+                        <p className="text-sm lg:text-xl font-black text-rose-600 tracking-tight">{formatCurrency(studentFeeSummary.outstanding)}</p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <h3 className="font-bold text-slate-900">Fee Records</h3>
+                  <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-4 lg:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <h3 className="text-sm lg:text-base font-black text-slate-900 uppercase tracking-widest">Fee Records</h3>
                       <div className="flex flex-wrap gap-2">
-                        <div className="relative">
+                        <div className="relative flex-1 lg:flex-none">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                           <input
                             type="text"
                             placeholder="Search records..."
                             value={feeRecordSearch}
                             onChange={(e) => setFeeRecordSearch(e.target.value)}
-                            className="pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-48"
+                            className="w-full lg:w-48 pl-9 pr-4 py-2 lg:py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                           />
                         </div>
                         <select
                           value={feeRecordStatusFilter}
                           onChange={(e) => setFeeRecordStatusFilter(e.target.value)}
-                          className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                          className="flex-1 lg:flex-none px-3 py-2 lg:py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold uppercase"
                         >
-                          <option value="all">All Status</option>
+                          <option value="all">Status</option>
                           <option value="paid">Paid</option>
                           <option value="pending">Pending</option>
                           <option value="partial">Partial</option>
-                          <option value="overdue">Overdue</option>
                         </select>
                       </div>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
+                    
+                    {/* Desktop Fee Records Table */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full text-left font-medium">
                         <thead className="bg-slate-50 border-b border-slate-100">
                           <tr>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Fee Type</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Term/Year</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Due Date</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Amount</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Waiver</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Paid</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Status</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase text-right">Action</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Fee Type</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Term</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Due Date</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Outstanding</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Status</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {filteredStudentFeeRecords.map(record => {
                             const feeTypeName = record.feeType || feeTypes.find(t => t.id === record.feeTypeId)?.name;
+                            const outstanding = Math.max(0, record.amount - record.paidAmount - (record.waiverAmount || 0));
                             return (
                               <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-4 font-medium text-slate-900">{feeTypeName || 'Unknown'}</td>
-                                <td className="p-4 text-sm text-slate-700">{record.termOrYear}</td>
-                                <td className="p-4 text-sm text-slate-700">{record.dueDate}</td>
-                                <td className="p-4 text-sm font-medium text-slate-900">{formatCurrency(record.amount)}</td>
-                                <td className="p-4">
-                                  <div className="text-sm font-medium text-indigo-600">
-                                    {record.waiverAmount ? formatCurrency(record.waiverAmount) : '-'}
-                                  </div>
-                                  {record.waiverReason && (
-                                    <div className="text-[10px] text-slate-400 italic truncate max-w-[100px]" title={record.waiverReason}>
-                                      {record.waiverReason}
-                                    </div>
-                                  )}
+                                <td className="p-6 font-bold text-slate-900 uppercase tracking-tight">{feeTypeName || 'Unknown'}</td>
+                                <td className="p-6 text-slate-600">{record.termOrYear}</td>
+                                <td className="p-6 text-slate-600 font-bold text-xs uppercase">{record.dueDate}</td>
+                                <td className="p-6 text-right">
+                                  <div className="text-slate-900 font-black tracking-tight">{formatCurrency(outstanding)}</div>
+                                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest line-through">Org: {formatCurrency(record.amount)}</div>
                                 </td>
-                                <td className="p-4 text-sm font-medium text-emerald-600">{formatCurrency(record.paidAmount)}</td>
-                                <td className="p-4">
+                                <td className="p-6 text-right">
                                   <span className={cn(
-                                    "px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
-                                    record.status === 'paid' ? "bg-emerald-100 text-emerald-700" :
-                                    record.status === 'partial' ? "bg-amber-100 text-amber-700" :
-                                    record.status === 'overdue' ? "bg-rose-100 text-rose-700" :
-                                    "bg-slate-100 text-slate-700"
+                                    "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border",
+                                    record.status === 'paid' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                    record.status === 'partial' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                                    "bg-rose-50 text-rose-600 border-rose-100"
                                   )}>
                                     {record.status}
                                   </span>
                                 </td>
-                                <td className="p-4 text-right">
+                                <td className="p-6 text-right">
                                   <div className="flex justify-end gap-2">
+                                    <button 
+                                      onClick={() => {
+                                        setSelectedRecordForWaiver(record);
+                                        setWaiverForm({ amount: record.waiverAmount || 0, reason: record.waiverReason || '' });
+                                        setIsWaiverModalOpen(true);
+                                      }}
+                                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl border border-transparent hover:border-indigo-100 transition-all"
+                                      title="Waiver"
+                                    >
+                                      <Settings className="w-5 h-5" />
+                                    </button>
                                     {record.status !== 'paid' && (
-                                      <>
-                                        <button 
-                                          onClick={() => {
-                                            setSelectedRecordForWaiver(record);
-                                            setWaiverForm({ amount: record.waiverAmount || 0, reason: record.waiverReason || '' });
-                                            setIsWaiverModalOpen(true);
-                                          }}
-                                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                          title="Apply Waiver"
-                                        >
-                                          <Settings className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => {
-                                            setEditingRecord(record);
-                                            setRecordForm({
-                                              amount: record.amount,
-                                              dueDate: record.dueDate,
-                                              termOrYear: record.termOrYear,
-                                              status: record.status
-                                            });
-                                            setIsEditRecordModalOpen(true);
-                                          }}
-                                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                          title="Edit Record"
-                                        >
-                                          <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => handleDeleteRecord(record.id!)}
-                                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                          title="Delete Record"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                          onClick={() => {
-                                            setSelectedFeeRecord(record);
-                                            setPaymentForm({ feeRecordId: record.id!, amount: Math.max(0, record.amount - record.paidAmount - (record.waiverAmount || 0)), method: 'online', date: new Date().toISOString().split('T')[0] });
-                                            setIsPaymentModalOpen(true);
-                                          }}
-                                          className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors"
-                                        >
-                                          Pay Now
-                                        </button>
-                                      </>
+                                      <button 
+                                        onClick={() => {
+                                          setSelectedFeeRecord(record);
+                                          setPaymentForm({ feeRecordId: record.id!, amount: outstanding, method: 'online', date: new Date().toISOString().split('T')[0] });
+                                          setIsPaymentModalOpen(true);
+                                        }}
+                                        className="btn-primary px-4 py-2 text-xs"
+                                      >
+                                        Pay
+                                      </button>
                                     )}
                                   </div>
                                 </td>
@@ -1108,42 +1114,131 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Mobile Fee Records Cards */}
+                    <div className="lg:hidden divide-y divide-slate-100">
+                      {filteredStudentFeeRecords.map(record => {
+                        const feeTypeName = record.feeType || feeTypes.find(t => t.id === record.feeTypeId)?.name;
+                        const outstanding = Math.max(0, record.amount - record.paidAmount - (record.waiverAmount || 0));
+                        return (
+                          <div key={record.id} className="p-4 space-y-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-black text-slate-900 uppercase tracking-tight">{feeTypeName}</h4>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{record.termOrYear} • Due: {record.dueDate}</p>
+                              </div>
+                              <span className={cn(
+                                "px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border",
+                                record.status === 'paid' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                record.status === 'partial' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                                "bg-rose-50 text-rose-600 border-rose-100"
+                              )}>
+                                {record.status}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="p-2 bg-slate-50 rounded-xl">
+                                <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Expected</p>
+                                <p className="text-xs font-bold text-slate-900">{formatCurrency(record.amount)}</p>
+                              </div>
+                              <div className="p-2 bg-rose-50 rounded-xl">
+                                <p className="text-[8px] font-black text-rose-400 uppercase mb-0.5">Outstanding</p>
+                                <p className="text-xs font-black text-rose-600">{formatCurrency(outstanding)}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                              <button 
+                                onClick={() => {
+                                  setSelectedRecordForWaiver(record);
+                                  setWaiverForm({ amount: record.waiverAmount || 0, reason: record.waiverReason || '' });
+                                  setIsWaiverModalOpen(true);
+                                }}
+                                className="flex items-center gap-1 text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2 py-1 bg-indigo-50 rounded-lg"
+                              >
+                                <Settings className="w-3.5 h-3.5" />
+                                Waiver
+                              </button>
+                              {record.status !== 'paid' && (
+                                <button 
+                                  onClick={() => {
+                                    setSelectedFeeRecord(record);
+                                    setPaymentForm({ feeRecordId: record.id!, amount: outstanding, method: 'online', date: new Date().toISOString().split('T')[0] });
+                                    setIsPaymentModalOpen(true);
+                                  }}
+                                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100"
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  Collect Payment
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-4 border-b border-slate-100">
-                      <h3 className="font-bold text-slate-900">Payment History</h3>
+                  {/* Payment History Section */}
+                  <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="p-6 border-b border-slate-100">
+                      <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Payment History</h3>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
+                    {/* Desktop Table */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full text-left font-medium">
                         <thead className="bg-slate-50 border-b border-slate-100">
                           <tr>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Date</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Amount</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Method</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Transaction ID</th>
-                            <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Action</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Date</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Method</th>
+                            <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Receipt</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {paymentHistory.filter(p => p.studentId === selectedStudent.id).map(payment => (
                             <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="p-4 text-sm text-slate-700">{payment.date}</td>
-                              <td className="p-4 text-sm font-medium text-emerald-600">${payment.amount.toLocaleString()}</td>
-                              <td className="p-4 text-sm text-slate-700 capitalize">{payment.method.replace('_', ' ')}</td>
-                              <td className="p-4 text-sm text-slate-500 font-mono">{payment.transactionId || '-'}</td>
-                              <td className="p-4">
+                              <td className="p-6 text-slate-600 font-bold text-xs uppercase">{payment.date}</td>
+                              <td className="p-6 text-emerald-600 font-black tracking-tight">{formatCurrency(payment.amount)}</td>
+                              <td className="p-6">
+                                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                                  {payment.method.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="p-6 text-right">
                                 <button 
                                   onClick={() => handleDownloadReceipt(payment)}
-                                  className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
                                 >
-                                  <Download className="w-4 h-4" />
+                                  <Download className="w-5 h-5" />
                                 </button>
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                    
+                    {/* Mobile Payment History Cards */}
+                    <div className="lg:hidden divide-y divide-slate-100">
+                      {paymentHistory.filter(p => p.studentId === selectedStudent.id).map(payment => (
+                        <div key={payment.id} className="p-4 flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                              <Receipt className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="font-black text-slate-900 tracking-tight leading-none">{formatCurrency(payment.amount)}</p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{payment.date} • {payment.method}</p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => handleDownloadReceipt(payment)}
+                            className="p-3 text-indigo-600 bg-indigo-50 rounded-2xl active:scale-90 transition-transform"
+                          >
+                            <Download className="w-5 h-5" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

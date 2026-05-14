@@ -57,9 +57,12 @@ export default function Classes({ profile }: ClassesProps) {
       const campusId = profile?.campusId || 'main';
       const schoolId = profile?.schoolId || '';
       
-      const qConstraints: any[] = [where('campusId', '==', campusId)];
+      const qConstraints: any[] = [];
       if (schoolId) {
         qConstraints.push(where('schoolId', '==', schoolId));
+      }
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
       }
 
       // 1. Fetch Class Definitions

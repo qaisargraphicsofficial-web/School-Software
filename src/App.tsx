@@ -134,7 +134,13 @@ export default function App() {
   const handleSwitchSchool = (schoolId: string) => {
     setActiveSchoolId(schoolId);
     if (profile) {
-      setProfile({ ...profile, schoolId });
+      setProfile({ ...profile, schoolId, campusId: 'all' });
+    }
+  };
+
+  const handleSwitchCampus = (campusId: string) => {
+    if (profile) {
+      setProfile({ ...profile, campusId });
     }
   };
 
@@ -203,7 +209,11 @@ export default function App() {
         {!user ? (
           <Route path="*" element={<Login />} />
         ) : (
-          <Route path="/" element={<Layout profile={profile} onSwitchSchool={isSystemAdmin ? handleSwitchSchool : undefined} />}>
+          <Route path="/" element={<Layout 
+            profile={profile} 
+            onSwitchSchool={isSystemAdmin ? handleSwitchSchool : undefined} 
+            onSwitchCampus={profile?.role === 'admin' ? handleSwitchCampus : undefined}
+          />}>
             <Route index element={<Dashboard profile={profile} />} />
             <Route path="students" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Students profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="classes" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Classes profile={profile} /> : <Navigate to="/" replace />} />

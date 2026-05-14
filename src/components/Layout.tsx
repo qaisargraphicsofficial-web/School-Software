@@ -29,21 +29,24 @@ import {
   MessageSquare,
   CreditCard,
   Bus,
-  Shield
+  Shield,
+  MapPin
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, getDoc, getDocs } from 'firebase/firestore';
 import { UserProfile, Task } from '../types';
 import { cn } from '../lib/utils';
 import AIAssistant from './AIAssistant';
+import MobileNavigation from './MobileNavigation';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LayoutProps {
   profile: UserProfile | null;
   onSwitchSchool?: (schoolId: string) => void;
+  onSwitchCampus?: (campusId: string) => void;
 }
 
-export default function Layout({ profile, onSwitchSchool }: LayoutProps) {
+export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [notifications, setNotifications] = useState<Task[]>([]);
@@ -57,7 +60,9 @@ export default function Layout({ profile, onSwitchSchool }: LayoutProps) {
   const [staffRole, setStaffRole] = useState<string | null>(null);
   const [staffPermissions, setStaffPermissions] = useState<Record<string, string[]>>({});
   const [allSchools, setAllSchools] = useState<{id: string, schoolName: string}[]>([]);
+  const [allCampuses, setAllCampuses] = useState<{id: string, name: string}[]>([]);
   const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
+  const [showCampusSwitcher, setShowCampusSwitcher] = useState(false);
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -93,6 +98,24 @@ export default function Layout({ profile, onSwitchSchool }: LayoutProps) {
       }
     };
     fetchSchoolSettings();
+  }, [profile?.schoolId]);
+
+  useEffect(() => {
+    const fetchCampuses = async () => {
+      if (!profile?.schoolId) return;
+      try {
+        const q = query(collection(db, 'campuses'), where('schoolId', '==', profile.schoolId));
+        const snap = await getDocs(q);
+        const campuses = snap.docs.map(d => ({ 
+          id: d.id, 
+          name: d.data().name 
+        }));
+        setAllCampuses(campuses);
+      } catch (error) {
+        console.error("Error fetching campuses:", error);
+      }
+    };
+    fetchCampuses();
   }, [profile?.schoolId]);
 
   useEffect(() => {
@@ -417,7 +440,7 @@ export default function Layout({ profile, onSwitchSchool }: LayoutProps) {
                   {onSwitchSchool && <Building2 className="w-4 h-4 text-indigo-600" />}
                 </div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  {schoolName} • {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                  {schoolName} • {allCampuses.find(c => c.id === profile?.campusId)?.name || (profile?.campusId === 'all' ? 'All Campuses' : 'Primary Campus')} • {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
                 </p>
               </div>
 
@@ -450,6 +473,61 @@ export default function Layout({ profile, onSwitchSchool }: LayoutProps) {
                 </div>
               )}
             </div>
+
+            {profile?.role === 'admin' && allCampuses.length > 0 && (
+              <div className="hidden lg:block relative ml-4">
+                <button
+                  onClick={() => setShowCampusSwitcher(!showCampusSwitcher)}
+                  className={cn(
+                    "flex flex-col cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl border border-slate-200",
+                    showCampusSwitcher && "bg-slate-100"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-bold text-slate-700">
+                      {allCampuses.find(c => c.id === profile?.campusId)?.name || (profile?.campusId === 'all' ? 'All Campuses' : 'Switch Campus')}
+                    </span>
+                  </div>
+                </button>
+                {showCampusSwitcher && (
+                  <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-slate-100">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Campus</p>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      <button
+                        onClick={() => {
+                          onSwitchCampus?.('all');
+                          setShowCampusSwitcher(false);
+                        }}
+                        className={cn(
+                          "w-full text-left px-5 py-3 hover:bg-emerald-50 transition-colors flex items-center justify-between",
+                          profile?.campusId === 'all' ? "bg-emerald-50" : ""
+                        )}
+                      >
+                        <span className={cn("text-sm font-bold", profile?.campusId === 'all' ? "text-emerald-600" : "text-slate-700")}>All Campuses</span>
+                      </button>
+                      {allCampuses.map(campus => (
+                        <button
+                          key={campus.id}
+                          onClick={() => {
+                            onSwitchCampus?.(campus.id);
+                            setShowCampusSwitcher(false);
+                          }}
+                          className={cn(
+                            "w-full text-left px-5 py-3 hover:bg-indigo-50 transition-colors flex items-center justify-between",
+                            profile?.campusId === campus.id ? "bg-indigo-50" : ""
+                          )}
+                        >
+                          <span className={cn("text-sm font-bold", profile?.campusId === campus.id ? "text-indigo-600" : "text-slate-700")}>{campus.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex-1 max-w-md relative group hidden md:block">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
@@ -550,9 +628,69 @@ export default function Layout({ profile, onSwitchSchool }: LayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto print:overflow-visible p-4 lg:p-8 print:p-0">
+        <main className="flex-1 overflow-y-auto print:overflow-visible p-4 lg:p-8 pb-24 lg:pb-8 print:p-0">
           <Outlet />
         </main>
+
+        {/* Bottom Navigation for Mobile */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-200 px-6 py-3 flex items-center justify-between z-40 no-print safe-area-bottom">
+          <Link 
+            to="/" 
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all",
+              location.pathname === '/' ? "text-indigo-600 scale-110" : "text-slate-400"
+            )}
+          >
+            <LayoutDashboard className="w-6 h-6" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Home</span>
+          </Link>
+          
+          {(profile?.role === 'admin' || profile?.role === 'staff') && (
+            <Link 
+              to="/students" 
+              className={cn(
+                "flex flex-col items-center gap-1 transition-all",
+                location.pathname === '/students' ? "text-indigo-600 scale-110" : "text-slate-400"
+              )}
+            >
+              <Users className="w-6 h-6" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Pupils</span>
+            </Link>
+          )}
+
+          <Link 
+            to="/communication" 
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all",
+              location.pathname === '/communication' ? "text-indigo-600 scale-110" : "text-slate-400"
+            )}
+          >
+            <MessageSquare className="w-6 h-6" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Chat</span>
+          </Link>
+
+          <button 
+            onClick={() => setShowNotifications(!showNotifications)}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all relative",
+              showNotifications ? "text-indigo-600 scale-110" : "text-slate-400"
+            )}
+          >
+            <Bell className="w-6 h-6" />
+            {notifications.length > 0 && (
+              <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full border border-white" />
+            )}
+            <span className="text-[10px] font-black uppercase tracking-widest">Alerts</span>
+          </button>
+
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="flex flex-col items-center gap-1 text-slate-400"
+          >
+            <Menu className="w-6 h-6" />
+            <span className="text-[10px] font-black uppercase tracking-widest">More</span>
+          </button>
+        </nav>
       </div>
 
       {/* Profile Modal */}
@@ -637,6 +775,9 @@ export default function Layout({ profile, onSwitchSchool }: LayoutProps) {
       <div className="no-print">
         <AIAssistant profile={profile} />
       </div>
+
+      {/* Mobile Navigation */}
+      <MobileNavigation />
     </div>
   );
 }

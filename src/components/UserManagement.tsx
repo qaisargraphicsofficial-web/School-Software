@@ -27,7 +27,7 @@ export default function UserManagement({ profile }: UserManagementProps) {
       // School Admin would see users for their school only (if we allowed them access to this module).
       const q = query(collection(db, 'users'));
       const snap = await getDocs(q);
-      setUsers(snap.docs.map(doc => ({ ...doc.data() } as UserProfile)));
+      setUsers(snap.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile)));
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
@@ -60,6 +60,7 @@ export default function UserManagement({ profile }: UserManagementProps) {
       setUsers(users.filter(u => u.uid !== uid));
     } catch (error) {
       console.error("Error deleting user:", error);
+      alert("Failed to delete user profile. You may not have sufficient permissions.");
     }
   };
 

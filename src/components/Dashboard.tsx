@@ -57,6 +57,9 @@ export default function Dashboard({ profile }: DashboardProps) {
         if (profile.schoolId) {
           queryConstraints.push(where('schoolId', '==', profile.schoolId));
         }
+        if (profile.campusId && profile.campusId !== 'all') {
+          queryConstraints.push(where('campusId', '==', profile.campusId));
+        }
 
         const studentsSnap = await getDocs(query(collection(db, 'students'), ...queryConstraints));
         const staffSnap = await getDocs(query(collection(db, 'staff'), ...queryConstraints));
@@ -85,6 +88,9 @@ export default function Dashboard({ profile }: DashboardProps) {
     const queryConstraints = [];
     if (profile.schoolId) {
       queryConstraints.push(where('schoolId', '==', profile.schoolId));
+    }
+    if (profile.campusId && profile.campusId !== 'all') {
+      queryConstraints.push(where('campusId', '==', profile.campusId));
     }
 
     if (profile.role === 'admin' || profile.role === 'staff') {
@@ -164,24 +170,24 @@ export default function Dashboard({ profile }: DashboardProps) {
   const StatCard = ({ title, value, icon: Icon, trend, color }: any) => (
     <motion.div 
       whileHover={{ y: -5, scale: 1.02 }}
-      className="card p-7 group cursor-default"
+      className="card p-4 lg:p-7 group cursor-default"
     >
-      <div className="flex items-start justify-between mb-5">
-        <div className={cn("p-3.5 rounded-2xl shadow-lg transition-transform duration-300 group-hover:rotate-6", color)}>
-          <Icon className="w-6 h-6 text-white" />
+      <div className="flex items-start justify-between mb-3 lg:mb-5">
+        <div className={cn("p-2 lg:p-3.5 rounded-xl lg:rounded-2xl shadow-lg transition-transform duration-300 group-hover:rotate-6", color)}>
+          <Icon className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
         </div>
         {trend && (
           <div className={cn(
-            "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold",
+            "flex items-center gap-1 px-2 py-0.5 lg:px-2.5 lg:py-1 rounded-full text-[10px] lg:text-xs font-bold",
             trend > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
           )}>
-            {trend > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+            {trend > 0 ? <ArrowUpRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" /> : <ArrowDownRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />}
             {Math.abs(trend)}%
           </div>
         )}
       </div>
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">{title}</p>
-      <h3 className="text-3xl font-black text-slate-900 tracking-tight">{value}</h3>
+      <p className="text-[10px] lg:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{title}</p>
+      <h3 className="text-xl lg:text-3xl font-black text-slate-900 tracking-tight">{value}</h3>
     </motion.div>
   );
 
@@ -202,30 +208,30 @@ export default function Dashboard({ profile }: DashboardProps) {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         <StatCard 
-          title="Total Students" 
+          title="Students" 
           value={stats.totalStudents} 
           icon={Users} 
           trend={12}
           color="bg-indigo-600"
         />
         <StatCard 
-          title="Total Staff" 
+          title="Staff" 
           value={stats.totalStaff} 
           icon={GraduationCap} 
           trend={4}
           color="bg-purple-600"
         />
         <StatCard 
-          title="Total Fees Collected" 
+          title="Fees" 
           value={`$${stats.totalFees.toLocaleString()}`} 
           icon={Wallet} 
           trend={8}
           color="bg-emerald-600"
         />
         <StatCard 
-          title="Avg. Attendance" 
+          title="Attendance" 
           value={`${stats.attendanceRate}%`} 
           icon={TrendingUp} 
           trend={-2}
@@ -237,12 +243,12 @@ export default function Dashboard({ profile }: DashboardProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         {/* Main Charts */}
         <div className="lg:col-span-8 space-y-10">
-          <div className="card p-8">
+          <div className="card p-5 lg:p-8">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">Fee Collection Overview</h3>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Fee Collection</h3>
               <div className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full uppercase tracking-widest">Monthly</div>
             </div>
-            <div className="h-80 min-h-[320px] w-full">
+            <div className="h-64 lg:h-80 min-h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={feeData}>
                   <defs>
@@ -263,12 +269,12 @@ export default function Dashboard({ profile }: DashboardProps) {
             </div>
           </div>
 
-          <div className="card p-8">
+          <div className="card p-5 lg:p-8">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">Weekly Attendance Rate</h3>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Weekly Attendance</h3>
               <div className="px-3 py-1 bg-purple-50 text-purple-600 text-[10px] font-black rounded-full uppercase tracking-widest">Weekly</div>
             </div>
-            <div className="h-80 min-h-[320px] w-full">
+            <div className="h-64 lg:h-80 min-h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={attendanceData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />

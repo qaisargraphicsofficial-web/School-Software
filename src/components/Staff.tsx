@@ -55,6 +55,9 @@ export default function StaffManagement({ profile }: StaffProps) {
   const [joiningDateEnd, setJoiningDateEnd] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'staffId' | 'joiningDate' | 'status' | 'role'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [classFilter, setClassFilter] = useState('all');
+  const [sectionFilter, setSectionFilter] = useState('all');
+  const [classGroups, setClassGroups] = useState<ClassGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingSalaryHistory, setViewingSalaryHistory] = useState<Staff | null>(null);
   const [viewingAttendanceHistory, setViewingAttendanceHistory] = useState<Staff | null>(null);
@@ -175,8 +178,23 @@ export default function StaffManagement({ profile }: StaffProps) {
     if (profile) {
       fetchStaff();
       fetchSettings();
+      fetchClasses();
     }
   }, [profile]);
+
+  const fetchClasses = async () => {
+    try {
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'classes'), ...qConstraints);
+      const snap = await getDocs(q);
+      setClassGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup)));
+    } catch (e) {
+      console.error("Error fetching classes:", e);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -258,7 +276,11 @@ export default function StaffManagement({ profile }: StaffProps) {
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'staff'), where('schoolId', '==', profile?.schoolId || ''));
+      const qConstraints = [where('schoolId', '==', profile?.schoolId || '')];
+      if (profile?.campusId && profile.campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', profile.campusId));
+      }
+      const q = query(collection(db, 'staff'), ...qConstraints);
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Staff));
       setStaffList(data);
@@ -361,11 +383,31 @@ export default function StaffManagement({ profile }: StaffProps) {
   };
 
   const filteredStaff = staffList.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.staffId.includes(searchQuery);
+    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.staffId.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
     const matchesRole = roleFilter === 'all' || s.role === roleFilter;
     const matchesDate = (!joiningDateStart || s.joiningDate >= joiningDateStart) && (!joiningDateEnd || s.joiningDate <= joiningDateEnd);
-    return matchesSearch && matchesStatus && matchesRole && matchesDate;
+    
+    // Section/Class filter for teachers
+    let matchesClassAndSection = true;
+    if (classFilter !== 'all' || sectionFilter !== 'all') {
+      const staffAssignments = classGroups.filter(c => 
+        c.sections.some(sec => sec.teacherIds.includes(s.id!))
+      );
+      
+      if (classFilter !== 'all') {
+        matchesClassAndSection = staffAssignments.some(c => c.className === classFilter);
+      }
+      
+      if (matchesClassAndSection && sectionFilter !== 'all') {
+        matchesClassAndSection = classGroups.some(c => 
+          (classFilter === 'all' || c.className === classFilter) &&
+          c.sections.some(sec => sec.name === sectionFilter && sec.teacherIds.includes(s.id!))
+        );
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesRole && matchesDate && matchesClassAndSection;
   }).sort((a, b) => {
     let comparison = 0;
     if (sortBy === 'name') comparison = a.name.localeCompare(b.name);
@@ -376,6 +418,10 @@ export default function StaffManagement({ profile }: StaffProps) {
     
     return sortOrder === 'asc' ? comparison : -comparison;
   });
+
+  const availableSections = classFilter === 'all'
+    ? Array.from(new Set(classGroups.flatMap(c => c.sections.map(s => s.name)))).sort()
+    : classGroups.find(c => c.className === classFilter)?.sections.map(s => s.name).sort() || [];
 
   const roles = ['all', ...new Set(staffList.map(s => s.role))];
 
@@ -417,27 +463,27 @@ export default function StaffManagement({ profile }: StaffProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Staff Management</h1>
-          <p className="text-slate-500 font-medium">Manage faculty, administration, and financial records.</p>
+          <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">Staff Management</h1>
+          <p className="text-sm text-slate-500 font-medium">Manage faculty, administration, and financial records.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 lg:gap-3">
           <button 
             onClick={exportToCSV}
-            className="btn-secondary px-5 py-2.5 text-sm flex items-center gap-2"
+            className="flex-1 lg:flex-none justify-center btn-secondary px-4 lg:px-5 py-2.5 text-[10px] lg:text-sm flex items-center gap-2"
           >
-            <FileSpreadsheet className="w-4 h-4" />
-            Export CSV
+            <FileSpreadsheet className="w-3.5 h-3.5 lg:w-4 h-4" />
+            <span className="lg:inline">Export CSV</span>
           </button>
           {profile?.role === 'admin' && (
-            <div className="flex gap-2">
+            <div className="flex w-full sm:w-auto gap-2">
               <button
                 onClick={() => setIsScannerOpen(true)}
-                className="btn-secondary px-5 py-2.5 text-sm flex items-center gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                className="flex-1 sm:flex-none justify-center btn-secondary px-4 lg:px-5 py-2.5 text-[10px] lg:text-sm flex items-center gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
               >
-                <Scan className="w-4 h-4" />
-                Scan Attendance
+                <Scan className="w-3.5 h-3.5 lg:w-4 h-4" />
+                <span>Attendance</span>
               </button>
               <button
                 onClick={() => {
@@ -445,61 +491,110 @@ export default function StaffManagement({ profile }: StaffProps) {
                   setIsEditMode(false);
                   setIsModalOpen(true);
                 }}
-                className="btn-primary"
+                className="flex-1 sm:flex-none justify-center btn-primary px-4 lg:px-5 py-2.5 text-[10px] lg:text-sm"
               >
-                <UserPlus className="w-5 h-5" />
-                Add Staff Member
+                <UserPlus className="w-3.5 h-3.5 lg:w-5 h-5" />
+                <span>Add Staff</span>
               </button>
             </div>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3 space-y-6">
+      {/* Summary Cards for Mobile */}
+      <div className="lg:hidden grid grid-cols-2 gap-4">
+        <div className="card p-4 bg-indigo-600 text-white">
+          <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-1">Total Staff</p>
+          <div className="flex items-end justify-between">
+            <span className="text-xl font-black">{staffList.length}</span>
+            <Users className="w-4 h-4 opacity-40" />
+          </div>
+        </div>
+        <div className="card p-4 bg-slate-900 text-white">
+          <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-1">Monthly Payroll</p>
+          <div className="flex items-end justify-between">
+            <span className="text-xl font-black">${staffList.reduce((acc, s) => acc + s.salary, 0).toLocaleString()}</span>
+            <DollarSign className="w-4 h-4 opacity-40" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:grid lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3 space-y-4 lg:space-y-6">
           {/* Filters */}
-          <div className="card p-6 flex flex-col md:flex-row gap-4 items-center">
-            <div className="relative flex-1 w-full">
+          <div className="card p-3 lg:p-6 flex flex-col md:flex-row gap-3 lg:gap-4 items-stretch md:items-center">
+            <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search by name or staff ID..."
-                className="input-field pl-12"
+                placeholder="Search staff..."
+                className="input-field pl-12 h-11 lg:h-auto"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex gap-2 w-full md:w-auto">
-              <input type="date" value={joiningDateStart} onChange={e => setJoiningDateStart(e.target.value)} className="input-field py-2 text-sm w-full md:w-32" title="Start Date" />
-              <input type="date" value={joiningDateEnd} onChange={e => setJoiningDateEnd(e.target.value)} className="input-field py-2 text-sm w-full md:w-32" title="End Date" />
-              <select 
-                className="input-field py-2 text-sm w-full md:w-40"
-                value={roleFilter}
-                onChange={e => setRoleFilter(e.target.value)}
-              >
-                {roles.map(role => (
-                  <option key={role as string} value={role as string}>{(role as string).charAt(0).toUpperCase() + (role as string).slice(1)}</option>
-                ))}
-              </select>
-              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-                {(['all', 'active', 'inactive'] as const).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
-                    className={cn(
-                      "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                      statusFilter === status ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                    )}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex gap-2">
+                <input type="date" value={joiningDateStart} onChange={e => setJoiningDateStart(e.target.value)} className="input-field py-2 text-[10px] lg:text-sm flex-1 lg:w-32 h-11 lg:h-auto" title="Start Date" />
+                <input type="date" value={joiningDateEnd} onChange={e => setJoiningDateEnd(e.target.value)} className="input-field py-2 text-[10px] lg:text-sm flex-1 lg:w-32 h-11 lg:h-auto" title="End Date" />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 lg:gap-3 items-center">
+                  <select 
+                    className="input-field py-2 text-[10px] lg:text-sm lg:w-40 h-11 lg:h-auto"
+                    value={classFilter}
+                    onChange={e => {
+                      setClassFilter(e.target.value);
+                      setSectionFilter('all');
+                    }}
                   >
-                    {status}
-                  </button>
-                ))}
+                    <option value="all">All Classes</option>
+                    {classGroups.map(c => (
+                      <option key={c.id} value={c.className}>{c.className}</option>
+                    ))}
+                  </select>
+
+                  <select 
+                    className="input-field py-2 text-[10px] lg:text-sm lg:w-40 h-11 lg:h-auto font-mono"
+                    value={sectionFilter}
+                    onChange={e => setSectionFilter(e.target.value)}
+                  >
+                    <option value="all">All Sections</option>
+                    {availableSections.map(sec => (
+                      <option key={sec} value={sec}>Section {sec}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <select 
+                  className="input-field py-2 text-[10px] lg:text-sm flex-1 lg:w-40 h-11 lg:h-auto"
+                  value={roleFilter}
+                  onChange={e => setRoleFilter(e.target.value)}
+                >
+                  {roles.map(role => (
+                    <option key={role as string} value={role as string}>{(role as string).charAt(0).toUpperCase() + (role as string).slice(1)}</option>
+                  ))}
+                </select>
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 lg:w-auto">
+                  {(['all', 'active'] as const).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setStatusFilter(status)}
+                      className={cn(
+                        "px-3 lg:px-4 py-1.5 rounded-lg text-[8px] lg:text-[10px] font-black uppercase tracking-widest transition-all",
+                        statusFilter === status ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Staff Table */}
-          <div className="card overflow-hidden">
+          {/* Desktop Staff Table */}
+          <div className="hidden lg:block card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -560,7 +655,18 @@ export default function StaffManagement({ profile }: StaffProps) {
                             <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-bold capitalize w-fit">
                               {staff.role}
                             </span>
-                            {staff.classIncharge && (
+                            {classGroups.filter(c => c.sections.some(sec => sec.teacherIds.includes(staff.id!))).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {classGroups.filter(c => c.sections.some(sec => sec.teacherIds.includes(staff.id!))).map(c => (
+                                  <div key={c.id} className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
+                                      {c.className} ({c.sections.filter(sec => sec.teacherIds.includes(staff.id!)).map(sec => sec.name).join(', ')})
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {staff.classIncharge && !classGroups.some(c => c.sections.some(sec => sec.teacherIds.includes(staff.id!))) && (
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                 Incharge: {staff.classIncharge}
                               </span>
@@ -672,10 +778,103 @@ export default function StaffManagement({ profile }: StaffProps) {
               </table>
             </div>
           </div>
+
+          {/* Staff Cards for Mobile */}
+          <div className="lg:hidden grid grid-cols-1 gap-4">
+            {loading ? (
+              <div className="card p-12 text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+              </div>
+            ) : filteredStaff.length === 0 ? (
+              <div className="card p-12 text-center text-slate-500 font-bold">
+                No staff records found.
+              </div>
+            ) : (
+              filteredStaff.map((staff) => (
+                <motion.div 
+                  key={staff.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  onClick={() => handleViewDetail(staff)}
+                  className="card p-4 relative flex flex-col gap-4 active:scale-[0.98] transition-transform"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 font-bold overflow-hidden shadow-sm border border-white">
+                      {staff.photoUrl ? (
+                        <img src={staff.photoUrl} alt={staff.name} className="w-full h-full object-cover" />
+                      ) : (
+                        staff.name[0]
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-bold text-slate-900 truncate">{staff.name}</h3>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border",
+                          staff.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
+                        )}>
+                          {staff.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{staff.staffId}</span>
+                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">{staff.role}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 bg-slate-50 rounded-xl">
+                      <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Contact</p>
+                      <p className="text-[10px] font-bold text-slate-700">{staff.whatsappNumber || '-'}</p>
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded-xl">
+                      <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Salary</p>
+                      <p className="text-[10px] font-bold text-slate-700">${staff.salary.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setViewingIdCard(staff); }}
+                        className="p-2 text-indigo-600 bg-indigo-50 rounded-lg"
+                      >
+                        <IdCard className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setViewingSalaryHistory(staff); fetchPayrollHistory(staff.id!); }}
+                        className="p-2 text-slate-600 bg-slate-50 rounded-lg"
+                      >
+                        <History className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleEdit(staff); }}
+                        className="p-2 text-indigo-600 bg-indigo-50 rounded-lg"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      {profile?.role === 'admin' && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDelete(staff.id!); }}
+                          className="p-2 text-rose-600 bg-rose-50 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </div>
         </div>
 
-        {/* Sidebar Stats */}
-        <div className="space-y-6">
+        {/* Desktop Sidebar Stats (Hidden on mobile as they are moved to top) */}
+        <div className="hidden lg:block space-y-6">
           <div className="card p-6 bg-indigo-600 text-white">
             <h3 className="text-lg font-black uppercase tracking-widest mb-6 opacity-80">Staff Summary</h3>
             <div className="space-y-6">

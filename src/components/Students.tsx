@@ -71,6 +71,8 @@ export default function Students({ profile }: StudentsProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [classFilter, setClassFilter] = useState('all');
+  const [sectionFilter, setSectionFilter] = useState('all');
+  const [classGroups, setClassGroups] = useState<any[]>([]);
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -114,8 +116,26 @@ export default function Students({ profile }: StudentsProps) {
   useEffect(() => {
     if (profile) {
       fetchStudents();
+      fetchClasses();
     }
   }, [profile]);
+
+  const fetchClasses = async () => {
+    try {
+      const schoolId = profile?.schoolId || '';
+      const campusId = profile?.campusId || 'main';
+      const qConstraints = [where('schoolId', '==', schoolId)];
+      if (campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
+      const q = query(collection(db, 'classes'), ...qConstraints);
+      const snap = await getDocs(q);
+      const classesData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setClassGroups(classesData);
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+    }
+  };
 
   const fetchStudents = async () => {
     if (!profile?.schoolId && profile?.role !== 'admin') {
@@ -513,10 +533,11 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
   };
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.rollNumber.includes(searchQuery);
+    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      s.rollNumber.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
     const matchesClass = classFilter === 'all' || s.class === classFilter;
+    const matchesSection = sectionFilter === 'all' || s.section === sectionFilter;
     
     let matchesDate = true;
     if (dateFilter.start) {
@@ -526,10 +547,12 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
       matchesDate = matchesDate && s.admissionDate <= dateFilter.end;
     }
 
-    return matchesSearch && matchesStatus && matchesClass && matchesDate;
+    return matchesSearch && matchesStatus && matchesClass && matchesSection && matchesDate;
   });
 
-  const classes = Array.from(new Set(students.map(s => s.class))).sort();
+  const availableSections = classFilter === 'all' 
+    ? [] 
+    : classGroups.find(c => c.className === classFilter)?.sections || [];
 
   return (
     <div className="space-y-6 no-print">
@@ -591,18 +614,18 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
       </div>
 
       {/* Search and Filters */}
-      <div className="card p-5 flex flex-col md:flex-row gap-4">
+      <div className="card p-3 lg:p-5 flex flex-col md:flex-row gap-3 lg:gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input
             type="text"
-            placeholder="Search by name or roll number..."
-            className="input-field pl-12"
+            placeholder="Search students..."
+            className="input-field pl-12 h-12 lg:h-auto"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex overflow-x-auto pb-2 sm:pb-0 gap-2 lg:gap-3 hide-scrollbar">
           {[
             { id: 'all', label: 'All', icon: GraduationCap },
             { id: 'active', label: 'Active', icon: CheckCircle2 },
@@ -612,10 +635,10 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
               key={filter.id}
               onClick={() => setStatusFilter(filter.id as any)}
               className={cn(
-                "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+                "px-4 py-2.5 rounded-xl text-[10px] lg:text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 shrink-0",
                 statusFilter === filter.id 
-                  ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200" 
-                  : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" 
+                  : "bg-slate-50 text-slate-500 hover:text-slate-700"
               )}
             >
               <filter.icon className="w-3.5 h-3.5" />
@@ -623,41 +646,44 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+        <div className="flex flex-wrap gap-2 lg:gap-3 items-center">
+          <div className="flex-1 lg:flex-none flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <select 
               value={classFilter}
-              onChange={(e) => setClassFilter(e.target.value)}
-              className="bg-transparent text-xs font-bold uppercase tracking-widest text-slate-600 focus:outline-none"
+              onChange={(e) => {
+                setClassFilter(e.target.value);
+                setSectionFilter('all');
+              }}
+              className="bg-transparent text-xs font-bold uppercase tracking-widest text-slate-600 focus:outline-none w-full"
             >
               <option value="all">All Classes</option>
-              {classes.map(c => (
-                <option key={c} value={c}>{c}</option>
+              {classGroups.map(c => (
+                <option key={c.id} value={c.className}>{c.className}</option>
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <input 
-              type="date"
-              value={dateFilter.start}
-              onChange={(e) => setDateFilter({...dateFilter, start: e.target.value})}
-              className="bg-transparent text-[10px] font-bold uppercase text-slate-600 focus:outline-none"
-            />
-            <span className="text-slate-300">-</span>
-            <input 
-              type="date"
-              value={dateFilter.end}
-              onChange={(e) => setDateFilter({...dateFilter, end: e.target.value})}
-              className="bg-transparent text-[10px] font-bold uppercase text-slate-600 focus:outline-none"
-            />
-          </div>
+
+          {classFilter !== 'all' && (
+            <div className="flex-1 lg:flex-none flex items-center gap-2 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100 min-w-[120px]">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <select 
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value)}
+                className="bg-transparent text-xs font-bold uppercase tracking-widest text-slate-600 focus:outline-none w-full font-mono"
+              >
+                <option value="all">All Sections</option>
+                {availableSections.map((sec: any) => (
+                  <option key={sec.id} value={sec.name}>Section {sec.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Student List */}
-      <div className="card">
+      {/* Student List - Table for Desktop */}
+      <div className="hidden lg:block card">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -794,6 +820,92 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Student Cards for Mobile */}
+      <div className="lg:hidden grid grid-cols-1 gap-4 pb-20">
+        {loading ? (
+          <div className="card p-12 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="card p-12 text-center text-slate-500 font-bold">
+            No students found.
+          </div>
+        ) : (
+          filteredStudents.map((student) => (
+            <motion.div 
+              key={student.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => handleViewDetails(student)}
+              className="card p-4 relative group active:scale-[0.98] transition-transform"
+            >
+              <div className="flex items-center gap-4 mb-4">
+                {student.photoUrl ? (
+                  <img 
+                    src={student.photoUrl} 
+                    alt={student.name} 
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-sm ring-1 ring-slate-100"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl border border-indigo-100 uppercase">
+                    {student.name[0]}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-slate-900 truncate">{student.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{student.rollNumber}</span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Class {student.class}</span>
+                  </div>
+                </div>
+                <div className={cn(
+                  "px-2 px-1 rounded-lg text-[8px] font-black uppercase tracking-widest border",
+                  student.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-500 border-slate-100"
+                )}>
+                  {student.status}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="p-2 bg-slate-50 rounded-xl">
+                  <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Parent</p>
+                  <p className="text-xs font-bold text-slate-700 truncate">{student.parentName || '-'}</p>
+                </div>
+                <div className="p-2 bg-slate-50 rounded-xl">
+                  <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Contact</p>
+                  <p className="text-xs font-bold text-slate-700 truncate">{student.contact || '-'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-50">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleEdit(student); }}
+                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setViewingStudent(student); setIsIdCardModalOpen(true); }}
+                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                >
+                  <IdCard className="w-4 h-4" />
+                </button>
+                {profile?.role === 'admin' && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDelete(student.id!); }}
+                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          ))
+        )}
       </div>
 
       {/* Student Detail Modal */}
@@ -1211,23 +1323,32 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Class</label>
-                    <input
+                    <select
                       required
-                      type="text"
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       value={formData.class}
-                      onChange={e => setFormData({...formData, class: e.target.value})}
-                    />
+                      onChange={e => setFormData({...formData, class: e.target.value, section: ''})}
+                    >
+                      <option value="">Select Class</option>
+                      {classGroups.map(c => (
+                        <option key={c.id} value={c.className}>{c.className}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Section</label>
-                    <input
+                    <select
                       required
-                      type="text"
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       value={formData.section}
                       onChange={e => setFormData({...formData, section: e.target.value})}
-                    />
+                      disabled={!formData.class}
+                    >
+                      <option value="">Select Section</option>
+                      {classGroups.find(c => c.className === formData.class)?.sections.map((sec: any) => (
+                        <option key={sec.id} value={sec.name}>Section {sec.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Parent/Guardian Name</label>

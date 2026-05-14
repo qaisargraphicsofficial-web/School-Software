@@ -476,7 +476,11 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchExamResults = async () => {
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      const qConstraints = [];
+      const campusId = profile?.campusId || 'main';
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
       if (profile?.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
@@ -678,7 +682,11 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchExamSchedules = async () => {
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      const qConstraints = [];
+      const campusId = profile?.campusId || 'main';
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
       if (profile?.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
@@ -836,7 +844,11 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchExamPapers = async () => {
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      const qConstraints = [];
+      const campusId = profile?.campusId || 'main';
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
       if (profile?.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
@@ -903,7 +915,11 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchStudents = async () => {
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      const qConstraints = [];
+      const campusId = profile?.campusId || 'main';
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
       if (profile?.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
@@ -918,9 +934,12 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
   const fetchStaff = async () => {
     try {
       const qConstraints = [
-        where('status', '==', 'active'),
-        where('campusId', '==', profile?.campusId || 'main')
+        where('status', '==', 'active')
       ];
+      const campusId = profile?.campusId || 'main';
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
       if (profile?.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
@@ -934,7 +953,11 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchSubjects = async () => {
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      const qConstraints = [];
+      const campusId = profile?.campusId || 'main';
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
       if (profile?.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
@@ -949,7 +972,11 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchClasses = async () => {
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      const qConstraints = [];
+      const campusId = profile?.campusId || 'main';
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
       if (profile?.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
@@ -964,7 +991,11 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
 
   const fetchExamTypes = async () => {
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      const qConstraints = [];
+      const campusId = profile?.campusId || 'main';
+      if (campusId && campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', campusId));
+      }
       if (profile?.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
