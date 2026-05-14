@@ -236,7 +236,7 @@ export default function SchoolWebsite({ profile }: SchoolWebsiteProps) {
                   <label className="text-sm font-bold text-slate-700">Your school web address</label>
                   <div className="flex items-center group">
                     <div className="h-12 px-4 flex items-center bg-slate-50 border border-r-0 border-slate-200 rounded-l-xl text-slate-400 font-medium text-sm">
-                      pakeducate.com/
+                      {window.location.host}/
                     </div>
                     <input 
                       className="flex-1 h-12 bg-white border border-slate-200 rounded-r-xl px-4 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all group-focus-within:border-indigo-500"

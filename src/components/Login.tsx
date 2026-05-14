@@ -127,7 +127,7 @@ export default function Login() {
         <div className="mb-6 text-left">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Your school web address</label>
           <div className="flex bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
-            <div className="px-4 py-3 bg-white text-slate-400 font-medium text-sm flex items-center border-r border-slate-200">pakeducate.com/</div>
+            <div className="px-4 py-3 bg-white text-slate-400 font-medium text-sm flex items-center border-r border-slate-200">{window.location.host}/</div>
             <input 
               className="flex-1 px-4 py-3 bg-transparent outline-none text-sm text-gray-900"
               placeholder="e.g. wali, tcsl-lahore"
