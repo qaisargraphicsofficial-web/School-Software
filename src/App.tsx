@@ -49,83 +49,106 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        const docRef = doc(db, 'users', firebaseUser.uid);
-        let docSnap;
-        try {
-          docSnap = await getDoc(docRef);
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, 'users/' + firebaseUser.uid);
-          return;
-        }
-        
-        if (docSnap && docSnap.exists()) {
-          const existingProfile = docSnap.data() as UserProfile;
-          
-          // Ensure primary admin always has admin role and is approved
-          if (firebaseUser.email?.toLowerCase() === "qaisarabbas6496@gmail.com" && (existingProfile.role !== 'admin' || existingProfile.status !== 'approved')) {
-            const updatedProfile = { 
-              ...existingProfile, 
-              role: 'admin' as UserRole,
-              status: 'approved' as UserStatus,
-              schoolId: existingProfile.schoolId || 'main-hq'
-            };
-            await updateDoc(docRef, { role: 'admin', status: 'approved' });
-            setProfile(updatedProfile);
-            if (!activeSchoolId) setActiveSchoolId(updatedProfile.schoolId);
-          } else {
-            setProfile(existingProfile);
-            if (!activeSchoolId) setActiveSchoolId(existingProfile.schoolId);
-          }
-        } else {
-          // If profile doesn't exist, check if this email is pre-authorized
+      setLoading(true);
+      try {
+        if (firebaseUser) {
+          setUser(firebaseUser);
+          const docRef = doc(db, 'users', firebaseUser.uid);
+          let docSnap;
           try {
-            const authQuery = query(collection(db, 'authorized_emails'), where('email', '==', firebaseUser.email));
-            const authSnap = await getDocs(authQuery);
+            docSnap = await getDoc(docRef);
+          } catch (error) {
+            handleFirestoreError(error, OperationType.GET, 'users/' + firebaseUser.uid);
+            return;
+          }
+          
+          if (docSnap && docSnap.exists()) {
+            const existingProfile = docSnap.data() as UserProfile;
             
-            if (!authSnap.empty) {
-              const authData = authSnap.docs[0].data();
-              const newProfile: UserProfile = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                role: authData.role || 'staff',
-                status: 'approved',
-                schoolId: authData.schoolId,
-                campusId: authData.campusId || '',
-                isSubscribed: false,
+            // Ensure primary admin always has admin role and is approved
+            if (firebaseUser.email?.toLowerCase() === "qaisarabbas6496@gmail.com" && (existingProfile.role !== 'admin' || existingProfile.status !== 'approved')) {
+              const updatedProfile = { 
+                ...existingProfile, 
+                role: 'admin' as UserRole,
+                status: 'approved' as UserStatus,
+                schoolId: existingProfile.schoolId || 'main-hq'
               };
-              await setDoc(docRef, newProfile);
-              setProfile(newProfile);
-              setActiveSchoolId(authData.schoolId);
-            } else if (firebaseUser.email?.toLowerCase() === "qaisarabbas6496@gmail.com") {
-              // Super admin auto-creation
-              const newProfile: UserProfile = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                role: 'admin',
-                status: 'approved',
-                isSubscribed: true,
-                schoolId: 'main-hq'
-              };
-              await setDoc(docRef, newProfile);
-              setProfile(newProfile);
-              setActiveSchoolId('main-hq');
+              try {
+                await updateDoc(docRef, { role: 'admin', status: 'approved' });
+              } catch (e) {
+                console.warn("Failed to update admin profile status:", e);
+              }
+              setProfile(updatedProfile);
+              if (!activeSchoolId) setActiveSchoolId(updatedProfile.schoolId);
             } else {
-              // Not authorized
+              setProfile(existingProfile);
+              if (!activeSchoolId) setActiveSchoolId(existingProfile.schoolId);
+            }
+          } else {
+            // If profile doesn't exist, check if this email is pre-authorized
+            try {
+              const authQuery = query(collection(db, 'authorized_emails'), where('email', '==', firebaseUser.email));
+              const authSnap = await getDocs(authQuery);
+              
+              if (!authSnap.empty) {
+                const authData = authSnap.docs[0].data();
+                const newProfile: UserProfile = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || '',
+                  role: authData.role || 'staff',
+                  status: 'approved',
+                  schoolId: authData.schoolId,
+                  campusId: authData.campusId || '',
+                  isSubscribed: false,
+                };
+                await setDoc(docRef, newProfile);
+                setProfile(newProfile);
+                setActiveSchoolId(authData.schoolId);
+              } else if (firebaseUser.email?.toLowerCase() === "qaisarabbas6496@gmail.com") {
+                const schoolId = 'main-hq';
+                // Ensure school record exists
+                const schoolRef = doc(db, 'schools', schoolId);
+                const schoolSnap = await getDoc(schoolRef);
+                if (!schoolSnap.exists()) {
+                  await setDoc(schoolRef, {
+                    name: 'Education HQ',
+                    domain: 'admin',
+                    email: firebaseUser.email,
+                    createdAt: new Date().toISOString()
+                  });
+                }
+
+                // Super admin auto-creation
+                const newProfile: UserProfile = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || '',
+                  role: 'admin',
+                  status: 'approved',
+                  isSubscribed: true,
+                  schoolId: schoolId
+                };
+                await setDoc(docRef, newProfile);
+                setProfile(newProfile);
+                setActiveSchoolId(schoolId);
+              } else {
+                // Not authorized
+                setProfile(null);
+              }
+            } catch (err) {
+              console.error("Authorization check failed:", err);
               setProfile(null);
             }
-          } catch (err) {
-            console.error("Authorization check failed:", err);
-            setProfile(null);
           }
+        } else {
+          setUser(null);
+          setProfile(null);
+          setActiveSchoolId(null);
         }
-      } else {
-        setUser(null);
-        setProfile(null);
-        setActiveSchoolId(null);
+      } catch (globalErr) {
+        console.error("Auth state processing error:", globalErr);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

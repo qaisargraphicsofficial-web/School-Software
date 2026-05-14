@@ -38,7 +38,22 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      // 1. Get the school ID for the entered domain
+      // 1. Perform Google Sign-In FIRST
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      // 2. If super admin, they bypass the domain check
+      if (firebaseUser.email?.toLowerCase() === "qaisarabbas6496@gmail.com") {
+        // App.tsx handles the profile redirection for super admin
+        return;
+      }
+
+      // 3. For regular users, verify the school domain exists
+      if (!domain) {
+        throw new Error("Please enter your school web address.");
+      }
+
       const schoolQuery = query(collection(db, 'schools'), where('domain', '==', domain));
       const schoolSnap = await getDocs(schoolQuery);
       
@@ -47,13 +62,7 @@ export default function Login() {
       }
       const schoolId = schoolSnap.docs[0].id;
 
-      // 2. Perform Google Sign-In
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-
-      // 3. Verify membership for this specific school
-      // This is also handled in App.tsx, but we do it here for better feedback
+      // 4. Verify membership for this specific school
       const authQuery = query(
         collection(db, 'authorized_emails'), 
         where('email', '==', firebaseUser.email),
@@ -61,12 +70,10 @@ export default function Login() {
       );
       const authSnap = await getDocs(authQuery);
 
-      if (authSnap.empty && firebaseUser.email !== "qaisarabbas6496@gmail.com") {
+      if (authSnap.empty) {
         await auth.signOut();
         throw new Error("You are not authorized to login to this school. Please contact the administrator.");
       }
-
-      // If authorized, App.tsx will take over because the auth state changed
     } catch (error: any) {
       console.error("Login failed:", error);
       setError(error.message || 'Login failed');
@@ -166,7 +173,7 @@ export default function Login() {
             >
               <button
                 onClick={handleGoogleLogin}
-                disabled={loading || !domain}
+                disabled={loading}
                 className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
               >
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />

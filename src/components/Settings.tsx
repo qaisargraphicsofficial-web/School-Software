@@ -163,7 +163,18 @@ export default function Settings({ profile }: SettingsProps) {
         paymentStatus: 'paid'
       });
 
-      // 2. Find and update user profile
+      // 2. Create the school record
+      await setDoc(doc(db, 'schools', app.id), {
+        name: app.schoolName,
+        domain: app.schoolName.toLowerCase().replace(/\s+/g, '-'), // Generate a domain if not provided
+        email: app.email,
+        phone: app.phone,
+        address: app.address,
+        plan: app.plan,
+        createdAt: new Date().toISOString()
+      });
+
+      // 3. Find and update user profile
       const userQ = query(collection(db, 'users'), where('email', '==', app.email));
       const userSnap = await getDocs(userQ);
       

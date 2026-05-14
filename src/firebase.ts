@@ -1,13 +1,16 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = initializeFirestore(app, { 
+
+// Initialize Firestore with settings to bypass potential proxy/connection issues
+export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+  ignoreUndefinedProperties: true,
+}, firebaseConfig.firestoreDatabaseId || '(default)');
 
 export const auth = getAuth(app);
 export const storage = getStorage(app);
@@ -18,20 +21,22 @@ export const uploadFile = async (file: File, path: string): Promise<string> => {
   return getDownloadURL(fileRef);
 };
 
-// Connectivity Test
-async function testConnection() {
+// Connectivity Test (Safe)
+export const checkConnection = async () => {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firebase connection successful");
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. The client is offline.");
-    } else {
-      console.error("Firebase connection error:", error);
+    // Try to reach the backend directly
+    await getDocFromServer(doc(db, '_connection_test_', 'ping'));
+    console.log("Firebase connection established successfully.");
+    return true;
+  } catch (error: any) {
+    if (error.code === 'unavailable' || error.message?.includes('offline')) {
+      console.warn("Firestore is currently unreachable. The app will work in offline mode.");
+      return false;
     }
+    console.error("Firebase connection test failed:", error);
+    return false;
   }
-}
-testConnection();
+};
 
 // Error Handling Utility
 export enum OperationType {
@@ -67,6 +72,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  // Log detailed error for debugging
+  console.error('Firestore Error Details:', JSON.stringify(errInfo, null, 2));
+  
+  // If it's a connectivity error, suggest checking the console
+  if (errInfo.error.includes('offline') || errInfo.error.includes('unavailable')) {
+    console.info("Connectivity Tip: If this persists, please ensure you have accepted the Firebase terms in the project settings.");
+  }
+
   throw new Error(JSON.stringify(errInfo));
 }
