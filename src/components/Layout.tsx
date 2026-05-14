@@ -37,7 +37,6 @@ import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, g
 import { UserProfile, Task } from '../types';
 import { cn } from '../lib/utils';
 import AIAssistant from './AIAssistant';
-import MobileNavigation from './MobileNavigation';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LayoutProps {
@@ -628,69 +627,9 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto print:overflow-visible p-4 lg:p-8 pb-24 lg:pb-8 print:p-0">
+        <main className="flex-1 overflow-y-auto print:overflow-visible p-4 lg:p-8 print:p-0">
           <Outlet />
         </main>
-
-        {/* Bottom Navigation for Mobile */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-200 px-6 py-3 flex items-center justify-between z-40 no-print safe-area-bottom">
-          <Link 
-            to="/" 
-            className={cn(
-              "flex flex-col items-center gap-1 transition-all",
-              location.pathname === '/' ? "text-indigo-600 scale-110" : "text-slate-400"
-            )}
-          >
-            <LayoutDashboard className="w-6 h-6" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Home</span>
-          </Link>
-          
-          {(profile?.role === 'admin' || profile?.role === 'staff') && (
-            <Link 
-              to="/students" 
-              className={cn(
-                "flex flex-col items-center gap-1 transition-all",
-                location.pathname === '/students' ? "text-indigo-600 scale-110" : "text-slate-400"
-              )}
-            >
-              <Users className="w-6 h-6" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Pupils</span>
-            </Link>
-          )}
-
-          <Link 
-            to="/communication" 
-            className={cn(
-              "flex flex-col items-center gap-1 transition-all",
-              location.pathname === '/communication' ? "text-indigo-600 scale-110" : "text-slate-400"
-            )}
-          >
-            <MessageSquare className="w-6 h-6" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Chat</span>
-          </Link>
-
-          <button 
-            onClick={() => setShowNotifications(!showNotifications)}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-all relative",
-              showNotifications ? "text-indigo-600 scale-110" : "text-slate-400"
-            )}
-          >
-            <Bell className="w-6 h-6" />
-            {notifications.length > 0 && (
-              <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full border border-white" />
-            )}
-            <span className="text-[10px] font-black uppercase tracking-widest">Alerts</span>
-          </button>
-
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="flex flex-col items-center gap-1 text-slate-400"
-          >
-            <Menu className="w-6 h-6" />
-            <span className="text-[10px] font-black uppercase tracking-widest">More</span>
-          </button>
-        </nav>
       </div>
 
       {/* Profile Modal */}
@@ -775,9 +714,6 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
       <div className="no-print">
         <AIAssistant profile={profile} />
       </div>
-
-      {/* Mobile Navigation */}
-      <MobileNavigation />
     </div>
   );
 }
