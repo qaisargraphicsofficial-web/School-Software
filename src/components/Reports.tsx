@@ -34,23 +34,28 @@ export default function Reports({ profile }: ReportsProps) {
     setLoading(true);
     const campusId = profile?.campusId || 'main';
     try {
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+
       if (activeTab === 'students') {
-        const q = query(collection(db, 'students'), orderBy('name'));
+        const q = query(collection(db, 'students'), ...qConstraints, orderBy('name'));
         const snap = await getDocs(q);
         setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.campusId === campusId));
       } else if (activeTab === 'finance') {
-        const q = query(collection(db, 'payment_history'), orderBy('date', 'desc'));
+        const q = query(collection(db, 'payment_history'), ...qConstraints, orderBy('date', 'desc'));
         const snap = await getDocs(q);
         setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.campusId === campusId));
       } else if (activeTab === 'attendance') {
-        const q = query(collection(db, 'attendance'), orderBy('date', 'desc'));
+        const q = query(collection(db, 'attendance'), ...qConstraints, orderBy('date', 'desc'));
         const snap = await getDocs(q);
         setReportData(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((r: any) => r.campusId === campusId));
       } else if (activeTab === 'academic') {
-        const examTypesSnap = await getDocs(collection(db, 'exam_types'));
+        const examTypesSnap = await getDocs(query(collection(db, 'exam_types'), ...qConstraints));
         const examTypes = examTypesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const q = query(collection(db, 'exam_results'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'exam_results'), ...qConstraints, orderBy('createdAt', 'desc'));
         const snap = await getDocs(q);
         
         const results = snap.docs.map(doc => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, addDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, addDoc, updateDoc, doc, writeBatch, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Expense, UserProfile, SchoolSettings } from '../types';
 import { Search, Plus, Download, X, FileText, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
@@ -71,7 +71,13 @@ export default function ExpensesManagement({ profile }: ExpensesManagementProps)
   const fetchData = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'expenses'), orderBy('date', 'desc'));
+      const qConstraints: any[] = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      qConstraints.push(orderBy('date', 'desc'));
+      
+      const q = query(collection(db, 'expenses'), ...qConstraints);
       const snap = await getDocs(q);
       setExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense)));
     } catch (error) {
@@ -82,7 +88,11 @@ export default function ExpensesManagement({ profile }: ExpensesManagementProps)
   };
 
   const fetchSettings = async () => {
-    const snap = await getDocs(collection(db, 'settings'));
+    const qConstraints: any[] = [];
+    if (profile?.schoolId) {
+      qConstraints.push(where('schoolId', '==', profile.schoolId));
+    }
+    const snap = await getDocs(query(collection(db, 'settings'), ...qConstraints));
     if (!snap.empty) {
       const s = { id: snap.docs[0].id, ...snap.docs[0].data() } as SchoolSettings;
       setSettings(s);
@@ -175,7 +185,8 @@ export default function ExpensesManagement({ profile }: ExpensesManagementProps)
       await addDoc(collection(db, 'expenses'), {
         ...newExpense,
         amount: Number(newExpense.amount),
-        campusId: profile?.campusId || 'main'
+        campusId: profile?.campusId || 'main',
+        schoolId: profile?.schoolId || ''
       });
       setIsAddModalOpen(false);
       setNewExpense({

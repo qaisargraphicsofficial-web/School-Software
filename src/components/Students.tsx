@@ -118,19 +118,23 @@ export default function Students({ profile }: StudentsProps) {
   }, [profile]);
 
   const fetchStudents = async () => {
+    if (!profile?.schoolId && profile?.role !== 'admin') {
+      // If super admin has no schoolId, they can see all (optional)
+      // but usually they belong to the "main" system
+    }
     setLoading(true);
     try {
-      let q = query(collection(db, 'students'));
-      if (profile?.campusId) {
-        q = query(collection(db, 'students'), where('campusId', '==', profile.campusId));
-      }
-      let querySnapshot = await getDocs(q);
+      const schoolId = profile?.schoolId || '';
+      let q = query(collection(db, 'students'), where('schoolId', '==', schoolId));
       
-      // Fallback
-      if (querySnapshot.empty && profile?.campusId) {
-        querySnapshot = await getDocs(query(collection(db, 'students')));
+      if (profile?.campusId && profile.campusId !== 'all') {
+        q = query(collection(db, 'students'), 
+          where('schoolId', '==', schoolId),
+          where('campusId', '==', profile.campusId)
+        );
       }
-
+      
+      const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student));
       // Client-side sort
       data.sort((a, b) => a.name.localeCompare(b.name));
@@ -179,6 +183,7 @@ export default function Students({ profile }: StudentsProps) {
       const studentToSave = {
         ...formData,
         photoUrl,
+        schoolId: profile?.schoolId,
         busNumber: formData.useTransport ? formData.busNumber : '',
         route: formData.useTransport ? formData.route : '',
         pickupPoint: formData.useTransport ? formData.pickupPoint : '',

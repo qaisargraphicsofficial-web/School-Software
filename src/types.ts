@@ -34,6 +34,7 @@ export interface Campus {
   contact: string;
   headOfCampusName?: string;
   headOfCampusContact?: string;
+  schoolId?: string;
 }
 
 export interface Student {
@@ -50,6 +51,7 @@ export interface Student {
   admissionDate: string;
   status: 'active' | 'inactive';
   campusId: string;
+  schoolId?: string;
   // New fields
   contactPerson?: string;
   emergencyContact?: string;
@@ -81,6 +83,7 @@ export interface Staff {
   remainingDues?: number;
   status: 'active' | 'inactive';
   campusId: string;
+  schoolId?: string;
   bankAccount?: string;
   bankDetails?: {
     bankName: string;
@@ -96,6 +99,7 @@ export interface Attendance {
   targetType: 'student' | 'staff';
   status: 'present' | 'absent' | 'late';
   campusId: string;
+  schoolId?: string;
   method?: 'manual' | 'qr';
 }
 
@@ -119,6 +123,7 @@ export interface ReportCard {
   terms: TermData[];
   overallRemarks?: string;
   campusId: string;
+  schoolId?: string;
   createdAt: string;
 }
 
@@ -136,6 +141,7 @@ export interface ExamResult {
   remarks?: string;
   position?: number;
   campusId: string;
+  schoolId?: string;
   updatedAt?: string;
 }
 
@@ -150,6 +156,7 @@ export interface ExamSchedule {
   invigilatorIds: string[];
   roomNumber: string;
   campusId: string;
+  schoolId?: string;
   updatedAt?: string;
 }
 
@@ -161,6 +168,7 @@ export interface Fee {
   status: 'paid' | 'pending';
   receiptNumber?: string;
   campusId: string;
+  schoolId?: string;
   taxAmount?: number;
 }
 
@@ -170,6 +178,7 @@ export interface FeeType {
   defaultAmount: number;
   defaultDueDate: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface FeeRecord {
@@ -187,6 +196,7 @@ export interface FeeRecord {
   waiverReason?: string;
   termOrYear: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface PaymentHistory {
@@ -198,6 +208,7 @@ export interface PaymentHistory {
   method: 'cash' | 'online' | 'bank_transfer';
   transactionId?: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface Expense {
@@ -207,6 +218,7 @@ export interface Expense {
   date: string;
   description: string;
   campusId: string;
+  schoolId?: string;
   taxAmount?: number;
   invoiceNumber?: string;
 }
@@ -223,6 +235,7 @@ export interface Payroll {
   accountDetails: string;
   status: 'pending' | 'paid';
   campusId: string;
+  schoolId?: string;
 }
 
 export interface InventoryItem {
@@ -234,6 +247,7 @@ export interface InventoryItem {
   details?: string;
   lastUpdated: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface Notice {
@@ -243,6 +257,7 @@ export interface Notice {
   date: string;
   targetAudience: 'parents' | 'staff' | 'all' | 'students';
   campusId: string;
+  schoolId?: string;
 }
 
 export interface BulkMessage {
@@ -255,6 +270,7 @@ export interface BulkMessage {
   recipientsCount: number;
   status: 'sent' | 'failed';
   campusId: string;
+  schoolId?: string;
 }
 
 export interface Syllabus {
@@ -266,6 +282,7 @@ export interface Syllabus {
   fileUrl?: string;
   linkedExams?: string[];
   campusId: string;
+  schoolId?: string;
 }
 
 
@@ -282,6 +299,7 @@ export interface Certificate {
   signature1Label: string;
   signature2Label: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface ExamType {
@@ -289,6 +307,7 @@ export interface ExamType {
   name: string;
   term: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface ExamPaper {
@@ -318,6 +337,7 @@ export interface ExamPaper {
     }[];
   }[];
   campusId: string;
+  schoolId?: string;
 }
 
 export interface DateSheetNote {
@@ -348,6 +368,7 @@ export interface DateSheet {
   notes: DateSheetNote[];
   signatures: DateSheetSignature[];
   campusId: string;
+  schoolId?: string;
   updatedAt: string;
 }
 
@@ -389,6 +410,7 @@ export interface TimetableNote {
 export interface Timetable {
   id?: string;
   campusId: string;
+  schoolId?: string;
   className: string; // "School Wide" or specific class
   mode: 'class-monthly' | 'school-daily' | 'custom';
   title: string;
@@ -413,6 +435,7 @@ export interface LibraryLoan {
   returnDate?: string;
   status: 'borrowed' | 'returned' | 'overdue';
   campusId: string;
+  schoolId?: string;
 }
 
 export interface SchoolEvent {
@@ -423,6 +446,7 @@ export interface SchoolEvent {
   time: string;
   location: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface Task {
@@ -435,6 +459,7 @@ export interface Task {
   assignedToIds?: string[]; // array of staffIds or uids
   createdBy: string; // uid
   campusId: string;
+  schoolId?: string;
   createdAt: string;
   reminderDate?: string;
   reminderTime?: string;
@@ -442,6 +467,7 @@ export interface Task {
 
 export interface SchoolSettings {
   id?: string;
+  schoolId?: string;
   schoolName: string;
   schoolAddress: string;
   schoolContact: string;
@@ -486,6 +512,7 @@ export interface TransportVehicle {
   driverContact: string;
   status: 'active' | 'maintenance' | 'inactive';
   campusId: string;
+  schoolId?: string;
 }
 
 export interface TransportRoute {
@@ -494,6 +521,7 @@ export interface TransportRoute {
   vehicleId: string;
   stops: string[];
   campusId: string;
+  schoolId?: string;
 }
 
 export interface Subject {
@@ -503,6 +531,7 @@ export interface Subject {
   class: string;
   teacherId?: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface ClassSection {
@@ -516,6 +545,7 @@ export interface ClassGroup {
   className: string;
   sections: ClassSection[];
   campusId: string;
+  schoolId?: string;
 }
 
 export interface LeaveRequest {
@@ -529,6 +559,7 @@ export interface LeaveRequest {
   status: 'pending' | 'approved' | 'rejected';
   appliedOn: string;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface LeaveBalance {
@@ -538,11 +569,13 @@ export interface LeaveBalance {
   casualLeave: number;
   paidLeave: number;
   campusId: string;
+  schoolId?: string;
 }
 
 export interface SchoolWebsiteConfig {
   id?: string;
   campusId: string;
+  schoolId?: string;
   slug: string;
   tagline: string;
   announcement: string;

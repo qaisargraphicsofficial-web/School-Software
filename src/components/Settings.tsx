@@ -216,20 +216,27 @@ export default function Settings({ profile }: SettingsProps) {
   });
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    if (profile?.schoolId) {
+      fetchSettings();
+    }
+  }, [profile?.schoolId]);
 
   const fetchSettings = async () => {
+    if (!profile?.schoolId) return;
     setLoading(true);
     try {
-      const docRef = doc(db, 'settings', 'global');
+      const docRef = doc(db, 'settings', profile.schoolId);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
         setSettings(docSnap.data() as SchoolSettings);
       } else {
-        // Initialize with defaults if not exists
-        await setDoc(docRef, settings);
+        // Initialize with Defaults for THIS school
+        await setDoc(docRef, {
+          ...settings,
+          schoolId: profile.schoolId,
+          updatedAt: new Date().toISOString()
+        });
       }
     } catch (error) {
       console.error("Error fetching settings:", error);
@@ -255,13 +262,14 @@ export default function Settings({ profile }: SettingsProps) {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (profile?.role !== 'admin') return;
+    if (profile?.role !== 'admin' || !profile?.schoolId) return;
     
     setSaving(true);
     try {
-      const docRef = doc(db, 'settings', 'global');
+      const docRef = doc(db, 'settings', profile.schoolId);
       const updatedSettings = {
         ...settings,
+        schoolId: profile.schoolId,
         updatedAt: new Date().toISOString()
       };
       await setDoc(docRef, updatedSettings);

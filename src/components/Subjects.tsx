@@ -27,14 +27,20 @@ export default function SubjectsManagement({ profile }: SubjectsProps) {
 
   const fetchData = async () => {
     try {
-      const q = query(collection(db, 'subjects'), where('campusId', '==', profile?.campusId || 'main'));
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'subjects'), ...qConstraints);
       const snap = await getDocs(q);
       let subjectsData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
 
       if (profile?.role === 'staff' && profile.staffId) {
-        // Find the staff document ID that corresponds to the user's staffId
-        const staffQ = query(collection(db, 'staff'), where('staffId', '==', profile.staffId));
-        const staffSnap = await getDocs(staffQ);
+        const staffConstraints = [where('staffId', '==', profile.staffId)];
+        if (profile?.schoolId) {
+          staffConstraints.push(where('schoolId', '==', profile.schoolId));
+        }
+        const staffSnap = await getDocs(query(collection(db, 'staff'), ...staffConstraints));
         if (!staffSnap.empty) {
           const staffDocId = staffSnap.docs[0].id;
           subjectsData = subjectsData.filter(s => s.teacherId === staffDocId);
@@ -49,7 +55,14 @@ export default function SubjectsManagement({ profile }: SubjectsProps) {
 
   const fetchStaff = async () => {
     try {
-      const q = query(collection(db, 'staff'), where('campusId', '==', profile?.campusId || 'main'), where('status', '==', 'active'));
+      const qConstraints = [
+        where('campusId', '==', profile?.campusId || 'main'),
+        where('status', '==', 'active')
+      ];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'staff'), ...qConstraints);
       const snap = await getDocs(q);
       setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
     } catch (error) {
@@ -63,7 +76,11 @@ export default function SubjectsManagement({ profile }: SubjectsProps) {
       if (editingSubject) {
         await updateDoc(doc(db, 'subjects', editingSubject.id!), formData);
       } else {
-        await addDoc(collection(db, 'subjects'), { ...formData, campusId: profile?.campusId || 'main' });
+        await addDoc(collection(db, 'subjects'), { 
+          ...formData, 
+          campusId: profile?.campusId || 'main',
+          schoolId: profile?.schoolId || ''
+        });
       }
       setIsModalOpen(false);
       setEditingSubject(null);

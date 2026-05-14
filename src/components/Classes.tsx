@@ -55,39 +55,24 @@ export default function Classes({ profile }: ClassesProps) {
     setLoading(true);
     try {
       const campusId = profile?.campusId || 'main';
+      const schoolId = profile?.schoolId || '';
       
+      const qConstraints: any[] = [where('campusId', '==', campusId)];
+      if (schoolId) {
+        qConstraints.push(where('schoolId', '==', schoolId));
+      }
+
       // 1. Fetch Class Definitions
-      let classesQ = query(collection(db, 'classes'), where('campusId', '==', campusId));
-      let classesSnap = await getDocs(classesQ);
+      let classesSnap = await getDocs(query(collection(db, 'classes'), ...qConstraints));
       let classDefs = classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup));
       
-      // Fallback
-      if (classDefs.length === 0) {
-        classesSnap = await getDocs(query(collection(db, 'classes')));
-        classDefs = classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup));
-      }
-
       // 2. Fetch Students for counts
-      let studentsQ = query(collection(db, 'students'), where('campusId', '==', campusId));
-      let studentsSnap = await getDocs(studentsQ);
+      let studentsSnap = await getDocs(query(collection(db, 'students'), ...qConstraints));
       let students = studentsSnap.docs.map(doc => doc.data() as Student);
       
-      // Fallback
-      if (students.length === 0) {
-        studentsSnap = await getDocs(query(collection(db, 'students')));
-        students = studentsSnap.docs.map(doc => doc.data() as Student);
-      }
-
       // 3. Fetch Staff for teacher names
-      let staffQ = query(collection(db, 'staff'), where('campusId', '==', campusId));
-      let staffSnap = await getDocs(staffQ);
+      let staffSnap = await getDocs(query(collection(db, 'staff'), ...qConstraints));
       let staffList = staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
-      
-      // Fallback
-      if (staffList.length === 0) {
-        staffSnap = await getDocs(query(collection(db, 'staff')));
-        staffList = staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
-      }
       setStaff(staffList);
 
       // 4. Initialize missing classes/sections from students
@@ -108,7 +93,8 @@ export default function Classes({ profile }: ClassesProps) {
                 name: s.section,
                 teacherIds: []
               }] : [],
-              campusId
+              campusId,
+              schoolId: profile?.schoolId || ''
             };
             hasChanges = true;
           } else if (s.section && !existingDef.sections.find(sec => sec.name === s.section)) {
@@ -145,7 +131,7 @@ export default function Classes({ profile }: ClassesProps) {
 
         if (hasChanges) {
           // Refetch
-          const newClassesSnap = await getDocs(classesQ);
+          const newClassesSnap = await getDocs(query(collection(db, 'classes'), ...qConstraints));
           classDefs = newClassesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup));
         }
       }
@@ -198,11 +184,14 @@ export default function Classes({ profile }: ClassesProps) {
 
     setPromoting(true);
     try {
-      const q = query(
-        collection(db, 'students'), 
+      const qConstraints = [
         where('class', '==', promotionData.fromClass),
         where('campusId', '==', profile?.campusId || 'main')
-      );
+      ];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'students'), ...qConstraints);
       const snap = await getDocs(q);
       
       if (snap.empty) {
@@ -277,7 +266,8 @@ export default function Classes({ profile }: ClassesProps) {
               teacherIds: []
             }
           ],
-          campusId
+          campusId,
+          schoolId: profile?.schoolId || ''
         };
         await addDoc(collection(db, 'classes'), newGroup);
       }

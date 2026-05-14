@@ -20,6 +20,18 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function getSchoolId() {
+      return getUserData().schoolId;
+    }
+
+    function isMemberOf(schoolId) {
+      return isSignedIn() && getSchoolId() == schoolId;
+    }
+
+    function isMemberOfSameSchool(data) {
+      return isSignedIn() && getSchoolId() == data.schoolId;
+    }
+
     function userExists() {
       return exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -66,8 +78,13 @@ service cloud.firestore {
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
+    match /authorized_emails/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /campuses/{campusId} {
-      allow read: if isSignedIn() || true; 
+      allow read: if isMemberOfSameSchool(resource.data) || true; 
       allow write: if isAdmin();
     }
 
@@ -87,22 +104,22 @@ service cloud.firestore {
     }
 
     match /school_settings/{settingId} {
-      allow read: if true; 
+      allow read: if isMemberOfSameSchool(resource.data) || true; 
       allow write: if isAdmin();
     }
 
     match /settings/{settingId} {
-      allow read: if true; 
+      allow read: if isMemberOfSameSchool(resource.data) || true; 
       allow write: if isAdmin();
     }
 
     match /students/{studentId} {
-      allow read, list: if true; 
+      allow read, list: if isMemberOfSameSchool(resource.data); 
       allow write: if isAdmin();
     }
 
     match /staff/{staffId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if isMemberOfSameSchool(resource.data);
       allow write: if isAdmin();
     }
 

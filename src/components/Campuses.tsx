@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, addDoc, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Campus, UserProfile } from '../types';
 import { School, Plus, Search, MapPin, Phone, Building2 } from 'lucide-react';
@@ -24,7 +24,11 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
 
   const fetchCampuses = async () => {
     try {
-      const q = query(collection(db, 'campuses'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'campuses'), ...qConstraints);
       const snap = await getDocs(q);
       setCampuses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campus)));
     } catch (error) {
@@ -40,7 +44,10 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
       if (activeCampus?.id) {
         await updateDoc(doc(db, 'campuses', activeCampus.id), newCampus);
       } else {
-        await addDoc(collection(db, 'campuses'), newCampus);
+        await addDoc(collection(db, 'campuses'), {
+          ...newCampus,
+          schoolId: profile?.schoolId || ''
+        });
       }
       setIsModalOpen(false);
       setActiveCampus(null);

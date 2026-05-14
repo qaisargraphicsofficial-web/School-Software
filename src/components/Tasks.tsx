@@ -66,19 +66,23 @@ export default function Tasks({ profile }: TasksProps) {
   const fetchTasks = async () => {
     setLoading(true);
     try {
+      const qConstraints = [
+        where('campusId', '==', profile?.campusId || 'main'),
+        orderBy('createdAt', 'desc')
+      ];
+      
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+
       let q;
       if (profile?.role === 'admin' || profile?.role === 'staff') {
-        q = query(
-          collection(db, 'tasks'),
-          where('campusId', '==', profile?.campusId || 'main'),
-          orderBy('createdAt', 'desc')
-        );
+        q = query(collection(db, 'tasks'), ...qConstraints);
       } else {
         q = query(
           collection(db, 'tasks'),
-          where('campusId', '==', profile?.campusId || 'main'),
-          where('assignedToIds', 'array-contains', profile?.uid),
-          orderBy('createdAt', 'desc')
+          ...qConstraints,
+          where('assignedToIds', 'array-contains', profile?.uid)
         );
       }
       const snap = await getDocs(q);
@@ -93,7 +97,12 @@ export default function Tasks({ profile }: TasksProps) {
   const fetchStaff = async () => {
     if (profile?.role !== 'admin' && profile?.role !== 'staff') return;
     try {
-      const snap = await getDocs(collection(db, 'staff'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'staff'), ...qConstraints);
+      const snap = await getDocs(q);
       setStaff(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Staff)));
     } catch (error) {
       console.error("Error fetching staff:", error);
@@ -115,6 +124,7 @@ export default function Tasks({ profile }: TasksProps) {
           ...formData,
           createdBy: profile.uid,
           campusId: profile.campusId || 'main',
+          schoolId: profile.schoolId || '',
           createdAt: new Date().toISOString(),
         });
       }

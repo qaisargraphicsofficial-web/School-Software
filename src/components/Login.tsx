@@ -38,11 +38,38 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
+      // 1. Get the school ID for the entered domain
+      const schoolQuery = query(collection(db, 'schools'), where('domain', '==', domain));
+      const schoolSnap = await getDocs(schoolQuery);
+      
+      if (schoolSnap.empty) {
+        throw new Error("School not found. Please check the web address.");
+      }
+      const schoolId = schoolSnap.docs[0].id;
+
+      // 2. Perform Google Sign-In
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      // 3. Verify membership for this specific school
+      // This is also handled in App.tsx, but we do it here for better feedback
+      const authQuery = query(
+        collection(db, 'authorized_emails'), 
+        where('email', '==', firebaseUser.email),
+        where('schoolId', '==', schoolId)
+      );
+      const authSnap = await getDocs(authQuery);
+
+      if (authSnap.empty && firebaseUser.email !== "qaisarabbas6496@gmail.com") {
+        await auth.signOut();
+        throw new Error("You are not authorized to login to this school. Please contact the administrator.");
+      }
+
+      // If authorized, App.tsx will take over because the auth state changed
     } catch (error: any) {
       console.error("Login failed:", error);
-      setError('Login failed: ' + error.message);
+      setError(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -116,7 +143,7 @@ export default function Login() {
               loginType === 'google' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'
             }`}
           >
-            Admin / Parent
+            Google Login
           </button>
           <button
             onClick={() => setLoginType('staff')}

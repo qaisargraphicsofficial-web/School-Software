@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, getDocFromServer, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile, UserRole, UserStatus } from './types';
-import { Clock } from 'lucide-react';
+import { Clock, LogIn } from 'lucide-react';
 
 import Login from './components/Login';
 import Layout from './components/Layout';
@@ -35,6 +35,7 @@ import SubjectsManagement from './components/Subjects';
 import TeachersPortal from './components/TeachersPortal';
 import SchoolWebsite from './components/SchoolWebsite';
 import SchoolShop from './components/SchoolShop';
+import UserManagement from './components/UserManagement';
 
 import Registration from './components/Registration';
 import PublicWebsite from './components/PublicWebsite';
@@ -44,6 +45,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeSchoolId, setActiveSchoolId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -61,60 +63,110 @@ export default function App() {
         if (docSnap && docSnap.exists()) {
           const existingProfile = docSnap.data() as UserProfile;
           
-          // Fix missing campusId for admins
-          if (!existingProfile.campusId && existingProfile.role === 'admin') {
-            try {
-              const campSnap = await getDocs(collection(db, 'campuses'));
-              if (!campSnap.empty) {
-                const firstCampus = campSnap.docs[0];
-                await updateDoc(docRef, { campusId: firstCampus.id });
-                existingProfile.campusId = firstCampus.id;
-              }
-            } catch (err) {
-              console.error("Error setting default campus:", err);
-            }
-          }
-
           // Ensure primary admin always has admin role and is approved
-          if (firebaseUser.email === "qaisarabbas6496@gmail.com" && (existingProfile.role !== 'admin' || existingProfile.status !== 'approved')) {
+          if (firebaseUser.email?.toLowerCase() === "qaisarabbas6496@gmail.com" && (existingProfile.role !== 'admin' || existingProfile.status !== 'approved')) {
             const updatedProfile = { 
               ...existingProfile, 
               role: 'admin' as UserRole,
-              status: 'approved' as UserStatus 
+              status: 'approved' as UserStatus,
+              schoolId: existingProfile.schoolId || 'main-hq'
             };
             await updateDoc(docRef, { role: 'admin', status: 'approved' });
             setProfile(updatedProfile);
+            if (!activeSchoolId) setActiveSchoolId(updatedProfile.schoolId);
           } else {
             setProfile(existingProfile);
+            if (!activeSchoolId) setActiveSchoolId(existingProfile.schoolId);
           }
         } else {
-          // Default to parent or staff if not set, but admin for the specific email
-          const defaultRole: UserRole = firebaseUser.email === "qaisarabbas6496@gmail.com" ? 'admin' : 'parent';
-          const defaultStatus: UserStatus = firebaseUser.email === "qaisarabbas6496@gmail.com" ? 'approved' : 'pending';
-          const newProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            role: defaultRole,
-            status: defaultStatus,
-            isSubscribed: firebaseUser.email === "qaisarabbas6496@gmail.com",
-          };
-          await setDoc(docRef, newProfile);
-          setProfile(newProfile);
+          // If profile doesn't exist, check if this email is pre-authorized
+          try {
+            const authQuery = query(collection(db, 'authorized_emails'), where('email', '==', firebaseUser.email));
+            const authSnap = await getDocs(authQuery);
+            
+            if (!authSnap.empty) {
+              const authData = authSnap.docs[0].data();
+              const newProfile: UserProfile = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                role: authData.role || 'staff',
+                status: 'approved',
+                schoolId: authData.schoolId,
+                campusId: authData.campusId || '',
+                isSubscribed: false,
+              };
+              await setDoc(docRef, newProfile);
+              setProfile(newProfile);
+              setActiveSchoolId(authData.schoolId);
+            } else if (firebaseUser.email?.toLowerCase() === "qaisarabbas6496@gmail.com") {
+              // Super admin auto-creation
+              const newProfile: UserProfile = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                role: 'admin',
+                status: 'approved',
+                isSubscribed: true,
+                schoolId: 'main-hq'
+              };
+              await setDoc(docRef, newProfile);
+              setProfile(newProfile);
+              setActiveSchoolId('main-hq');
+            } else {
+              // Not authorized
+              setProfile(null);
+            }
+          } catch (err) {
+            console.error("Authorization check failed:", err);
+            setProfile(null);
+          }
         }
       } else {
         setUser(null);
         setProfile(null);
+        setActiveSchoolId(null);
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [activeSchoolId]);
+
+  const handleSwitchSchool = (schoolId: string) => {
+    setActiveSchoolId(schoolId);
+    if (profile) {
+      setProfile({ ...profile, schoolId });
+    }
+  };
+
+  const isSystemAdmin = user?.email?.toLowerCase() === "qaisarabbas6496@gmail.com";
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  // Handle unauthorized access
+  if (user && !profile) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <LogIn className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h2>
+          <p className="text-slate-600 mb-8">
+            Your email is not authorized to access this school. Please contact your school administrator to request access.
+          </p>
+          <button 
+            onClick={() => auth.signOut()}
+            className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
+          >
+            Switch Account
+          </button>
+        </div>
       </div>
     );
   }
@@ -151,7 +203,7 @@ export default function App() {
         {!user ? (
           <Route path="*" element={<Login />} />
         ) : (
-          <Route path="/" element={<Layout profile={profile} />}>
+          <Route path="/" element={<Layout profile={profile} onSwitchSchool={isSystemAdmin ? handleSwitchSchool : undefined} />}>
             <Route index element={<Dashboard profile={profile} />} />
             <Route path="students" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Students profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="classes" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Classes profile={profile} /> : <Navigate to="/" replace />} />
@@ -181,6 +233,7 @@ export default function App() {
             <Route path="school-shop" element={profile?.role === 'admin' ? <SchoolShop profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="transport" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Transport profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="campuses" element={profile?.role === 'admin' ? <Campuses profile={profile} /> : <Navigate to="/" replace />} />
+            <Route path="users" element={isSystemAdmin ? <UserManagement profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="reports" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Reports profile={profile} /> : <Navigate to="/" replace />} />
             <Route path="settings" element={profile?.role === 'admin' ? <Settings profile={profile} /> : <Navigate to="/" replace />} />
             

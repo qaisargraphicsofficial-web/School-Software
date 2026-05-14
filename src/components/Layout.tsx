@@ -28,10 +28,11 @@ import {
   Calendar,
   MessageSquare,
   CreditCard,
-  Bus
+  Bus,
+  Shield
 } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, getDoc, getDocs } from 'firebase/firestore';
 import { UserProfile, Task } from '../types';
 import { cn } from '../lib/utils';
 import AIAssistant from './AIAssistant';
@@ -39,9 +40,10 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface LayoutProps {
   profile: UserProfile | null;
+  onSwitchSchool?: (schoolId: string) => void;
 }
 
-export default function Layout({ profile }: LayoutProps) {
+export default function Layout({ profile, onSwitchSchool }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [notifications, setNotifications] = useState<Task[]>([]);
@@ -54,6 +56,8 @@ export default function Layout({ profile }: LayoutProps) {
   const [logoUrl, setLogoUrl] = useState('');
   const [staffRole, setStaffRole] = useState<string | null>(null);
   const [staffPermissions, setStaffPermissions] = useState<Record<string, string[]>>({});
+  const [allSchools, setAllSchools] = useState<{id: string, schoolName: string}[]>([]);
+  const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -74,8 +78,9 @@ export default function Layout({ profile }: LayoutProps) {
 
   useEffect(() => {
     const fetchSchoolSettings = async () => {
+      if (!profile?.schoolId) return;
       try {
-        const docRef = doc(db, 'settings', 'global');
+        const docRef = doc(db, 'settings', profile.schoolId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -88,7 +93,25 @@ export default function Layout({ profile }: LayoutProps) {
       }
     };
     fetchSchoolSettings();
-  }, []);
+  }, [profile?.schoolId]);
+
+  useEffect(() => {
+    // Fetch all schools for system admin
+    if (onSwitchSchool) {
+      const fetchAllSchools = async () => {
+        try {
+          const snap = await getDocs(collection(db, 'settings'));
+          setAllSchools(snap.docs.map(d => ({ 
+            id: d.id, 
+            schoolName: d.data().schoolName || d.id 
+          })));
+        } catch (error) {
+          console.error("Error fetching schools list:", error);
+        }
+      };
+      fetchAllSchools();
+    }
+  }, [onSwitchSchool]);
 
   useEffect(() => {
     const fetchStaffRole = async () => {
@@ -217,6 +240,7 @@ export default function Layout({ profile }: LayoutProps) {
     },
     { name: 'Communication', icon: MessageSquare, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION' },
     { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS' },
+    { name: 'User Management', icon: Shield, path: '/users', roles: ['admin'], category: 'AI & SETTINGS', systemOnly: true },
     { name: 'Settings', icon: Settings, path: '/settings', roles: ['admin'], category: 'AI & SETTINGS' },
     { name: 'Campuses', icon: Building2, path: '/campuses', roles: ['admin'], category: 'STAFF & OPS' },
     { name: 'Library', icon: Library, path: '/library', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
@@ -229,6 +253,9 @@ export default function Layout({ profile }: LayoutProps) {
   ];
 
   const filteredNavItems = navItems.filter(item => {
+    // Check if it's a system admin only menu
+    if ((item as any).systemOnly && profile?.email?.toLowerCase() !== "qaisarabbas6496@gmail.com") return false;
+
     if (profile?.role === 'admin') return true;
     
     if (profile?.role === 'staff') {
@@ -363,25 +390,65 @@ export default function Layout({ profile }: LayoutProps) {
               <Menu className="w-6 h-6" />
             </button>
             
-            <div className="hidden lg:block">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                {(() => {
-                  const findNavItem = (items: any[], path: string): any => {
-                    for (const item of items) {
-                      if (item.path === path) return item;
-                      if (item.children) {
-                        const found = findNavItem(item.children, path);
-                        if (found) return found;
-                      }
-                    }
-                    return null;
-                  };
-                  return findNavItem(navItems, location.pathname)?.name || 'Dashboard';
-                })()}
-              </h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-              </p>
+            <div className="hidden lg:block relative">
+              <div 
+                className={cn(
+                  "flex flex-col cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl",
+                  showSchoolSwitcher && "bg-slate-100"
+                )}
+                onClick={() => onSwitchSchool && setShowSchoolSwitcher(!showSchoolSwitcher)}
+              >
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                    {(() => {
+                      const findNavItem = (items: any[], path: string): any => {
+                        for (const item of items) {
+                          if (item.path === path) return item;
+                          if (item.children) {
+                            const found = findNavItem(item.children, path);
+                            if (found) return found;
+                          }
+                        }
+                        return null;
+                      };
+                      return findNavItem(navItems, location.pathname)?.name || 'Dashboard';
+                    })()}
+                  </h2>
+                  {onSwitchSchool && <Building2 className="w-4 h-4 text-indigo-600" />}
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  {schoolName} • {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                </p>
+              </div>
+
+              {showSchoolSwitcher && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Switch School Context</p>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {allSchools.map(school => (
+                      <button
+                        key={school.id}
+                        onClick={() => {
+                          onSwitchSchool?.(school.id);
+                          setShowSchoolSwitcher(false);
+                        }}
+                        className={cn(
+                          "w-full text-left px-5 py-3 hover:bg-indigo-50 transition-colors flex items-center justify-between group",
+                          profile?.schoolId === school.id ? "bg-indigo-50/50" : ""
+                        )}
+                      >
+                        <span className={cn(
+                          "text-sm font-bold",
+                          profile?.schoolId === school.id ? "text-indigo-600" : "text-slate-700"
+                        )}>{school.schoolName}</span>
+                        {profile?.schoolId === school.id && <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 max-w-md relative group hidden md:block">

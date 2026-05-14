@@ -35,17 +35,26 @@ export default function Leave({ profile }: LeaveProps) {
 
     // Fetch Staff
     const fetchStaff = async () => {
-      const q = query(collection(db, 'staff'), where('campusId', '==', profile.campusId));
+      const qConstraints: any[] = [where('campusId', '==', profile.campusId)];
+      if (profile.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'staff'), ...qConstraints);
       const snap = await getDocs(q);
       setStaffList(snap.docs.map(d => ({ id: d.id, ...d.data() } as Staff)));
     };
     fetchStaff();
 
     // Listen to Leave Requests
-    let requestsQuery = query(collection(db, 'leave_requests'), where('campusId', '==', profile.campusId));
-    if (profile.role !== 'admin') {
-      requestsQuery = query(collection(db, 'leave_requests'), where('campusId', '==', profile.campusId), where('staffId', '==', profile.staffId || profile.uid));
+    const reqConstraints: any[] = [where('campusId', '==', profile.campusId)];
+    if (profile.schoolId) {
+      reqConstraints.push(where('schoolId', '==', profile.schoolId));
     }
+    if (profile.role !== 'admin') {
+      reqConstraints.push(where('staffId', '==', profile.staffId || profile.uid));
+    }
+    
+    let requestsQuery = query(collection(db, 'leave_requests'), ...reqConstraints);
 
     const unsubRequests = onSnapshot(requestsQuery, (snap) => {
       setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest)));
@@ -53,10 +62,15 @@ export default function Leave({ profile }: LeaveProps) {
     });
 
     // Listen to Leave Balances
-    let balancesQuery = query(collection(db, 'leave_balances'), where('campusId', '==', profile.campusId));
-    if (profile.role !== 'admin') {
-      balancesQuery = query(collection(db, 'leave_balances'), where('campusId', '==', profile.campusId), where('staffId', '==', profile.staffId || profile.uid));
+    const balConstraints: any[] = [where('campusId', '==', profile.campusId)];
+    if (profile.schoolId) {
+      balConstraints.push(where('schoolId', '==', profile.schoolId));
     }
+    if (profile.role !== 'admin') {
+      balConstraints.push(where('staffId', '==', profile.staffId || profile.uid));
+    }
+    
+    let balancesQuery = query(collection(db, 'leave_balances'), ...balConstraints);
 
     const unsubBalances = onSnapshot(balancesQuery, (snap) => {
       setBalances(snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveBalance)));
@@ -121,7 +135,8 @@ export default function Leave({ profile }: LeaveProps) {
         reason: newRequest.reason,
         status: 'pending',
         appliedOn: new Date().toISOString(),
-        campusId: profile.campusId
+        campusId: profile.campusId,
+        schoolId: profile.schoolId || ''
       };
       
       await addDoc(collection(db, 'leave_requests'), requestData);

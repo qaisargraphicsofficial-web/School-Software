@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { InventoryItem, UserProfile } from '../types';
 import { 
@@ -44,7 +44,13 @@ export default function Inventory({ profile }: InventoryProps) {
   const fetchInventory = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'inventory'), orderBy('lastUpdated', 'desc'));
+      const qConstraints: any[] = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      qConstraints.push(orderBy('lastUpdated', 'desc'));
+      
+      const q = query(collection(db, 'inventory'), ...qConstraints);
       const snap = await getDocs(q);
       setItems(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as InventoryItem)));
     } catch (error) {
@@ -62,7 +68,10 @@ export default function Inventory({ profile }: InventoryProps) {
         delete updateData.id;
         await updateDoc(doc(db, 'inventory', formData.id), updateData);
       } else {
-        await addDoc(collection(db, 'inventory'), formData);
+        await addDoc(collection(db, 'inventory'), {
+          ...formData,
+          schoolId: profile?.schoolId || ''
+        });
       }
       setIsModalOpen(false);
       setFormData({ name: '', quantity: 0, category: 'Assets', details: '', lastUpdated: new Date().toISOString().split('T')[0] });

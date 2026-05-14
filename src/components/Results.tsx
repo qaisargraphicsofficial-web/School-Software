@@ -58,8 +58,11 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
 
   const fetchClasses = async () => {
     try {
-      const campusId = profile?.campusId || 'main';
-      const q = query(collection(db, 'classes'), where('campusId', '==', campusId));
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'classes'), ...qConstraints);
       const snap = await getDocs(q);
       setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup)));
     } catch (error) {
@@ -70,10 +73,13 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
   const fetchSchoolSettings = async () => {
     try {
       const campusId = profile?.campusId || 'main';
-      const docRef = doc(db, 'school_settings', campusId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        setSchoolSettings(snap.data() as SchoolSettings);
+      const qConstraints = [where('campusId', '==', campusId)];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const snap = await getDocs(query(collection(db, 'settings'), ...qConstraints));
+      if (!snap.empty) {
+        setSchoolSettings(snap.docs[0].data() as SchoolSettings);
       }
     } catch (error) {
       console.error("Error fetching school settings:", error);
@@ -82,8 +88,11 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
 
   const fetchExamTypes = async () => {
     try {
-      const campusId = profile?.campusId || 'main';
-      const q = query(collection(db, 'exam_types'), where('campusId', '==', campusId));
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'exam_types'), ...qConstraints);
       const snap = await getDocs(q);
       setExamTypes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamType)));
     } catch (error) {
@@ -93,7 +102,11 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
 
   const fetchStudents = async () => {
     try {
-      const q = query(collection(db, 'students'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'students'), ...qConstraints);
       const snap = await getDocs(q);
       setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
     } catch (error) {
@@ -103,7 +116,11 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
 
   const fetchResults = async () => {
     try {
-      const q = query(collection(db, 'exam_results'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'exam_results'), ...qConstraints);
       const snap = await getDocs(q);
       const resultsData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExamResult));
       setResults(resultsData);

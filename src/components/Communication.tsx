@@ -141,7 +141,11 @@ export default function Communication({ profile }: CommunicationProps) {
 
   const fetchSettings = async () => {
     try {
-      const snap = await getDocs(collection(db, 'settings'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const snap = await getDocs(query(collection(db, 'settings'), ...qConstraints));
       if (!snap.empty) {
         setSettings(snap.docs[0].data() as SchoolSettings);
       }
@@ -153,34 +157,23 @@ export default function Communication({ profile }: CommunicationProps) {
   const fetchClasses = async () => {
     const path = 'classes';
     try {
-      let q = query(collection(db, path));
-      if (profile?.campusId) {
-        q = query(collection(db, path), where('campusId', '==', profile.campusId));
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
-      let snap = await getDocs(q);
+      const snap = await getDocs(query(collection(db, path), ...qConstraints));
       let fetchedDocs = snap.docs;
-
-      // If filtered query is empty but campusId exists, try fallback to all classes
-      if (fetchedDocs.length === 0 && profile?.campusId) {
-        const fallbackSnap = await getDocs(query(collection(db, path)));
-        fetchedDocs = fallbackSnap.docs;
-      }
 
       const classOrder = ['Nursery', 'KG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'];
       let fetchedClasses = fetchedDocs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       // If no classes exist in the collection, try to derive them from students
       if (fetchedClasses.length === 0) {
-        let studentQ = query(collection(db, 'students'));
-        if (profile?.campusId) {
-          studentQ = query(collection(db, 'students'), where('campusId', '==', profile.campusId));
+        const sConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+        if (profile?.schoolId) {
+          sConstraints.push(where('schoolId', '==', profile.schoolId));
         }
-        let studentSnap = await getDocs(studentQ);
-        
-        // Fallback for students too
-        if (studentSnap.empty && profile?.campusId) {
-          studentSnap = await getDocs(query(collection(db, 'students')));
-        }
+        let studentSnap = await getDocs(query(collection(db, 'students'), ...sConstraints));
 
         const uniqueClasses = Array.from(new Set(studentSnap.docs.map(d => (d.data() as any).class)));
         fetchedClasses = uniqueClasses.filter(Boolean).map(c => ({
@@ -210,7 +203,11 @@ export default function Communication({ profile }: CommunicationProps) {
   const fetchAttendance = async (date: string) => {
     const path = 'attendance';
     try {
-      const q = query(collection(db, path), where('date', '==', date));
+      const qConstraints = [where('date', '==', date)];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, path), ...qConstraints);
       const snap = await getDocs(q);
       setAttendance(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance)));
     } catch (error) {
@@ -221,7 +218,11 @@ export default function Communication({ profile }: CommunicationProps) {
   const fetchNotices = async () => {
     const path = 'notices';
     try {
-      const q = query(collection(db, path), orderBy('date', 'desc'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, path), ...qConstraints, orderBy('date', 'desc'));
       const snap = await getDocs(q);
       setNotices(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Notice)));
     } catch (error) {
@@ -232,7 +233,11 @@ export default function Communication({ profile }: CommunicationProps) {
   const fetchBulkMessages = async () => {
     const path = 'bulk_messages';
     try {
-      const q = query(collection(db, path), orderBy('date', 'desc'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, path), ...qConstraints, orderBy('date', 'desc'));
       const snap = await getDocs(q);
       setBulkMessages(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as BulkMessage)));
     } catch (error) {
@@ -243,17 +248,12 @@ export default function Communication({ profile }: CommunicationProps) {
   const fetchStudents = async () => {
     const path = 'students';
     try {
-      let q = query(collection(db, path));
-      if (profile?.campusId) {
-        q = query(collection(db, path), where('campusId', '==', profile.campusId));
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
-      let snap = await getDocs(q);
+      const snap = await getDocs(query(collection(db, path), ...qConstraints));
       let docs = snap.docs;
-
-      if (docs.length === 0 && profile?.campusId) {
-        const fallbackSnap = await getDocs(query(collection(db, path)));
-        docs = fallbackSnap.docs;
-      }
 
       setStudents(docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student)));
     } catch (error) {
@@ -264,9 +264,13 @@ export default function Communication({ profile }: CommunicationProps) {
   const fetchFeeData = async () => {
     const path = 'fees';
     try {
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
       const [recordsSnap, typesSnap] = await Promise.all([
-        getDocs(collection(db, 'fee_records')),
-        getDocs(collection(db, 'fee_types'))
+        getDocs(query(collection(db, 'fee_records'), ...qConstraints)),
+        getDocs(query(collection(db, 'fee_types'), ...qConstraints))
       ]);
       setFeeRecords(recordsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeeRecord)));
       setFeeTypes(typesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeeType)));

@@ -28,7 +28,11 @@ export default function Curriculum({ profile }: { profile: UserProfile | null })
 
   const fetchSyllabuses = async () => {
     try {
-      const q = query(collection(db, 'syllabus'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'syllabus'), ...qConstraints);
       const snap = await getDocs(q);
       setSyllabuses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Syllabus)));
     } catch (error) {
@@ -59,6 +63,7 @@ export default function Curriculum({ profile }: { profile: UserProfile | null })
         fileUrl,
         linkedExams,
         campusId: profile?.campusId || 'main',
+        schoolId: profile?.schoolId || '',
       });
       
       setIsModalOpen(false);

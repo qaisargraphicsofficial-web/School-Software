@@ -30,11 +30,14 @@ export default function TeacherAttendance({ profile }: TeacherAttendanceProps) {
     if (!profile) return;
     setLoading(true);
     try {
-      const q = query(
-        collection(db, 'attendance'),
+      const qConstraints = [
         where('targetId', '==', profile.uid),
         where('targetType', '==', 'staff')
-      );
+      ];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'attendance'), ...qConstraints);
       const snapshot = await getDocs(q);
       const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance));
       records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -91,6 +94,7 @@ export default function TeacherAttendance({ profile }: TeacherAttendanceProps) {
       targetType: 'staff',
       status: 'present',
       campusId: profile.campusId || 'main',
+      schoolId: profile.schoolId || '',
       method: method,
     };
     

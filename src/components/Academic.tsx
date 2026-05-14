@@ -145,11 +145,12 @@ export default function Academic({ profile }: AcademicProps) {
 
   const fetchClasses = async () => {
     try {
-      const q = query(collection(db, 'classes'), where('campusId', '==', profile?.campusId || 'main'));
-      let snap = await getDocs(q);
-      if (snap.empty) {
-        snap = await getDocs(query(collection(db, 'classes')));
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
+      const q = query(collection(db, 'classes'), ...qConstraints);
+      let snap = await getDocs(q);
       setClassGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup)));
     } catch (error) {
       console.error("Error fetching classes:", error);
@@ -158,11 +159,12 @@ export default function Academic({ profile }: AcademicProps) {
 
   const fetchSubjects = async () => {
     try {
-      const q = query(collection(db, 'subjects'), where('campusId', '==', profile?.campusId || 'main'));
-      let snap = await getDocs(q);
-      if (snap.empty) {
-         snap = await getDocs(query(collection(db, 'subjects')));
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
+      const q = query(collection(db, 'subjects'), ...qConstraints);
+      let snap = await getDocs(q);
       setSubjectsList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
       console.error("Error fetching subjects:", error);
@@ -175,6 +177,7 @@ export default function Academic({ profile }: AcademicProps) {
       const data = {
         ...subjectForm,
         campusId: profile?.campusId || 'main',
+        schoolId: profile?.schoolId,
         updatedAt: new Date().toISOString()
       };
 
@@ -205,7 +208,11 @@ export default function Academic({ profile }: AcademicProps) {
 
   const fetchStaff = async () => {
     try {
-      const q = query(collection(db, 'staff'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'staff'), ...qConstraints);
       const snap = await getDocs(q);
       setStaffList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
     } catch (error) {
@@ -217,22 +224,31 @@ export default function Academic({ profile }: AcademicProps) {
     let unsubscribe: () => void;
     if (activeTab === 'stats') {
       const campusId = profile?.campusId || 'main';
+      const schoolId = profile?.schoolId || '';
       
       // Real-time listener for attendance
-      const aQuery = query(
-        collection(db, 'attendance'),
+      const constraints = [
         where('date', '==', selectedDate),
         where('campusId', '==', campusId)
+      ];
+      if (schoolId) constraints.push(where('schoolId', '==', schoolId));
+
+      const aQuery = query(
+        collection(db, 'attendance'),
+        ...constraints
       );
 
       unsubscribe = onSnapshot(aQuery, async (aSnap) => {
         try {
           // Fetch students of the selected class
-          const sQuery = query(collection(db, 'students'), where('class', '==', selectedClass), where('campusId', '==', campusId));
+          const sConstraints = [
+            where('class', '==', selectedClass), 
+            where('campusId', '==', campusId)
+          ];
+          if (schoolId) sConstraints.push(where('schoolId', '==', schoolId));
+
+          const sQuery = query(collection(db, 'students'), ...sConstraints);
           let sSnap = await getDocs(sQuery);
-          if (sSnap.empty) {
-            sSnap = await getDocs(query(collection(db, 'students'), where('class', '==', selectedClass)));
-          }
           const classStudentIds = sSnap.docs.map(doc => doc.id);
 
           if (classStudentIds.length === 0) {
@@ -271,9 +287,11 @@ export default function Academic({ profile }: AcademicProps) {
     const fetchStudents = async () => {
       setLoading(true);
       try {
-        let q;
+        const schoolId = profile?.schoolId || '';
         const baseConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+        if (schoolId) baseConstraints.push(where('schoolId', '==', schoolId));
         
+        let q;
         if (selectedClass !== 'All') {
           q = query(collection(db, 'students'), where('class', '==', selectedClass), ...baseConstraints);
         } else {
@@ -281,15 +299,6 @@ export default function Academic({ profile }: AcademicProps) {
         }
 
         let querySnapshot = await getDocs(q);
-        
-        if (querySnapshot.empty) {
-          if (selectedClass !== 'All') {
-            querySnapshot = await getDocs(query(collection(db, 'students'), where('class', '==', selectedClass)));
-          } else {
-            querySnapshot = await getDocs(query(collection(db, 'students')));
-          }
-        }
-
         const data = querySnapshot.docs.map(studentDoc => ({ id: studentDoc.id, ...(studentDoc.data() as any) } as Student));
         setStudents(data);
         
@@ -316,7 +325,8 @@ export default function Academic({ profile }: AcademicProps) {
           targetId: studentId,
           targetType: 'student',
           status,
-          campusId: profile?.campusId || 'main'
+          campusId: profile?.campusId || 'main',
+          schoolId: profile?.schoolId
         })
       );
       await Promise.all(promises);

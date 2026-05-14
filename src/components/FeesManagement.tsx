@@ -161,19 +161,22 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
     if (!profile) return;
     setLoading(true);
     try {
-      const campusId = profile.campusId || 'main';
+      const qConstraints = [];
+      if (profile.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
       
-      const studentsSnap = await getDocs(collection(db, 'students'));
-      setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Student)).filter(s => s.campusId === campusId));
+      const studentsSnap = await getDocs(query(collection(db, 'students'), ...qConstraints));
+      setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Student)));
 
-      const feeTypesSnap = await getDocs(collection(db, 'fee_types'));
-      setFeeTypes(feeTypesSnap.docs.map(d => ({ id: d.id, ...d.data() } as FeeType)).filter(f => f.campusId === campusId));
+      const feeTypesSnap = await getDocs(query(collection(db, 'fee_types'), ...qConstraints));
+      setFeeTypes(feeTypesSnap.docs.map(d => ({ id: d.id, ...d.data() } as FeeType)));
 
-      const feeRecordsSnap = await getDocs(collection(db, 'fee_records'));
-      setFeeRecords(feeRecordsSnap.docs.map(d => ({ id: d.id, ...d.data() } as FeeRecord)).filter(f => f.campusId === campusId));
+      const feeRecordsSnap = await getDocs(query(collection(db, 'fee_records'), ...qConstraints));
+      setFeeRecords(feeRecordsSnap.docs.map(d => ({ id: d.id, ...d.data() } as FeeRecord)));
 
-      const paymentsSnap = await getDocs(collection(db, 'payment_history'));
-      setPaymentHistory(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PaymentHistory)).filter(p => p.campusId === campusId));
+      const paymentsSnap = await getDocs(query(collection(db, 'payment_history'), ...qConstraints));
+      setPaymentHistory(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PaymentHistory)));
 
     } catch (error) {
       console.error("Error fetching fee data:", error);
@@ -208,7 +211,8 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         name: feeTypeForm.name.trim(),
         defaultAmount: Number(feeTypeForm.defaultAmount),
         defaultDueDate: feeTypeForm.defaultDueDate,
-        campusId: profile.campusId || 'main'
+        campusId: profile.campusId || 'main',
+        schoolId: profile.schoolId
       };
 
       if (editingFeeType?.id) {
@@ -276,7 +280,8 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
             status: 'pending',
             paidAmount: 0,
             termOrYear: generateForm.termOrYear,
-            campusId: profile.campusId || 'main'
+            campusId: profile.campusId || 'main',
+            schoolId: profile.schoolId
           });
           recordsCount++;
         });
@@ -376,7 +381,8 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         date: paymentForm.date,
         method: paymentForm.method,
         transactionId: paymentForm.method === 'online' ? `txn_${Math.random().toString(36).substr(2, 9)}` : undefined,
-        campusId: profile.campusId || 'main'
+        campusId: profile.campusId || 'main',
+        schoolId: profile.schoolId
       });
 
       alert("Payment processed successfully!");

@@ -87,6 +87,7 @@ export default function StaffManagement({ profile }: StaffProps) {
           password: credFormData.password,
           staffId: selectedStaffForCreds.staffId,
           campusId: profile?.campusId || 'main',
+          schoolId: profile?.schoolId,
           role: selectedStaffForCreds.role,
           name: selectedStaffForCreds.name
         });
@@ -234,6 +235,7 @@ export default function StaffManagement({ profile }: StaffProps) {
           status: 'present',
           method: 'qr',
           campusId: profile?.campusId || 'main',
+          schoolId: profile?.schoolId,
           timestamp: new Date().toISOString()
         });
         setScanResult(`Attendance marked for ${staff.name}`);
@@ -256,7 +258,7 @@ export default function StaffManagement({ profile }: StaffProps) {
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'staff'));
+      const q = query(collection(db, 'staff'), where('schoolId', '==', profile?.schoolId || ''));
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Staff));
       setStaffList(data);
@@ -288,14 +290,16 @@ export default function StaffManagement({ profile }: StaffProps) {
       if (isEditMode && editingId) {
         await setDoc(doc(db, 'staff', editingId), {
           ...formData,
-          campusId: profile?.campusId || 'main'
+          campusId: profile?.campusId || 'main',
+          schoolId: profile?.schoolId
         });
       } else {
         const newDocRef = doc(collection(db, 'staff'));
         await setDoc(newDocRef, {
           ...formData,
           staffId: newDocRef.id,
-          campusId: profile?.campusId || 'main'
+          campusId: profile?.campusId || 'main',
+          schoolId: profile?.schoolId
         });
       }
       

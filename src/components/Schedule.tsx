@@ -62,7 +62,11 @@ export default function Schedule({ profile }: ScheduleProps) {
     // Fetch School Settings
     const fetchSettings = async () => {
       try {
-        const settingsSnap = await getDocs(collection(db, 'school_settings'));
+        const qConstraints = [];
+        if (profile?.schoolId) {
+          qConstraints.push(where('schoolId', '==', profile.schoolId));
+        }
+        const settingsSnap = await getDocs(query(collection(db, 'school_settings'), ...qConstraints));
         if (!settingsSnap.empty) {
           setSchoolSettings(settingsSnap.docs[0].data() as SchoolSettings);
         }
@@ -74,7 +78,11 @@ export default function Schedule({ profile }: ScheduleProps) {
     // Fetch Classes
     const fetchClasses = async () => {
       try {
-        const q = query(collection(db, 'classes'), where('campusId', '==', profile.campusId));
+        const qConstraints = [where('campusId', '==', profile.campusId)];
+        if (profile?.schoolId) {
+          qConstraints.push(where('schoolId', '==', profile.schoolId));
+        }
+        const q = query(collection(db, 'classes'), ...qConstraints);
         const snap = await getDocs(q);
         const classNames = snap.docs.map(doc => (doc.data() as ClassGroup).className);
         setClasses(classNames);
@@ -84,7 +92,11 @@ export default function Schedule({ profile }: ScheduleProps) {
     };
 
     // Listen for Timetables
-    const q = query(collection(db, 'timetables'), where('campusId', '==', profile.campusId));
+    const qConstraints = [where('campusId', '==', profile.campusId)];
+    if (profile?.schoolId) {
+      qConstraints.push(where('schoolId', '==', profile.schoolId));
+    }
+    const q = query(collection(db, 'timetables'), ...qConstraints);
     const unsubscribe = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Timetable));
       setTimetables(docs);
@@ -103,6 +115,7 @@ export default function Schedule({ profile }: ScheduleProps) {
   const handleCreateNew = () => {
     const newTimetable: Timetable | any = {
       campusId: profile?.campusId || '',
+      schoolId: profile?.schoolId || '',
       className: classes[0] || 'Unassigned',
       mode: 'class-monthly',
       title: 'New Schedule',
@@ -132,6 +145,7 @@ export default function Schedule({ profile }: ScheduleProps) {
     try {
       const data = {
         ...activeTimetable,
+        schoolId: activeTimetable.schoolId || profile?.schoolId || '',
         updatedAt: new Date().toISOString()
       };
       

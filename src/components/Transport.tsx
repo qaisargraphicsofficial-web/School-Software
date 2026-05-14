@@ -90,10 +90,15 @@ export default function Transport({ profile }: TransportProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const vehicleSnap = await getDocs(query(collection(db, 'transport_vehicles'), where('campusId', '==', profile?.campusId || 'main')));
-      const routeSnap = await getDocs(query(collection(db, 'transport_routes'), where('campusId', '==', profile?.campusId || 'main')));
-      const feeSnap = await getDocs(query(collection(db, 'transport_fees'), where('campusId', '==', profile?.campusId || 'main')));
-      const studentSnap = await getDocs(query(collection(db, 'students'), where('campusId', '==', profile?.campusId || 'main')));
+      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+
+      const vehicleSnap = await getDocs(query(collection(db, 'transport_vehicles'), ...qConstraints));
+      const routeSnap = await getDocs(query(collection(db, 'transport_routes'), ...qConstraints));
+      const feeSnap = await getDocs(query(collection(db, 'transport_fees'), ...qConstraints));
+      const studentSnap = await getDocs(query(collection(db, 'students'), ...qConstraints));
 
       setVehicles(vehicleSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransportVehicle)));
       setRoutes(routeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransportRoute)));
@@ -114,7 +119,10 @@ export default function Transport({ profile }: TransportProps) {
       if (isEditMode && selectedVehicle?.id) {
         await setDoc(doc(db, 'transport_vehicles', selectedVehicle.id), vehicleFormData, { merge: true });
       } else {
-        await addDoc(collection(db, 'transport_vehicles'), vehicleFormData);
+        await addDoc(collection(db, 'transport_vehicles'), {
+          ...vehicleFormData,
+          schoolId: profile?.schoolId || ''
+        });
       }
       setIsVehicleModalOpen(false);
       fetchData();
@@ -133,7 +141,10 @@ export default function Transport({ profile }: TransportProps) {
       if (isEditMode && selectedRoute?.id) {
         await setDoc(doc(db, 'transport_routes', selectedRoute.id), routeFormData, { merge: true });
       } else {
-        await addDoc(collection(db, 'transport_routes'), routeFormData);
+        await addDoc(collection(db, 'transport_routes'), {
+          ...routeFormData,
+          schoolId: profile?.schoolId || ''
+        });
       }
       setIsRouteModalOpen(false);
       fetchData();
@@ -152,7 +163,10 @@ export default function Transport({ profile }: TransportProps) {
       if (isEditMode && selectedFee?.id) {
         await setDoc(doc(db, 'transport_fees', selectedFee.id), feeFormData, { merge: true });
       } else {
-        await addDoc(collection(db, 'transport_fees'), feeFormData);
+        await addDoc(collection(db, 'transport_fees'), {
+          ...feeFormData,
+          schoolId: profile?.schoolId || ''
+        });
       }
       setIsFeeModalOpen(false);
       fetchData();

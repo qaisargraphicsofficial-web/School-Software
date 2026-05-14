@@ -26,7 +26,11 @@ export default function Library({ profile }: { profile: UserProfile | null }) {
 
   const fetchLoans = async () => {
     try {
-      const q = query(collection(db, 'library_loans'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'library_loans'), ...qConstraints);
       const snap = await getDocs(q);
       setLoans(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LibraryLoan)));
     } catch (error) {
@@ -37,7 +41,12 @@ export default function Library({ profile }: { profile: UserProfile | null }) {
   };
 
   const fetchStudents = async () => {
-    const snap = await getDocs(collection(db, 'students'));
+    const qConstraints = [];
+    if (profile?.schoolId) {
+      qConstraints.push(where('schoolId', '==', profile.schoolId));
+    }
+    const q = query(collection(db, 'students'), ...qConstraints);
+    const snap = await getDocs(q);
     setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
   };
 
@@ -47,6 +56,7 @@ export default function Library({ profile }: { profile: UserProfile | null }) {
       await addDoc(collection(db, 'library_loans'), {
         ...newLoan,
         campusId: profile?.campusId || 'main',
+        schoolId: profile?.schoolId || '',
       });
       setIsModalOpen(false);
       fetchLoans();

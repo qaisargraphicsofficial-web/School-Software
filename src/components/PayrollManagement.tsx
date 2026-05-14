@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, updateDoc, doc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, updateDoc, doc, addDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Payroll, Staff, UserProfile } from '../types';
 import { Receipt, History, Plus, X } from 'lucide-react';
@@ -24,11 +24,15 @@ export default function PayrollManagement({ profile }: PayrollManagementProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'payroll'));
+      const qConstraints = [];
+      if (profile?.schoolId) {
+        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      const q = query(collection(db, 'payroll'), ...qConstraints);
       const snap = await getDocs(q);
       setPayroll(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payroll)));
       
-      const sSnap = await getDocs(collection(db, 'staff'));
+      const sSnap = await getDocs(query(collection(db, 'staff'), ...qConstraints));
       setStaff(sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
     } catch (error) {
       console.error("Error fetching payroll:", error);
@@ -56,7 +60,13 @@ export default function PayrollManagement({ profile }: PayrollManagementProps) {
   const handleAddPayroll = async () => {
     if (!newPayroll.staffId || !newPayroll.month || !newPayroll.paymentDate) return;
     try {
-      await addDoc(collection(db, 'payroll'), { ...newPayroll, amount: Number(newPayroll.amount), deductions: Number(newPayroll.deductions), netPay: Number(newPayroll.netPay) });
+      await addDoc(collection(db, 'payroll'), { 
+        ...newPayroll, 
+        amount: Number(newPayroll.amount), 
+        deductions: Number(newPayroll.deductions), 
+        netPay: Number(newPayroll.netPay),
+        schoolId: profile?.schoolId || ''
+      });
       setIsModalOpen(false);
       fetchData();
     } catch (error) {

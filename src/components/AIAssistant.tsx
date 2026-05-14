@@ -1123,6 +1123,19 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
 
   const startRecording = async () => {
     try {
+      // Check if mediaDevices API is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Recording not supported in this browser.");
+      }
+
+      // Check for available devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasMicrophone = devices.some(device => device.kind === 'audioinput');
+      
+      if (!hasMicrophone) {
+        throw new Error("No microphone found.");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -1149,7 +1162,11 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
       setIsRecording(true);
     } catch (error) {
       console.error("Recording Error:", error);
-      alert("Could not access microphone for recording.");
+      let message = "Could not access microphone for recording.";
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      alert(message);
     }
   };
 

@@ -50,11 +50,17 @@ export default function Dashboard({ profile }: DashboardProps) {
   useEffect(() => {
     const fetchStats = async () => {
       if (!profile || (profile.role !== 'admin' && profile.role !== 'staff')) return;
-      
+      if (!profile.schoolId && profile.role !== 'admin') return;
+
       try {
-        const studentsSnap = await getDocs(collection(db, 'students'));
-        const staffSnap = await getDocs(collection(db, 'staff'));
-        const feesSnap = await getDocs(collection(db, 'fee_records'));
+        const queryConstraints = [];
+        if (profile.schoolId) {
+          queryConstraints.push(where('schoolId', '==', profile.schoolId));
+        }
+
+        const studentsSnap = await getDocs(query(collection(db, 'students'), ...queryConstraints));
+        const staffSnap = await getDocs(query(collection(db, 'staff'), ...queryConstraints));
+        const feesSnap = await getDocs(query(collection(db, 'fee_records'), ...queryConstraints));
         
         let totalFees = 0;
         feesSnap.forEach(doc => {
@@ -76,12 +82,18 @@ export default function Dashboard({ profile }: DashboardProps) {
     if (!profile) return;
     
     let q;
+    const queryConstraints = [];
+    if (profile.schoolId) {
+      queryConstraints.push(where('schoolId', '==', profile.schoolId));
+    }
+
     if (profile.role === 'admin' || profile.role === 'staff') {
-      q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(5));
+      q = query(collection(db, 'tasks'), ...queryConstraints, orderBy('createdAt', 'desc'), limit(5));
     } else {
       // For students/parents, only show tasks assigned to them
       q = query(
         collection(db, 'tasks'),
+        ...queryConstraints,
         where('assignedToIds', 'array-contains', profile.uid),
         limit(20)
       );
@@ -104,11 +116,20 @@ export default function Dashboard({ profile }: DashboardProps) {
     const fetchMySubjects = async () => {
       if (profile?.role === 'staff' && profile.staffId) {
         try {
-          const staffQ = query(collection(db, 'staff'), where('staffId', '==', profile.staffId));
+          const queryConstraints = [where('staffId', '==', profile.staffId)];
+          if (profile.schoolId) {
+            queryConstraints.push(where('schoolId', '==', profile.schoolId));
+          }
+
+          const staffQ = query(collection(db, 'staff'), ...queryConstraints);
           const staffSnap = await getDocs(staffQ);
           if (!staffSnap.empty) {
             const staffDocId = staffSnap.docs[0].id;
-            const subjectsQ = query(collection(db, 'subjects'), where('teacherId', '==', staffDocId));
+            const subjectsConstraints = [where('teacherId', '==', staffDocId)];
+            if (profile.schoolId) {
+              subjectsConstraints.push(where('schoolId', '==', profile.schoolId));
+            }
+            const subjectsQ = query(collection(db, 'subjects'), ...subjectsConstraints);
             const subjectsSnap = await getDocs(subjectsQ);
             setMySubjects(subjectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
           }
