@@ -202,14 +202,14 @@ export default function Registration() {
               </div>
             </div>
 
-            <div className="pt-4 flex items-center justify-between gap-4">
-              <Link to="/" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">
+            <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <Link to="/" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors order-2 sm:order-1 font-medium bg-slate-50 sm:bg-transparent w-full sm:w-auto text-center py-2 sm:py-0 rounded-lg">
                 Already have an account? Login
               </Link>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50 order-1 sm:order-2"
               >
                 {loading ? 'Submitting...' : (
                   <>

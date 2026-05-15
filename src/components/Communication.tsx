@@ -672,64 +672,68 @@ export default function Communication({ profile }: CommunicationProps) {
   return (
     <div className="space-y-8">
       {/* Tabs */}
-      <div className="flex p-1 bg-slate-100 rounded-2xl w-fit">
-        <button
-          onClick={() => setActiveTab('notices')}
-          className={cn(
-            "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
-            activeTab === 'notices' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+      <div className="overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex p-1 bg-slate-100 rounded-2xl w-fit whitespace-nowrap">
+          <button
+            onClick={() => setActiveTab('notices')}
+            className={cn(
+              "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+              activeTab === 'notices' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            Notice Board
+          </button>
+          {profile?.role === 'admin' && (
+            <>
+              <button
+                onClick={() => setActiveTab('bulk')}
+                className={cn(
+                  "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                  activeTab === 'bulk' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Bulk Messaging
+              </button>
+              <button
+                onClick={() => setActiveTab('directory')}
+                className={cn(
+                  "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                  activeTab === 'directory' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Student Directory
+              </button>
+              <button
+                onClick={() => setActiveTab('absent')}
+                className={cn(
+                  "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+                  activeTab === 'absent' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Absent Students
+              </button>
+            </>
           )}
-        >
-          Notice Board
-        </button>
-        {profile?.role === 'admin' && (
-          <>
-            <button
-              onClick={() => setActiveTab('bulk')}
-              className={cn(
-                "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
-                activeTab === 'bulk' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              )}
-            >
-              Bulk Messaging
-            </button>
-            <button
-              onClick={() => setActiveTab('directory')}
-              className={cn(
-                "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
-                activeTab === 'directory' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              )}
-            >
-              Student Directory
-            </button>
-            <button
-              onClick={() => setActiveTab('absent')}
-              className={cn(
-                "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
-                activeTab === 'absent' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              )}
-            >
-              Absent Students
-            </button>
-          </>
-        )}
+        </div>
       </div>
 
       {activeTab === 'directory' ? (
         <section className="space-y-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-600 rounded-lg">
-                <Users className="w-6 h-6 text-white" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-600 rounded-lg shrink-0">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900">Student Directory</h2>
               </div>
-              <h2 className="text-2xl font-bold text-slate-900">Student Directory</h2>
-              <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-bold">
+              <span className="w-fit px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs md:text-sm font-bold">
                 {students.length} Students
               </span>
             </div>
             <button
               onClick={printDirectory}
-              className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-100 transition-colors border border-indigo-100 shadow-sm"
+              className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2.5 rounded-xl font-bold hover:bg-indigo-100 transition-colors border border-indigo-100 shadow-sm"
             >
               <FileText className="w-5 h-5" />
               Print Directory
@@ -1023,17 +1027,17 @@ export default function Communication({ profile }: CommunicationProps) {
         <>
           {/* Notice Board Section */}
           <section className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 rounded-lg">
+                <div className="p-2 bg-indigo-600 rounded-lg shrink-0">
                   <Megaphone className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900">Digital Notice Board</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900">Digital Notice Board</h2>
               </div>
               {profile?.role === 'admin' && (
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
                 >
                   <Plus className="w-5 h-5" />
                   Post Notice
@@ -1273,16 +1277,16 @@ export default function Communication({ profile }: CommunicationProps) {
         </>
       ) : (
         <section className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-600 rounded-lg">
+              <div className="p-2 bg-indigo-600 rounded-lg shrink-0">
                 <Send className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900">Bulk Messaging Center</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-slate-900">Bulk Messaging Center</h2>
             </div>
             <button
               onClick={() => setIsBulkModalOpen(true)}
-              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
             >
               <Plus className="w-5 h-5" />
               New Bulk Message

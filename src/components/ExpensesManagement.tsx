@@ -263,25 +263,29 @@ export default function ExpensesManagement({ profile }: ExpensesManagementProps)
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-900">Expense Management</h2>
-        <div className="flex gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="text-center md:text-left">
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight tracking-tight">Expense Management</h2>
+          <p className="text-slate-500 text-sm md:text-base font-medium">Track and categorize school expenses.</p>
+        </div>
+        <div className="grid grid-cols-2 md:flex md:items-center gap-2 lg:gap-3">
           <button 
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+            className="btn-secondary px-4 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] lg:text-sm flex items-center justify-center gap-2 transition-all"
           >
             <Download className="w-4 h-4" />
-            Download CSV
+            <span className="whitespace-nowrap">CSV Report</span>
           </button>
           <button 
             onClick={() => setShowExpenseReport(!showExpenseReport)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
+            className="btn-secondary px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] lg:text-sm flex items-center justify-center gap-2 transition-all"
           >
-            {showExpenseReport ? 'Hide Report' : 'View Report'}
+            <FileText className="w-4 h-4" />
+            <span className="whitespace-nowrap overflow-hidden text-ellipsis">{showExpenseReport ? 'Hide Report' : 'Summary'}</span>
           </button>
           <button 
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-colors"
+            className="col-span-2 md:col-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-xs lg:text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-100"
           >
             <Plus className="w-4 h-4" />
             Add Expense
@@ -377,56 +381,56 @@ export default function ExpensesManagement({ profile }: ExpensesManagementProps)
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-4 bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm">
-        <div className="flex-1 min-w-[200px] space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:flex xl:flex-wrap items-end gap-3 bg-white p-4 lg:p-6 rounded-[24px] border border-slate-100 shadow-sm transition-all focus-within:shadow-md">
+        <div className="sm:col-span-2 lg:col-span-2 xl:flex-1 min-w-[200px] space-y-1.5">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Search Expenses</label>
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
             <input 
               type="text" 
               placeholder="Search description, category..." 
-              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="w-48 space-y-2">
+        <div className="space-y-1.5">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Invoice #</label>
           <input 
             type="text" 
             placeholder="INV-001" 
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all font-mono"
+            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono font-bold"
             value={filterInvoiceNumber}
             onChange={e => setFilterInvoiceNumber(e.target.value)}
           />
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Start Date</label>
           <input 
             type="date" 
-            className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all" 
+            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium" 
             value={filterStartDate} 
             onChange={e => setFilterStartDate(e.target.value)} 
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">End Date</label>
           <input 
             type="date" 
-            className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all" 
+            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium" 
             value={filterEndDate} 
             onChange={e => setFilterEndDate(e.target.value)} 
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
           <select 
-            className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all" 
+            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold appearance-none cursor-pointer" 
             value={filterCategory} 
             onChange={e => setFilterCategory(e.target.value)}
           >
@@ -443,9 +447,10 @@ export default function ExpensesManagement({ profile }: ExpensesManagementProps)
             setFilterInvoiceNumber('');
             setSearchQuery('');
           }}
-          className="px-4 py-3 text-slate-400 hover:text-rose-600 font-bold text-sm transition-colors"
+          className="xl:ml-auto px-4 py-3 text-slate-400 hover:text-rose-600 font-bold text-[10px] uppercase tracking-widest transition-colors flex items-center justify-center gap-1"
         >
-          Clear
+          <X className="w-4 h-4" />
+          Clear FILTERS
         </button>
       </div>
 

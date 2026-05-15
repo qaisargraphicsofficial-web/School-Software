@@ -88,8 +88,11 @@ export default function Login() {
       }
     } catch (error: any) {
       console.error("Login failed:", error);
-      // Improve error message for specific Firestore permission errors
-      if (error.message?.includes('permission')) {
+      
+      // Handle Firebase Auth errors specifically
+      if (error.code === 'auth/unauthorized-domain') {
+        setError(`Domain "${window.location.host}" is not authorized in Firebase Console. Please add it to "Authorized domains" in the Authentication section of your Firebase project.`);
+      } else if (error.message?.includes('permission')) {
         setError("Access denied. Please ensure your school is registered and you are authorized.");
       } else {
         setError(error.message || 'Login failed');

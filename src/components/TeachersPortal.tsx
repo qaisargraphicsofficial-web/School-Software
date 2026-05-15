@@ -29,7 +29,7 @@ export default function TeachersPortal({ profile }: TeachersPortalProps) {
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
-      <div className="bg-white p-2 rounded-[24px] shadow-sm border border-slate-100 flex flex-wrap gap-2 sticky top-0 z-30">
+      <div className="bg-white p-1 rounded-[24px] shadow-sm border border-slate-100 flex overflow-x-auto hide-scrollbar gap-1 sticky top-0 z-30">
         {tabs.map((tab) => {
           const isActive = tab.exact 
             ? location.pathname === tab.path 
@@ -40,7 +40,7 @@ export default function TeachersPortal({ profile }: TeachersPortalProps) {
               key={tab.path}
               to={tab.path}
               className={({ isActive: linkActive }) => cn(
-                "flex items-center gap-2.5 px-6 py-3 rounded-2xl transition-all duration-300 relative group",
+                "flex items-center gap-2.5 px-4 py-3 rounded-2xl transition-all duration-300 relative group whitespace-nowrap shrink-0",
                 isActive 
                   ? "text-indigo-600 bg-indigo-50/50" 
                   : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"

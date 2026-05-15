@@ -463,27 +463,27 @@ export default function StaffManagement({ profile }: StaffProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">Staff Management</h1>
-          <p className="text-sm text-slate-500 font-medium">Manage faculty, administration, and financial records.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="text-center md:text-left">
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Staff Management</h1>
+          <p className="text-slate-500 font-medium text-sm md:text-base">Manage faculty, administration, and financial records.</p>
         </div>
-        <div className="flex flex-wrap gap-2 lg:gap-3">
+        <div className="flex flex-wrap items-center justify-center md:justify-end gap-3">
           <button 
             onClick={exportToCSV}
-            className="flex-1 lg:flex-none justify-center btn-secondary px-4 lg:px-5 py-2.5 text-[10px] lg:text-sm flex items-center gap-2"
+            className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-2 whitespace-nowrap"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 lg:w-4 h-4" />
-            <span className="lg:inline">Export CSV</span>
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Export CSV
           </button>
           {profile?.role === 'admin' && (
-            <div className="flex w-full sm:w-auto gap-2">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsScannerOpen(true)}
-                className="flex-1 sm:flex-none justify-center btn-secondary px-4 lg:px-5 py-2.5 text-[10px] lg:text-sm flex items-center gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
               >
-                <Scan className="w-3.5 h-3.5 lg:w-4 h-4" />
-                <span>Attendance</span>
+                <Scan className="w-3.5 h-3.5" />
+                Attendance
               </button>
               <button
                 onClick={() => {
@@ -491,10 +491,10 @@ export default function StaffManagement({ profile }: StaffProps) {
                   setIsEditMode(false);
                   setIsModalOpen(true);
                 }}
-                className="flex-1 sm:flex-none justify-center btn-primary px-4 lg:px-5 py-2.5 text-[10px] lg:text-sm"
+                className="btn-primary px-4 py-2.5 text-xs flex items-center gap-2"
               >
-                <UserPlus className="w-3.5 h-3.5 lg:w-5 h-5" />
-                <span>Add Staff</span>
+                <UserPlus className="w-4 h-4" />
+                Add Staff
               </button>
             </div>
           )}

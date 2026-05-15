@@ -341,16 +341,16 @@ export default function Students({ profile }: StudentsProps) {
   };
 
 const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Ref<HTMLDivElement>, id?: string, key?: string }) => (
-    <div id={id} ref={ref} className="w-[350px] h-[220px] bg-white border-2 border-indigo-600 rounded-2xl overflow-hidden flex flex-col shadow-xl">
+    <div id={id} ref={ref} className="w-full max-w-[350px] h-[220px] bg-white border-2 border-indigo-600 rounded-2xl overflow-hidden flex flex-col shadow-xl shrink-0">
       <div className="bg-indigo-600 p-4 flex items-center gap-3">
         <School className="w-8 h-8 text-white" />
         <div>
-          <h3 className="text-white font-bold text-lg leading-tight">EduManage Pro</h3>
+          <h3 className="text-white font-bold text-lg leading-tight truncate">EduManage Pro</h3>
           <p className="text-indigo-100 text-[10px] uppercase tracking-wider font-semibold">Student Identity Card</p>
         </div>
       </div>
-      <div className="flex-1 p-4 flex gap-4">
-        <div className="w-24 h-24 bg-slate-100 rounded-xl border-2 border-slate-200 flex items-center justify-center overflow-hidden">
+      <div className="flex-1 p-4 flex gap-4 overflow-hidden">
+        <div className="w-24 h-24 bg-slate-100 rounded-xl border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
           {student.photoUrl ? (
             <img 
               src={student.photoUrl} 
@@ -363,28 +363,28 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
             <Camera className="w-8 h-8 text-slate-300" />
           )}
         </div>
-        <div className="flex-1 space-y-2">
-          <h4 className="text-xl font-black text-slate-900 tracking-tight">{student.name}</h4>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="flex-1 space-y-2 min-w-0">
+          <h4 className="text-xl font-black text-slate-900 tracking-tight truncate">{student.name}</h4>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
             <div className="space-y-0.5">
               <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Roll Number</p>
-              <p className="text-xs font-bold text-slate-700">{student.rollNumber}</p>
+              <p className="text-xs font-bold text-slate-700 truncate">{student.rollNumber}</p>
             </div>
             <div className="space-y-0.5">
               <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Class</p>
-              <p className="text-xs font-bold text-slate-700">{student.class}</p>
+              <p className="text-xs font-bold text-slate-700 truncate">{student.class}</p>
             </div>
             <div className="space-y-0.5">
               <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Section</p>
-              <p className="text-xs font-bold text-slate-700">{student.section}</p>
+              <p className="text-xs font-bold text-slate-700 truncate">{student.section}</p>
             </div>
             <div className="space-y-0.5">
               <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Campus</p>
-              <p className="text-xs font-bold text-slate-700">{student.campusId || 'Main'}</p>
+              <p className="text-xs font-bold text-slate-700 truncate">{student.campusId || 'Main'}</p>
             </div>
           </div>
         </div>
-        <div className="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center">
+        <div className="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 flex items-center justify-center shrink-0">
           <QRCodeSVG 
             value={student.id!} 
             size={64}
@@ -393,7 +393,7 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
           />
         </div>
       </div>
-      <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex justify-between items-center">
+      <div className="bg-slate-50 px-4 py-2 border-t border-slate-100 flex justify-between items-center shrink-0">
         <p className="text-[10px] text-slate-400 font-medium">Valid for Academic Year 2026-27</p>
         <div className="w-12 h-6 bg-slate-200 rounded"></div>
       </div>
@@ -557,12 +557,12 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
   return (
     <div className="space-y-6 no-print">
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Student Directory</h1>
-          <p className="text-slate-500 font-medium">Manage and track all student records across campuses.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="text-center md:text-left">
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Student Directory</h1>
+          <p className="text-slate-500 font-medium text-sm md:text-base">Manage and track all student records across campuses.</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center justify-center md:justify-end gap-3">
           <button 
             onClick={fetchStudents}
             className="p-3 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
@@ -580,22 +580,22 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
-            className="btn-secondary px-5 py-2.5 text-sm flex items-center gap-2"
+            className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-2 whitespace-nowrap"
           >
-            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {importing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
             Import CSV
           </button>
           <button 
             onClick={exportToCSV}
-            className="btn-secondary px-5 py-2.5 text-sm flex items-center gap-2"
+            className="btn-secondary px-4 py-2.5 text-xs flex items-center gap-2 whitespace-nowrap"
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-3 h-3" />
             Export CSV
           </button>
           {selectedStudents.length > 0 && (
             <button
               onClick={() => setIsBulkIdCardModalOpen(true)}
-              className="btn-primary flex items-center gap-2"
+              className="btn-primary flex items-center gap-2 text-xs py-2.5"
             >
               <Printer className="w-4 h-4" />
               Print ({selectedStudents.length})
@@ -604,9 +604,9 @@ const IdCardTemplate = ({ student, ref, id }: { student: Student, ref?: React.Re
           {profile?.role === 'admin' && (
             <button
               onClick={() => setIsModalOpen(true)}
-              className="btn-primary"
+              className="btn-primary py-2.5 text-xs"
             >
-              <UserPlus className="w-5 h-5" />
+              <UserPlus className="w-4 h-4" />
               Digital Admission
             </button>
           )}

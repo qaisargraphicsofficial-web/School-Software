@@ -76,26 +76,28 @@ export default function PayrollManagement({ profile }: PayrollManagementProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-slate-900">Payroll Management</h2>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
+        <button onClick={() => setIsModalOpen(true)} className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors w-full md:w-auto">
           <Plus className="w-4 h-4" /> Add Record
         </button>
       </div>
-      <div className="flex gap-4">
-        <input type="text" placeholder="Search by staff name or month..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm" />
-        <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm">
-          <option value="staffName">Staff Name</option>
-          <option value="month">Month</option>
-          <option value="paymentDate">Payment Date</option>
-          <option value="status">Status</option>
-        </select>
-        <button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold">
-          {sortOrder === 'asc' ? 'Asc' : 'Desc'}
-        </button>
+      <div className="flex flex-col md:flex-row gap-4">
+        <input type="text" placeholder="Search by staff name or month..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full md:flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm" />
+        <div className="flex gap-2 w-full md:w-auto">
+          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="flex-1 md:w-auto px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm">
+            <option value="staffName">Staff Name</option>
+            <option value="month">Month</option>
+            <option value="paymentDate">Payment Date</option>
+            <option value="status">Status</option>
+          </select>
+          <button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold">
+            {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+          </button>
+        </div>
       </div>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <table className="w-full text-left border-collapse">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-max">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Staff</th>

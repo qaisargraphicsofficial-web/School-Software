@@ -119,7 +119,8 @@ export default function UserManagement({ profile }: UserManagementProps) {
       </div>
 
       <div className="bg-white rounded-[32px] border border-slate-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -223,6 +224,95 @@ export default function UserManagement({ profile }: UserManagementProps) {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Grid View */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {loading ? (
+            <div className="px-6 py-10 text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2" />
+              <p className="text-slate-500 font-bold">Loading users...</p>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="px-6 py-10 text-center text-slate-500 font-medium">
+              No users found matching your filters
+            </div>
+          ) : (
+            filteredUsers.map((user) => (
+              <div key={user.uid} className="p-6 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-lg">
+                    {user.email[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base font-black text-slate-900 truncate">{user.displayName || 'No Name'}</p>
+                    <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 font-medium">
+                      <Mail className="w-3.5 h-3.5" />
+                      {user.email}
+                    </p>
+                  </div>
+                  <span className={cn(
+                    "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest",
+                    user.status === 'approved' ? "bg-emerald-100 text-emerald-700" :
+                    user.status === 'pending' ? "bg-amber-100 text-amber-700" :
+                    "bg-rose-100 text-rose-700"
+                  )}>
+                    {user.status}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Context Role</p>
+                    <select
+                      className="text-xs font-bold px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                      value={user.role}
+                      onChange={(e) => handleUpdateRole(user.uid, e.target.value as UserRole)}
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="staff">Staff</option>
+                      <option value="student">Student</option>
+                      <option value="parent">Parent</option>
+                    </select>
+                  </div>
+                  <div className="text-right space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">School ID</p>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl">
+                      <Building2 className="w-3.5 h-3.5" />
+                      {user.schoolId || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  {user.status !== 'approved' && (
+                    <button
+                      onClick={() => handleUpdateStatus(user.uid, 'approved')}
+                      className="flex-1 py-3 bg-emerald-50 text-emerald-600 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Approve
+                    </button>
+                  )}
+                  {user.status !== 'rejected' && (
+                    <button
+                      onClick={() => handleUpdateStatus(user.uid, 'rejected')}
+                      className="flex-1 py-3 bg-rose-50 text-rose-600 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Reject
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDeleteUser(user.uid)}
+                    className="p-3 bg-slate-50 text-slate-400 rounded-2xl transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

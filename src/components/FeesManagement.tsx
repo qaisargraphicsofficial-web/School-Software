@@ -658,61 +658,61 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
 
   return (
     <div className="space-y-4 lg:space-y-6 pb-20 lg:pb-0">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fees Management</h1>
-          <p className="text-slate-500 text-sm font-medium">Manage fee types, records, and payments.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="text-center md:text-left">
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Fees Management</h1>
+          <p className="text-slate-500 text-sm md:text-base font-medium">Manage fee types, records, and payments.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 lg:gap-3">
           <button
             onClick={handlePrint}
-            className="flex-1 lg:flex-none justify-center inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] lg:text-sm font-bold hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm"
+            className="btn-secondary px-4 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] lg:text-sm flex items-center gap-2"
           >
-            <Printer className="w-3.5 h-3.5 lg:w-4 h-4" />
+            <Printer className="w-4 h-4" />
             <span className="whitespace-nowrap">Print Vouchers</span>
           </button>
           <button
             onClick={handleSendReminders}
             disabled={isSendingReminders}
-            className="flex-1 lg:flex-none justify-center inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] lg:text-sm font-bold hover:bg-indigo-100 transition-all disabled:opacity-50 border border-indigo-100 shadow-sm"
+            className="btn-secondary px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] lg:text-sm flex items-center gap-2"
           >
             {isSendingReminders ? (
-              <Loader2 className="w-3.5 h-3.5 lg:w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Bell className="w-3.5 h-3.5 lg:w-4 h-4" />
+              <Bell className="w-4 h-4" />
             )}
             <span className="whitespace-nowrap">Reminders</span>
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2 p-1 bg-slate-100/50 rounded-xl overflow-x-auto no-scrollbar scroll-smooth sticky top-0 z-10 backdrop-blur-md">
+      <div className="flex gap-1 p-1 bg-slate-100/50 rounded-2xl overflow-x-auto hide-scrollbar sticky top-0 z-10 backdrop-blur-md border border-slate-200/50">
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap", activeTab === 'dashboard' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+          className={cn("px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex items-center shrink-0", activeTab === 'dashboard' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
         >
-          <BarChart3 className="w-4 h-4 inline-block mr-2" />
+          <BarChart3 className="w-4 h-4 mr-2" />
           Dashboard
         </button>
         <button
           onClick={() => setActiveTab('studentFees')}
-          className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap", activeTab === 'studentFees' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+          className={cn("px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex items-center shrink-0", activeTab === 'studentFees' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
         >
-          <Wallet className="w-4 h-4 inline-block mr-2" />
+          <Wallet className="w-4 h-4 mr-2" />
           Student Fees
         </button>
         <button
           onClick={() => setActiveTab('generate')}
-          className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap", activeTab === 'generate' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+          className={cn("px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex items-center shrink-0", activeTab === 'generate' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
         >
-          <FileText className="w-4 h-4 inline-block mr-2" />
+          <FileText className="w-4 h-4 mr-2" />
           Generate Fees
         </button>
         <button
           onClick={() => setActiveTab('feeTypes')}
-          className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap", activeTab === 'feeTypes' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+          className={cn("px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex items-center shrink-0", activeTab === 'feeTypes' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
         >
-          <Settings className="w-4 h-4 inline-block mr-2" />
+          <Settings className="w-4 h-4 mr-2" />
           Fee Types
         </button>
       </div>

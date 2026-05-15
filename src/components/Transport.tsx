@@ -230,7 +230,7 @@ export default function Transport({ profile }: TransportProps) {
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Transport Management</h1>
           <p className="text-slate-500 font-medium">Manage school buses, routes, and student transport assignments.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button 
             onClick={() => {
               setIsEditMode(false);
@@ -244,9 +244,9 @@ export default function Transport({ profile }: TransportProps) {
               });
               setIsVehicleModalOpen(true);
             }}
-            className="btn-primary flex items-center gap-2"
+            className="flex-1 md:flex-none btn-primary flex items-center justify-center gap-2 text-xs md:text-sm"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4 md:w-5 md:h-5" />
             Add Vehicle
           </button>
           <button 
@@ -260,9 +260,9 @@ export default function Transport({ profile }: TransportProps) {
               });
               setIsRouteModalOpen(true);
             }}
-            className="btn-secondary flex items-center gap-2"
+            className="flex-1 md:flex-none btn-secondary flex items-center justify-center gap-2 text-xs md:text-sm"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4 md:w-5 md:h-5" />
             Add Route
           </button>
           <button 
@@ -276,52 +276,54 @@ export default function Transport({ profile }: TransportProps) {
               });
               setIsFeeModalOpen(true);
             }}
-            className="btn-secondary flex items-center gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+            className="flex-1 md:flex-none btn-secondary flex items-center justify-center gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 text-xs md:text-sm"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4 md:w-5 md:h-5" />
             Add Fee
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-8 border-b border-slate-200">
-        <button
-          onClick={() => setActiveTab('vehicles')}
-          className={cn(
-            "pb-4 text-sm font-bold uppercase tracking-widest transition-all relative",
-            activeTab === 'vehicles' ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
-          )}
-        >
-          Vehicles & Drivers
-          {activeTab === 'vehicles' && (
-            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('routes')}
-          className={cn(
-            "pb-4 text-sm font-bold uppercase tracking-widest transition-all relative",
-            activeTab === 'routes' ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
-          )}
-        >
-          Routes & Stops
-          {activeTab === 'routes' && (
-            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('fees')}
-          className={cn(
-            "pb-4 text-sm font-bold uppercase tracking-widest transition-all relative",
-            activeTab === 'fees' ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
-          )}
-        >
-          Transport Fees
-          {activeTab === 'fees' && (
-            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />
-          )}
-        </button>
+      <div className="overflow-x-auto pb-1 scrollbar-hide border-b border-slate-200">
+        <div className="flex gap-8 whitespace-nowrap min-w-max">
+          <button
+            onClick={() => setActiveTab('vehicles')}
+            className={cn(
+              "pb-4 text-sm font-bold uppercase tracking-widest transition-all relative px-1",
+              activeTab === 'vehicles' ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            Vehicles & Drivers
+            {activeTab === 'vehicles' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('routes')}
+            className={cn(
+              "pb-4 text-sm font-bold uppercase tracking-widest transition-all relative px-1",
+              activeTab === 'routes' ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            Routes & Stops
+            {activeTab === 'routes' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('fees')}
+            className={cn(
+              "pb-4 text-sm font-bold uppercase tracking-widest transition-all relative px-1",
+              activeTab === 'fees' ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            Transport Fees
+            {activeTab === 'fees' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full" />
+            )}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -332,27 +334,29 @@ export default function Transport({ profile }: TransportProps) {
       ) : (
         <div className="space-y-6">
           {activeTab === 'vehicles' && (
-            <div className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <Filter className="w-5 h-5 text-slate-400" />
-              <div className="flex gap-2">
-                {(['all', 'active', 'maintenance', 'inactive'] as const).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setVehicleStatusFilter(status)}
-                    className={cn(
-                      "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                      vehicleStatusFilter === status
-                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-100"
-                        : "bg-slate-50 text-slate-500 hover:bg-slate-100"
-                    )}
-                  >
-                    {status}
-                  </button>
-                ))}
+            <div className="flex flex-col md:flex-row md:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Filter className="w-5 h-5 text-slate-400 shrink-0" />
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                  {(['all', 'active', 'maintenance', 'inactive'] as const).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setVehicleStatusFilter(status)}
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap",
+                        vehicleStatusFilter === status
+                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-100"
+                          : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                      )}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-2 ml-auto">
+              <div className="flex gap-2 w-full md:w-auto md:ml-auto">
                 <select
-                  className="input-field py-2 text-xs"
+                  className="flex-1 md:w-auto input-field py-2 text-xs"
                   value={vehicleSortBy}
                   onChange={e => setVehicleSortBy(e.target.value as any)}
                 >

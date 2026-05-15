@@ -46,7 +46,11 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId || 
+        (request.auth.token.email != null && request.auth.token.email.toLowerCase() == "qaisarabbas6496@gmail.com") ||
+        isAdmin()
+      );
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
@@ -97,6 +101,71 @@ service cloud.firestore {
       allow read, list: if isStaff() || 
                     (getUserData().role == 'parent' && getUserData().studentId == resource.data.studentId) || 
                     (getUserData().role == 'student' && getUserData().studentId == resource.data.studentId);
+      allow write: if isStaff();
+    }
+
+    match /fee_types/{id} {
+      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff();
+      allow write: if isStaff();
+    }
+
+    match /payment_history/{id} {
+      allow read, list: if isStaff() || 
+                    (getUserData().role == 'parent' && getUserData().studentId == resource.data.studentId) || 
+                    (getUserData().role == 'student' && getUserData().studentId == resource.data.studentId);
+      allow write: if isStaff();
+    }
+
+    match /transport_fees/{id} {
+      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff();
+      allow write: if isStaff();
+    }
+    
+    match /fees/{id} {
+      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff();
+      allow write: if isStaff();
+    }
+
+    match /leave_requests/{id} {
+      allow read, list: if isStaff() || (isSignedIn() && getUserData().staffId == resource.data.staffId);
+      allow write: if isSignedIn();
+    }
+
+    match /leave_balances/{id} {
+      allow read, list: if isStaff() || (isSignedIn() && getUserData().staffId == resource.data.staffId);
+      allow write: if isStaff();
+    }
+
+    match /library_loans/{id} {
+      allow read, list: if isStaff() || 
+                    (getUserData().role == 'parent' && getUserData().studentId == resource.data.studentId) || 
+                    (getUserData().role == 'student' && getUserData().studentId == resource.data.studentId);
+      allow write: if isStaff();
+    }
+
+    match /certificates/{id} {
+      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff();
+      allow write: if isStaff();
+    }
+
+    match /timetables/{id} {
+      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff() || isSignedIn();
+      allow write: if isStaff();
+    }
+
+    match /exam_schedules/{id} {
+      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff() || isSignedIn();
+      allow write: if isStaff();
+    }
+
+    match /exam_papers/{id} {
+      allow read: if isStaff() || (isSignedIn() && isMemberOfSameSchool(resource.data));
+      allow list: if isStaff();
+      allow write: if isStaff();
+    }
+
+    match /exam_types/{id} {
+      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff() || isSignedIn();
       allow write: if isStaff();
     }
 
