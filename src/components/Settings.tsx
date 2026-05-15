@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 import { seedData } from '../services/seedService';
 import { SchoolSettings, UserProfile, SchoolApplication, UserStatus } from '../types';
 import { 
   Settings as SettingsIcon, 
+  Check,
   Building2, 
   MapPin, 
   Phone, 
@@ -105,7 +106,7 @@ const Tooltip = ({ text }: { text: string }) => (
 );
 
 export default function Settings({ profile }: SettingsProps) {
-  const [activeTab, setActiveTab] = useState<'general' | 'academic' | 'security' | 'system' | 'applications'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'voucher' | 'academic' | 'security' | 'system' | 'applications'>('general');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -130,18 +131,65 @@ export default function Settings({ profile }: SettingsProps) {
     }
   };
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [schools, setSchools] = useState<any[]>([]);
   
   const [newRoleName, setNewRoleName] = useState('');
   const [isAddingRole, setIsAddingRole] = useState(false);
 
   const isSuperAdmin = profile?.email === "qaisarabbas6496@gmail.com";
 
+  const fetchSettings = React.useCallback(async () => {
+    if (!profile?.schoolId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const docRef = doc(db, 'settings', profile.schoolId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        setSettings(docSnap.data() as SchoolSettings);
+      } else if (profile.role === 'admin') {
+        // Initialize with Defaults for THIS school only if current user is admin
+        const initialSettings = {
+          ...settings,
+          schoolId: profile.schoolId,
+          updatedAt: new Date().toISOString()
+        };
+        await setDoc(docRef, initialSettings);
+        setSettings(initialSettings);
+      }
+    } catch (error: any) {
+      console.error("Error fetching settings:", error);
+      // Don't throw for read errors if it's just missing, but log for permission issues
+      if (error.code !== 'permission-denied') {
+        // Silent fail for non-critical read
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [profile?.schoolId, profile?.role]);
+
   useEffect(() => {
     fetchSettings();
     if (isSuperAdmin) {
       fetchApplications();
+      fetchSchools();
     }
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, fetchSettings]);
+
+  const fetchSchools = async () => {
+    try {
+      const q = query(collection(db, 'schools'));
+      const snap = await getDocs(q);
+      setSchools(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) {
+      console.error("Error fetching schools:", error);
+    }
+  };
 
   const fetchApplications = async () => {
     try {
@@ -171,7 +219,10 @@ export default function Settings({ profile }: SettingsProps) {
         phone: app.phone,
         address: app.address,
         plan: app.plan,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        isActive: true, // Default to active
+        isTrial: app.isTrial || false,
+        trialExpiresAt: app.trialExpiresAt || null
       });
 
       // 3. Find and update user profile
@@ -195,6 +246,45 @@ export default function Settings({ profile }: SettingsProps) {
       alert("Failed to approve application.");
     } finally {
       setApprovingId(null);
+    }
+  };
+
+  const handleRejectApplication = async (appId: string) => {
+    if (!window.confirm("Are you sure you want to reject this application?")) return;
+    setRejectingId(appId);
+    try {
+      await updateDoc(doc(db, 'school_applications', appId), {
+        status: 'rejected'
+      });
+      alert("Application rejected.");
+      fetchApplications();
+    } catch (error) {
+      console.error("Error rejecting application:", error);
+    } finally {
+      setRejectingId(null);
+    }
+  };
+
+  const handleToggleSchoolStatus = async (school: any) => {
+    const newStatus = !school.isActive;
+    if (!window.confirm(`Are you sure you want to ${newStatus ? 'activate' : 'deactivate'} ${school.name}?`)) return;
+    
+    setDeactivatingId(school.id);
+    try {
+      // Update school record
+      await updateDoc(doc(db, 'schools', school.id), {
+        isActive: newStatus
+      });
+
+      // Update all users related to this school (simplified: just the primary admin if possible, but ideally we'd show status in profile)
+      // For now, let's just update the school record which the main App component should check for restriction.
+      
+      alert(`School ${newStatus ? 'activated' : 'deactivated'} successfully.`);
+      fetchSchools();
+    } catch (error) {
+      console.error("Error toggling school status:", error);
+    } finally {
+      setDeactivatingId(null);
     }
   };
 
@@ -225,36 +315,6 @@ export default function Settings({ profile }: SettingsProps) {
     logoUrl: '',
     updatedAt: new Date().toISOString()
   });
-
-  useEffect(() => {
-    if (profile?.schoolId) {
-      fetchSettings();
-    }
-  }, [profile?.schoolId]);
-
-  const fetchSettings = async () => {
-    if (!profile?.schoolId) return;
-    setLoading(true);
-    try {
-      const docRef = doc(db, 'settings', profile.schoolId);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        setSettings(docSnap.data() as SchoolSettings);
-      } else {
-        // Initialize with Defaults for THIS school
-        await setDoc(docRef, {
-          ...settings,
-          schoolId: profile.schoolId,
-          updatedAt: new Date().toISOString()
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching settings:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -299,7 +359,10 @@ export default function Settings({ profile }: SettingsProps) {
     { id: 'voucher', name: 'Voucher Settings', icon: Receipt },
     { id: 'security', name: 'Security & Access', icon: ShieldCheck },
     { id: 'system', name: 'System', icon: Database },
-    ...(isSuperAdmin ? [{ id: 'applications', name: 'System Applications', icon: FileText }] : []),
+    ...(isSuperAdmin ? [
+      { id: 'applications', name: 'System Applications', icon: FileText },
+      { id: 'schools_list', name: 'Managed Schools', icon: GraduationCap }
+    ] : []),
   ];
 
   if (loading) {
@@ -574,9 +637,127 @@ export default function Settings({ profile }: SettingsProps) {
                             })}
                           >
                             <option value="monospace">Default Monospace (Technical)</option>
-                            <option value="ui-sans-serif, system-ui, sans-serif">Modern Sans-serif (Clean)</option>
-                            <option value="ui-serif, Georgia, serif">Classic Serif (Formal)</option>
+                            <option value="'Inter', sans-serif">Inter (Modern & Clean)</option>
+                            <option value="'Roboto', sans-serif">Roboto (Standard Sans)</option>
+                            <option value="'Open Sans', sans-serif">Open Sans (Readable)</option>
+                            <option value="'Montserrat', sans-serif">Montserrat (Geometric)</option>
+                            <option value="'Oswald', sans-serif">Oswald (Narrow/Bold)</option>
+                            <option value="'Lora', serif">Lora (Elegant Serif)</option>
+                            <option value="'Playfair Display', serif">Playfair Display (Premium Serif)</option>
+                            <option value="ui-sans-serif, system-ui, sans-serif">System Sans-serif</option>
+                            <option value="ui-serif, Georgia, serif">System Serif</option>
                           </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 pt-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Printed Voucher Copies</label>
+                          <Tooltip text="Select which copies should be generated per voucher." />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Voucher Font Style</label>
+                              <Tooltip text="Choose the typography for your printed fee vouchers." />
+                            </div>
+                            <select
+                              className="input-field"
+                              value={settings.voucherSettings?.fontFamily || 'Inter'}
+                              onChange={e => setSettings({
+                                ...settings,
+                                voucherSettings: { ...settings.voucherSettings, fontFamily: e.target.value } as any
+                              })}
+                            >
+                              <option value="Inter">Inter (Modern Sans)</option>
+                              <option value="JetBrains Mono">JetBrains Mono (Technical)</option>
+                              <option value="Space Grotesk">Space Grotesk (Tech Forward)</option>
+                              <option value="Playfair Display">Playfair Display (Elegant Serif)</option>
+                              <option value="Outfit">Outfit (Clean Geometric)</option>
+                              <option value="Plus Jakarta Sans">Jakarta Sans (Dynamic)</option>
+                              <option value="monospace">System Monospace</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Vouchers per Sheet (A4)</label>
+                              <Tooltip text="How many vouchers should be printed on a single A4 page." />
+                            </div>
+                            <div className="grid grid-cols-4 gap-2">
+                              {[1, 2, 3, 4].map(num => (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => setSettings({
+                                    ...settings,
+                                    voucherSettings: { ...settings.voucherSettings, vouchersPerPage: num } as any
+                                  })}
+                                  className={cn(
+                                    "py-2 rounded-xl text-sm font-bold border transition-all",
+                                    (settings.voucherSettings?.vouchersPerPage || 3) === num
+                                      ? "bg-indigo-600 border-indigo-600 text-white shadow-md scale-95"
+                                      : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300"
+                                  )}
+                                >
+                                  {num}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-6 mt-1">
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                             <div className="relative flex items-center justify-center">
+                                <input 
+                                  type="checkbox"
+                                  className="peer sr-only"
+                                  checked={settings.voucherSettings?.showStudentCopy !== false}
+                                  onChange={e => setSettings({
+                                    ...settings,
+                                    voucherSettings: { ...settings.voucherSettings, showStudentCopy: e.target.checked } as any
+                                  })}
+                                />
+                                <div className="w-5 h-5 border-2 border-slate-300 rounded-md peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-all" />
+                                <Check className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                             </div>
+                             <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">Student Copy</span>
+                          </label>
+                          
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                             <div className="relative flex items-center justify-center">
+                                <input 
+                                  type="checkbox"
+                                  className="peer sr-only"
+                                  checked={settings.voucherSettings?.showSchoolCopy !== false}
+                                  onChange={e => setSettings({
+                                    ...settings,
+                                    voucherSettings: { ...settings.voucherSettings, showSchoolCopy: e.target.checked } as any
+                                  })}
+                                />
+                                <div className="w-5 h-5 border-2 border-slate-300 rounded-md peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-all" />
+                                <Check className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                             </div>
+                             <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">School Copy</span>
+                          </label>
+
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                             <div className="relative flex items-center justify-center">
+                                <input 
+                                  type="checkbox"
+                                  className="peer sr-only"
+                                  checked={settings.voucherSettings?.showBankCopy === true}
+                                  onChange={e => setSettings({
+                                    ...settings,
+                                    voucherSettings: { ...settings.voucherSettings, showBankCopy: e.target.checked } as any
+                                  })}
+                                />
+                                <div className="w-5 h-5 border-2 border-slate-300 rounded-md peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-all" />
+                                <Check className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                             </div>
+                             <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">Bank Copy</span>
+                          </label>
                         </div>
                       </div>
 
@@ -1169,18 +1350,18 @@ export default function Settings({ profile }: SettingsProps) {
                       <FileText className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900">School Applications</h3>
-                      <p className="text-sm text-slate-500 font-medium">Review and approve new school registrations.</p>
+                      <h3 className="text-xl font-black text-slate-900">Registration Requests</h3>
+                      <p className="text-sm text-slate-500 font-medium">Review and manage incoming school sign-ups.</p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    {applications.length === 0 ? (
+                    {applications.filter(a => a.status !== 'rejected').length === 0 ? (
                       <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                        No applications found.
+                        No pending applications found.
                       </div>
                     ) : (
-                      applications.map((app) => (
+                      applications.filter(a => a.status !== 'rejected').map((app) => (
                         <div key={app.id} className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                           <div className="flex flex-col md:flex-row justify-between gap-6">
                             <div className="space-y-3">
@@ -1216,6 +1397,12 @@ export default function Settings({ profile }: SettingsProps) {
                                   <CreditCard className="w-3.5 h-3.5" />
                                   Plan: {app.plan.toUpperCase()}
                                 </div>
+                                {app.isTrial && (
+                                  <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 rounded-lg text-xs font-bold text-amber-600 border border-amber-100">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    15-Day Trial
+                                  </div>
+                                )}
                                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                                   Applied: {new Date(app.createdAt).toLocaleDateString()}
                                 </div>
@@ -1223,14 +1410,24 @@ export default function Settings({ profile }: SettingsProps) {
                             </div>
                             <div className="flex flex-col justify-center gap-2 min-w-[140px]">
                               {app.status === 'pending' ? (
-                                <button
-                                  type="button"
-                                  disabled={approvingId === app.id}
-                                  onClick={() => handleApproveApplication(app)}
-                                  className="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
-                                >
-                                  {approvingId === app.id ? 'Approving...' : 'Approve & Pay'}
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={approvingId === app.id}
+                                    onClick={() => handleApproveApplication(app)}
+                                    className="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
+                                  >
+                                    {approvingId === app.id ? 'Approving...' : 'Approve & Pay'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={rejectingId === app.id}
+                                    onClick={() => handleRejectApplication(app.id!)}
+                                    className="w-full px-4 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-100 transition-all disabled:opacity-50"
+                                  >
+                                    {rejectingId === app.id ? 'Rejecting...' : 'Reject Application'}
+                                  </button>
+                                </>
                               ) : (
                                 <div className="flex items-center justify-center gap-2 text-emerald-600 font-black text-xs uppercase tracking-widest">
                                   <CheckCircle2 className="w-4 h-4" />
@@ -1238,6 +1435,83 @@ export default function Settings({ profile }: SettingsProps) {
                                 </div>
                               )}
                             </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'schools_list' && isSuperAdmin && (
+                <div className="space-y-8">
+                  <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
+                    <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
+                      <Building2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900">Managed Schools ({schools.length})</h3>
+                      <p className="text-sm text-slate-500 font-medium">Control access and monitor active institutions.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {schools.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-3xl border border-dashed border-slate-200 font-medium">
+                        No approved schools yet.
+                      </div>
+                    ) : (
+                      schools.map((school) => (
+                        <div key={school.id} className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 group">
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-black transition-colors",
+                              school.isActive !== false ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-400 grayscale"
+                            )}>
+                              {school.name.charAt(0)}
+                            </div>
+                            <div>
+                              <h4 className="font-black text-slate-900 text-lg">{school.name}</h4>
+                              <div className="flex items-center gap-4">
+                                <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">{school.plan} Plan</span>
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                                  school.isActive !== false ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
+                                )}>
+                                  {school.isActive !== false ? 'Active' : 'Suspended'}
+                                </span>
+                                {school.isTrial && (
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                                    new Date(school.trialExpiresAt) > new Date() ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-rose-50 text-rose-600 border-rose-100"
+                                  )}>
+                                    {new Date(school.trialExpiresAt) > new Date() ? 'Trial' : 'Trial Expired'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                             <div className="text-right hidden md:block">
+                               <p className="text-xs font-bold text-slate-600">{school.email}</p>
+                               <p className="text-[10px] text-slate-400 font-medium">{school.phone}</p>
+                             </div>
+                             <button
+                               type="button"
+                               disabled={deactivatingId === school.id}
+                               onClick={() => handleToggleSchoolStatus(school)}
+                               className={cn(
+                                 "px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
+                                 school.isActive !== false 
+                                   ? "bg-rose-50 text-rose-600 hover:bg-rose-100" 
+                                   : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                               )}
+                             >
+                               {deactivatingId === school.id 
+                                 ? 'Processing...' 
+                                 : (school.isActive !== false ? 'Suspend Access' : 'Restore Access')}
+                             </button>
                           </div>
                         </div>
                       ))

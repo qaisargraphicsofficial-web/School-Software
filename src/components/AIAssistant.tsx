@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type, GenerateContentResponse, Modality } from "@google/genai";
-import { collection, getDocs, query, where, limit, addDoc, updateDoc, doc, deleteDoc, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, getDocs, query, where, limit, addDoc, updateDoc, doc, deleteDoc, orderBy, getCountFromServer, getDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Student, UserProfile, Task } from '../types';
 import { 
   GraduationCap, 
@@ -432,85 +432,128 @@ const deleteTask = {
 
 // --- Tool Implementations ---
 const tools = {
-  get_student_stats: async () => {
-    const snap = await getDocs(collection(db, 'students'));
-    return { total_students: snap.size };
+  get_student_stats: async (_: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
+    const q = query(collection(db, 'students'), where('schoolId', '==', profile.schoolId));
+    const snap = await getCountFromServer(q).catch(err => {
+      handleFirestoreError(err, OperationType.GET, 'students');
+      throw err;
+    });
+    return { total_students: snap.data().count };
   },
-  get_staff_stats: async () => {
-    const snap = await getDocs(collection(db, 'staff'));
-    return { total_staff: snap.size };
+  get_staff_stats: async (_: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
+    const q = query(collection(db, 'staff'), where('schoolId', '==', profile.schoolId));
+    const snap = await getCountFromServer(q).catch(err => {
+      handleFirestoreError(err, OperationType.GET, 'staff');
+      throw err;
+    });
+    return { total_staff: snap.data().count };
   },
-  get_financial_summary: async () => {
-    const snap = await getDocs(collection(db, 'fees'));
+  get_financial_summary: async (_: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
+    const q = query(
+      collection(db, 'fee_records'), 
+      where('schoolId', '==', profile.schoolId),
+      where('status', '==', 'paid')
+    );
+    const snap = await getDocs(q).catch(err => {
+      handleFirestoreError(err, OperationType.LIST, 'fee_records');
+      throw err;
+    });
     let total = 0;
     snap.forEach(doc => {
-      if (doc.data().status === 'paid') total += doc.data().amount;
+      total += doc.data().amount || 0;
     });
     return { total_fees_collected: total };
   },
-  search_student: async ({ query: q }: { query: string }) => {
+  search_student: async ({ query: q }: { query: string }, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const studentsRef = collection(db, 'students');
-    const snap = await getDocs(studentsRef);
+    // Try roll number match first
+    const rollQuery = query(studentsRef, where('schoolId', '==', profile.schoolId), where('rollNumber', '==', q));
+    const rollSnap = await getDocs(rollQuery);
+    if (!rollSnap.empty) {
+      return { results: rollSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) };
+    }
+    
+    // Fallback to searching (ideally use a search index or at least limit reads)
+    const snap = await getDocs(query(studentsRef, where('schoolId', '==', profile.schoolId), limit(100)));
     const results = snap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter((s: any) => 
-        s.name.toLowerCase().includes(q.toLowerCase()) || 
-        s.rollNumber.includes(q)
+        s.name.toLowerCase().includes(q.toLowerCase())
       )
       .slice(0, 5);
     return { results };
   },
-  search_staff: async ({ query: q }: { query: string }) => {
+  search_staff: async ({ query: q }: { query: string }, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const staffRef = collection(db, 'staff');
-    const snap = await getDocs(staffRef);
+    // Try staffId match first
+    const idQuery = query(staffRef, where('schoolId', '==', profile.schoolId), where('staffId', '==', q));
+    const idSnap = await getDocs(idQuery);
+    if (!idSnap.empty) {
+      return { results: idSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) };
+    }
+
+    const snap = await getDocs(query(staffRef, where('schoolId', '==', profile.schoolId), limit(100)));
     const results = snap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter((s: any) => 
-        s.name.toLowerCase().includes(q.toLowerCase()) || 
-        s.staffId.includes(q)
+        (s.name && s.name.toLowerCase().includes(q.toLowerCase())) || 
+        (s.staffId && s.staffId.includes(q))
       )
       .slice(0, 5);
     return { results };
   },
-  get_class_list: async ({ className }: { className: string }) => {
+  get_class_list: async ({ className }: { className: string }, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const studentsRef = collection(db, 'students');
-    const snap = await getDocs(studentsRef);
-    const results = snap.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((s: any) => s.class.toLowerCase() === className.toLowerCase())
-      .map((s: any) => ({ name: s.name, rollNumber: s.rollNumber, section: s.section }));
+    const snap = await getDocs(query(studentsRef, where('schoolId', '==', profile.schoolId), where('class', '==', className))).catch(err => {
+      handleFirestoreError(err, OperationType.LIST, 'students');
+      throw err;
+    });
+    const results = snap.docs.map((doc: any) => {
+      const s = doc.data();
+      return { name: s.name, rollNumber: s.rollNumber, section: s.section };
+    });
     return { class: className, students: results };
   },
-  get_recent_admissions: async ({ limitCount = 5 }: { limitCount?: number }) => {
+  get_recent_admissions: async ({ limitCount = 5 }: { limitCount?: number }, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const studentsRef = collection(db, 'students');
-    const snap = await getDocs(studentsRef);
+    const snap = await getDocs(query(studentsRef, where('schoolId', '==', profile.schoolId), orderBy('admissionDate', 'desc'), limit(limitCount))).catch(async (err) => {
+      // If index missing, fallback to client side sort
+      const fallbackSnap = await getDocs(query(studentsRef, where('schoolId', '==', profile.schoolId), limit(50)));
+      return fallbackSnap;
+    });
     const results = snap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .sort((a: any, b: any) => new Date(b.admissionDate).getTime() - new Date(a.admissionDate).getTime())
       .slice(0, limitCount);
     return { recent_admissions: results };
   },
-  get_unpaid_fees: async () => {
-    const feesRef = collection(db, 'fees');
-    const snap = await getDocs(feesRef);
-    const results = snap.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((f: any) => f.status === 'pending')
-      .slice(0, 10);
+  get_unpaid_fees: async (_: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
+    const feesRef = collection(db, 'fee_records');
+    const snap = await getDocs(query(feesRef, where('schoolId', '==', profile.schoolId), where('status', '==', 'pending'), limit(20))).catch(err => {
+      handleFirestoreError(err, OperationType.LIST, 'fee_records');
+      throw err;
+    });
+    const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     return { pending_fees: results };
   },
-  get_attendance_stats: async ({ date, className }: any) => {
+  get_attendance_stats: async ({ date, className }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const attendanceRef = collection(db, 'attendance');
-    const snap = await getDocs(attendanceRef);
-    let records = snap.docs.map(doc => doc.data()).filter((a: any) => a.date === date);
+    const snap = await getDocs(query(attendanceRef, where('schoolId', '==', profile.schoolId), where('date', '==', date)));
+    let records = snap.docs.map(doc => doc.data());
     
     if (className) {
       const studentsRef = collection(db, 'students');
-      const sSnap = await getDocs(studentsRef);
-      const classStudentIds = sSnap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as any))
-        .filter(s => s.class === className)
-        .map(s => s.id);
+      const sSnap = await getDocs(query(studentsRef, where('schoolId', '==', profile.schoolId), where('class', '==', className)));
+      const classStudentIds = sSnap.docs.map(doc => doc.id);
       records = records.filter((a: any) => classStudentIds.includes(a.targetId));
     }
 
@@ -519,70 +562,88 @@ const tools = {
     
     return { date, class: className || 'All', present, absent, total: records.length };
   },
-  get_inventory_stats: async () => {
+  get_inventory_stats: async (_: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const inventoryRef = collection(db, 'inventory');
-    const snap = await getDocs(inventoryRef);
+    const snap = await getDocs(query(inventoryRef, where('schoolId', '==', profile.schoolId)));
     const items = snap.docs.map(doc => doc.data());
     const lowStock = items.filter((i: any) => i.quantity < 10);
     return { total_items: items.length, low_stock_items: lowStock };
   },
-  post_notice: async ({ title, content, targetAudience }: any) => {
+  post_notice: async ({ title, content, targetAudience }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     await addDoc(collection(db, 'notices'), {
       title,
       content,
       targetAudience,
+      schoolId: profile.schoolId,
+      campusId: profile.campusId || 'main',
       date: new Date().toISOString().split('T')[0]
     });
     return { success: true, message: "Notice posted successfully." };
   },
-  get_student_results: async ({ studentId }: any) => {
+  get_student_results: async ({ studentId }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const studentsRef = collection(db, 'students');
-    const sSnap = await getDocs(studentsRef);
-    const student = sSnap.docs
-      .map(doc => ({ id: doc.id, ...doc.data() } as any))
-      .find(s => s.rollNumber === studentId || s.id === studentId);
+    let student: any = null;
+
+    // Try roll number first
+    const qRoll = query(studentsRef, where('schoolId', '==', profile.schoolId), where('rollNumber', '==', studentId));
+    const rollSnap = await getDocs(qRoll);
+    if (!rollSnap.empty) {
+      student = { id: rollSnap.docs[0].id, ...rollSnap.docs[0].data() };
+    } else {
+      // Try ID
+      try {
+        const sDoc = await getDoc(doc(db, 'students', studentId));
+        if (sDoc.exists() && sDoc.data()?.schoolId === profile.schoolId) {
+          student = { id: sDoc.id, ...sDoc.data() };
+        }
+      } catch (e) {}
+    }
     
     if (!student) return { error: "Student not found." };
 
     const resultsRef = collection(db, 'results');
-    const rSnap = await getDocs(resultsRef);
-    const results = rSnap.docs
-      .map(doc => doc.data())
-      .filter((r: any) => r.studentId === student.id);
+    const rSnap = await getDocs(query(resultsRef, where('schoolId', '==', profile.schoolId), where('studentId', '==', student.id)));
+    const results = rSnap.docs.map(doc => doc.data());
     
     return { studentName: `${student.name} S/O ${student.parentName}`, results };
   },
-  get_staff_salary_summary: async () => {
+  get_staff_salary_summary: async (_: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const staffRef = collection(db, 'staff');
-    const snap = await getDocs(staffRef);
+    const snap = await getDocs(query(staffRef, where('schoolId', '==', profile.schoolId)));
     let total = 0;
     snap.forEach(doc => {
       total += doc.data().salary || 0;
     });
     return { total_monthly_salary_expense: total, staff_count: snap.size };
   },
-  get_school_events: async () => {
+  get_school_events: async (_: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const eventsRef = collection(db, 'events');
-    const snap = await getDocs(eventsRef);
+    const snap = await getDocs(query(eventsRef, where('schoolId', '==', profile.schoolId)));
     const results = snap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return { events: results };
   },
-  get_library_loans: async ({ studentId }: any) => {
+  get_library_loans: async ({ studentId }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const loansRef = collection(db, 'library_loans');
-    const snap = await getDocs(loansRef);
-    let results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-    
+    let q = query(loansRef, where('schoolId', '==', profile.schoolId));
     if (studentId) {
-      results = results.filter(l => l.studentId === studentId);
+      q = query(loansRef, where('schoolId', '==', profile.schoolId), where('studentId', '==', studentId));
     }
-    
+    const snap = await getDocs(q);
+    const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
     return { loans: results };
   },
-  generate_progress_report: async ({ studentId }: any) => {
+  generate_progress_report: async ({ studentId }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const studentsRef = collection(db, 'students');
-    const sSnap = await getDocs(studentsRef);
+    const sSnap = await getDocs(query(studentsRef, where('schoolId', '==', profile.schoolId)));
     const student = sSnap.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as any))
       .find(s => s.rollNumber === studentId || s.id === studentId);
@@ -590,16 +651,12 @@ const tools = {
     if (!student) return { error: "Student not found." };
 
     const resultsRef = collection(db, 'results');
-    const rSnap = await getDocs(resultsRef);
-    const results = rSnap.docs
-      .map(doc => doc.data() as any)
-      .filter(r => r.studentId === student.id);
+    const rSnap = await getDocs(query(resultsRef, where('schoolId', '==', profile.schoolId), where('studentId', '==', student.id)));
+    const results = rSnap.docs.map(doc => doc.data() as any);
     
     const attendanceRef = collection(db, 'attendance');
-    const aSnap = await getDocs(attendanceRef);
-    const attendanceRecords = aSnap.docs
-      .map(doc => doc.data() as any)
-      .filter(a => a.targetId === student.id);
+    const aSnap = await getDocs(query(attendanceRef, where('schoolId', '==', profile.schoolId), where('targetId', '==', student.id)));
+    const attendanceRecords = aSnap.docs.map(doc => doc.data() as any);
 
     const totalDays = attendanceRecords.length;
     const presentDays = attendanceRecords.filter(a => a.status === 'present').length;
@@ -638,17 +695,16 @@ const tools = {
       performanceSummary: avgPercentage > 80 ? "Excellent" : avgPercentage > 60 ? "Good" : "Needs Improvement"
     };
   },
-  get_class_rankings: async ({ className }: any) => {
+  get_class_rankings: async ({ className }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const studentsRef = collection(db, 'students');
-    const sSnap = await getDocs(studentsRef);
-    const classStudents = sSnap.docs
-      .map(doc => ({ id: doc.id, ...doc.data() } as any))
-      .filter(s => s.class === className);
+    const sSnap = await getDocs(query(studentsRef, where('schoolId', '==', profile.schoolId), where('class', '==', className)));
+    const classStudents = sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
     
     if (classStudents.length === 0) return { error: "No students found in this class." };
 
     const resultsRef = collection(db, 'results');
-    const rSnap = await getDocs(resultsRef);
+    const rSnap = await getDocs(query(resultsRef, where('schoolId', '==', profile.schoolId)));
     const allResults = rSnap.docs.map(doc => doc.data() as any);
 
     const rankings = classStudents.map(student => {
@@ -668,21 +724,19 @@ const tools = {
       rankings: rankings.sort((a, b) => b.average - a.average)
     };
   },
-  get_subject_performance: async ({ className, subject }: any) => {
+  get_subject_performance: async ({ className, subject }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const studentsRef = collection(db, 'students');
-    const sSnap = await getDocs(studentsRef);
-    const classStudentIds = sSnap.docs
-      .map(doc => ({ id: doc.id, ...doc.data() } as any))
-      .filter(s => s.class === className)
-      .map(s => s.id);
+    const sSnap = await getDocs(query(studentsRef, where('schoolId', '==', profile.schoolId), where('class', '==', className)));
+    const classStudentIds = sSnap.docs.map(doc => doc.id);
     
     if (classStudentIds.length === 0) return { error: "No students found in this class." };
 
     const resultsRef = collection(db, 'results');
-    const rSnap = await getDocs(resultsRef);
+    const rSnap = await getDocs(query(resultsRef, where('schoolId', '==', profile.schoolId), where('subject', '==', subject)));
     const subjectResults = rSnap.docs
       .map(doc => doc.data() as any)
-      .filter(r => r.subject === subject && classStudentIds.includes(r.studentId));
+      .filter(r => classStudentIds.includes(r.studentId));
     
     if (subjectResults.length === 0) return { error: "No results found for this subject in this class." };
 
@@ -697,40 +751,42 @@ const tools = {
       totalStudentsEvaluated: subjectResults.length
     };
   },
-  get_campuses: async () => {
-    const snap = await getDocs(collection(db, 'campuses'));
+  get_campuses: async (_: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
+    const snap = await getDocs(query(collection(db, 'campuses'), where('schoolId', '==', profile.schoolId)));
     return { campuses: snap.docs.map(doc => doc.data()) };
   },
-  get_syllabus: async ({ className }: any) => {
-    const snap = await getDocs(collection(db, 'syllabus'));
-    const results = snap.docs
-      .map(doc => doc.data())
-      .filter((s: any) => s.class === className);
+  get_syllabus: async ({ className }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
+    const snap = await getDocs(query(collection(db, 'syllabus'), where('schoolId', '==', profile.schoolId), where('class', '==', className)));
+    const results = snap.docs.map(doc => doc.data());
     return { class: className, syllabus: results };
   },
-  get_certificates: async ({ studentId }: any) => {
-    const snap = await getDocs(collection(db, 'certificates'));
-    const results = snap.docs
-      .map(doc => doc.data())
-      .filter((c: any) => c.studentId === studentId);
+  get_certificates: async ({ studentId }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
+    const snap = await getDocs(query(collection(db, 'certificates'), where('schoolId', '==', profile.schoolId), where('studentId', '==', studentId)));
+    const results = snap.docs.map(doc => doc.data());
     return { studentId, certificates: results };
   },
-  get_exam_papers: async ({ className }: any) => {
-    const snap = await getDocs(collection(db, 'exam_papers'));
-    let results = snap.docs.map(doc => doc.data());
+  get_exam_papers: async ({ className }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
+    let q = query(collection(db, 'exam_papers'), where('schoolId', '==', profile.schoolId));
     if (className) {
-      results = results.filter((p: any) => p.class === className);
+      q = query(collection(db, 'exam_papers'), where('schoolId', '==', profile.schoolId), where('class', '==', className));
     }
+    const snap = await getDocs(q);
+    let results = snap.docs.map(doc => doc.data());
     return { exam_papers: results };
   },
-  send_bulk_message: async ({ type, targetClass, content, subject }: any) => {
+  send_bulk_message: async ({ type, targetClass, content, subject }: any, { profile }: any) => {
+    if (!profile?.schoolId) return { error: "No school ID found in profile" };
     const studentsRef = collection(db, 'students');
-    const snap = await getDocs(studentsRef);
-    let recipients = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)).filter(s => s.status === 'active');
-    
+    let q = query(studentsRef, where('schoolId', '==', profile.schoolId), where('status', '==', 'active'));
     if (targetClass !== 'All') {
-      recipients = recipients.filter(s => s.class === targetClass);
+      q = query(studentsRef, where('schoolId', '==', profile.schoolId), where('status', '==', 'active'), where('class', '==', targetClass));
     }
+    const snap = await getDocs(q);
+    let recipients = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 
     if (recipients.length === 0) return { error: "No active students found." };
 
@@ -739,6 +795,8 @@ const tools = {
       targetClass,
       content,
       subject: subject || '',
+      schoolId: profile.schoolId,
+      campusId: profile.campusId || 'main',
       date: new Date().toISOString().split('T')[0],
       recipientsCount: recipients.length,
       status: 'sent'
@@ -777,13 +835,13 @@ const tools = {
   create_task: async (args: any, context: any) => {
     const { title, description, dueDate, priority, assignedTo, reminderDate, reminderTime } = args;
     const { profile } = context;
-    if (!profile) return { error: "User not authenticated." };
+    if (!profile?.schoolId) return { error: "User not authenticated or no school ID found." };
 
     let assignedToIds: string[] = [];
     if (assignedTo) {
       const names = assignedTo.split(',').map((n: string) => n.trim().toLowerCase());
       const staffRef = collection(db, 'staff');
-      const snap = await getDocs(staffRef);
+      const snap = await getDocs(query(staffRef, where('schoolId', '==', profile.schoolId)));
       const staffDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
       
       names.forEach((name: string) => {
@@ -800,6 +858,7 @@ const tools = {
       status: "pending",
       assignedToIds,
       createdBy: profile.uid,
+      schoolId: profile.schoolId,
       campusId: profile.campusId || "main",
       createdAt: new Date().toISOString(),
       reminderDate: reminderDate || "",
@@ -809,11 +868,11 @@ const tools = {
   },
   get_tasks: async ({ status }: any, context: any) => {
     const { profile } = context;
-    if (!profile) return { error: "User not authenticated." };
+    if (!profile?.schoolId) return { error: "User not authenticated or no school ID found." };
 
     const q = query(
       collection(db, 'tasks'),
-      where('campusId', '==', profile.campusId || 'main'),
+      where('schoolId', '==', profile.schoolId),
       orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
@@ -862,49 +921,51 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
   const playTTS = async (text: string) => {
     try {
       setIsSpeaking(true);
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say clearly: ${text}` }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Fenrir' },
+        const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY!;
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: "gemini-3.1-flash-tts-preview",
+          contents: [{ parts: [{ text: `Say clearly: ${text}` }] }],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: 'Fenrir' },
+              },
             },
           },
-        },
-      });
+        });
 
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        const binaryString = window.atob(base64Audio);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
-
-        if (audioContextRef.current.state === 'suspended') {
-          await audioContextRef.current.resume();
-        }
-        
-        let audioBuffer: AudioBuffer;
-        try {
-          audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
-        } catch (e) {
-          // Fallback for raw PCM L16 24kHz which is common for this model
-          const samples = new Int16Array(bytes.buffer);
-          audioBuffer = audioContextRef.current.createBuffer(1, samples.length, 24000);
-          const channelData = audioBuffer.getChannelData(0);
-          for (let i = 0; i < samples.length; i++) {
-            channelData[i] = samples[i] / 32768;
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (base64Audio) {
+          const binaryString = window.atob(base64Audio);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
           }
-        }
+
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          }
+
+          if (audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume();
+          }
+          
+          let audioBuffer: AudioBuffer;
+          try {
+            // Use slice(0) to avoid detaching the original buffer in case decodeAudioData fails or we need it for fallback
+            audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer.slice(0));
+          } catch (e) {
+            // Fallback for raw PCM L16 24kHz which is common for this model
+            const samples = new Int16Array(bytes.buffer);
+            audioBuffer = audioContextRef.current.createBuffer(1, samples.length, 24000);
+            const channelData = audioBuffer.getChannelData(0);
+            for (let i = 0; i < samples.length; i++) {
+              channelData[i] = samples[i] / 32768;
+            }
+          }
 
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
@@ -937,11 +998,20 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY!;
+      const ai = new GoogleGenAI({ apiKey });
       
       const modelName = isThinkingMode ? "gemini-3.1-pro-preview" : "gemini-3-flash-preview";
+      
+      // Prepare history for multimodal contents
+      // Filter out messages without text if they don't have parts (shouldn't happen here)
+      const history = messages.map(m => ({
+        role: m.role,
+        parts: [{ text: m.text }]
+      }));
+
       const config: any = {
-        systemInstruction: "You are a helpful school management assistant for EduManage. You have access to school data via tools. Be concise and professional. If you can't find data, say so.",
+        systemInstruction: "You are a helpful school management assistant for EduManage. You have access to school data via tools. You can process multimodal inputs including audio and images. Be concise and professional. If you can't find data, explain accurately. Total students, staff, and finances are available via tools.",
         tools: [{ 
           functionDeclarations: [
             getStudentStats, 
@@ -976,97 +1046,56 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
         }],
       };
 
+      // Only include search tool if using a pro model or if user explicitly needs web search
       if (isThinkingMode) {
+        config.tools.push({ googleSearch: {} });
         config.thinkingConfig = {
           includeThoughts: true,
           thinkingLevel: ThinkingLevel.HIGH
         };
       }
 
-      // If we have audio data, we use generateContent directly for multimodal
+      // Current turn parts
+      const currentParts: any[] = [];
       if (audioData) {
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: [
-            ...messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
-            { role: 'user', parts: [
-              { inlineData: audioData },
-              { text: text || "Please process this voice message." }
-            ]}
-          ],
-          config,
-        });
-
-        // Handle function calls if any
-        let currentResponse = response;
-        while (currentResponse.functionCalls) {
-          const functionResponses = await Promise.all(
-            currentResponse.functionCalls.map(async (call) => {
-              const tool = (tools as any)[call.name];
-              if (tool) {
-                const result = await tool(call.args, { profile });
-                return { name: call.name, response: result, id: call.id };
-              }
-              return { name: call.name, response: { error: "Tool not found" }, id: call.id };
-            })
-          );
-
-          currentResponse = await ai.models.generateContent({
-            model: modelName,
-            contents: [
-              ...messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
-              { role: 'user', parts: [{ inlineData: audioData }, { text: text || "Voice message" }] },
-              { role: 'model', parts: currentResponse.candidates?.[0]?.content?.parts || [] },
-              { role: 'user', parts: functionResponses.map(r => ({ functionResponse: r })) }
-            ],
-            config: { ...config, tools: [{ functionDeclarations: Object.values(tools) as any }] }
-          });
-        }
-
-        const modelText = currentResponse.text;
-        const imageResult = currentResponse.candidates?.[0]?.content?.parts?.find((p: any) => p.functionResponse?.name === "generate_image")?.functionResponse?.response;
-
-        setMessages(prev => [
-          ...prev, 
-          { 
-            role: 'model', 
-            text: modelText || (imageResult ? "I've generated the image for you." : "I processed your request."), 
-            isBot: true,
-            imageUrl: imageResult?.imageUrl
-          }
-        ]);
-        if (modelText) playTTS(modelText);
-        return;
+        currentParts.push({ inlineData: audioData });
       }
+      currentParts.push({ text: text || "Please process this voice message and answer based on school data." });
 
-      // Default text/STT path using Chat
-      const chat = ai.chats.create({
+      const contents = [
+        ...history,
+        { role: 'user' as const, parts: currentParts }
+      ];
+
+      let response = await ai.models.generateContent({
         model: modelName,
+        contents,
         config,
       });
 
-      // We need to handle function calling manually in a loop if needed, 
-      // but for simplicity, we'll do one turn of tool calls.
-      let response = await chat.sendMessage({ message: text });
-      
-      while (response.functionCalls) {
+      // Handle function calls loop
+      let turnCount = 0;
+      while (response.functionCalls && turnCount < 10) {
+        turnCount++;
         const functionResponses = await Promise.all(
           response.functionCalls.map(async (call) => {
             const tool = (tools as any)[call.name];
             if (tool) {
               const result = await tool(call.args, { profile });
-              return {
-                name: call.name,
-                response: result,
-                id: call.id
-              };
+              return { name: call.name, response: result, id: call.id };
             }
             return { name: call.name, response: { error: "Tool not found" }, id: call.id };
           })
         );
 
-        response = await chat.sendMessage({ 
-          message: JSON.stringify(functionResponses) 
+        // Update contents with the model's call and our response
+        contents.push({ role: 'model', parts: response.candidates?.[0]?.content?.parts || [] });
+        contents.push({ role: 'user', parts: functionResponses.map(r => ({ functionResponse: r })) });
+
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents,
+          config,
         });
       }
 
@@ -1082,12 +1111,11 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
           imageUrl: imageResult?.imageUrl
         }
       ]);
-      if (modelText) {
-        playTTS(modelText);
-      }
+      if (modelText) playTTS(modelText);
+
     } catch (error) {
       console.error("AI Error:", error);
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error processing your request.", isBot: true }]);
+      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error processing your request. Please try again.", isBot: true }]);
     } finally {
       setIsLoading(false);
     }
@@ -1199,7 +1227,7 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-24 right-6 z-[100] w-[90vw] sm:w-[400px] h-[500px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+            className="fixed bottom-24 right-6 z-[100] w-[90vw] sm:w-[400px] h-[550px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="p-4 bg-indigo-600 text-white flex items-center justify-between">
@@ -1209,14 +1237,31 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
                 </div>
                 <div>
                   <h3 className="font-bold">EduManage AI</h3>
-                  <p className="text-xs text-indigo-100">
-                    {isSpeaking ? "Speaking..." : "Always active to help"}
+                  <p className="text-xs text-indigo-100 italic">
+                    {isSpeaking ? "Speaking..." : "Ask me anything about students, staff or fees"}
                   </p>
                 </div>
               </div>
-              <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-white/10 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={async () => {
+                    const aiStudio = (window as any).aistudio;
+                    if (aiStudio?.openSelectKey) {
+                      await aiStudio.openSelectKey();
+                    } else {
+                      alert("API key selection is managed via Settings > Secrets.");
+                    }
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-lg text-[10px] flex items-center gap-1"
+                  title="Configure Premium API Key"
+                >
+                  <Settings2 className="w-4 h-4" />
+                  KEY
+                </button>
+                <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-white/10 rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Messages */}

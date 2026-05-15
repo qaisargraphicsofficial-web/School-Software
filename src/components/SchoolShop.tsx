@@ -32,40 +32,42 @@ export default function SchoolShop({ profile }: SchoolShopProps) {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile?.schoolId) return;
     const campusId = profile.campusId || 'main';
     setLoading(true);
 
-    const itemsQuery = query(collection(db, 'shop_items'), where('campusId', '==', campusId));
-    const salesQuery = query(collection(db, 'shop_sales'), where('campusId', '==', campusId));
-    const studentsQuery = query(collection(db, 'students'), where('campusId', '==', campusId));
-    const classesQuery = query(collection(db, 'classes'), where('campusId', '==', campusId));
+    const qConstraints = [where('schoolId', '==', profile.schoolId)];
+    const campusConstraints = campusId !== 'all' ? [...qConstraints, where('campusId', '==', campusId)] : qConstraints;
+
+    const itemsQuery = query(collection(db, 'shop_items'), ...campusConstraints);
+    const salesQuery = query(collection(db, 'shop_sales'), ...campusConstraints);
+    const studentsQuery = query(collection(db, 'students'), ...campusConstraints);
+    const classesQuery = query(collection(db, 'classes'), ...campusConstraints);
 
     const unsubItems = onSnapshot(itemsQuery, (snapshot) => {
       setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("Error in shop_items listener:", err);
     });
 
     const unsubSales = onSnapshot(salesQuery, (snapshot) => {
       setSales(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("Error in shop_sales listener:", err);
     });
 
     const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
       const studentDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setStudents(studentDocs);
       setLoading(false);
-      
-      // Fallback: If no students found for this campus, try fetching all students (for migration/legacy)
-      if (studentDocs.length === 0) {
-        getDocs(collection(db, 'students')).then(allSnap => {
-            if (allSnap.docs.length > 0) {
-                setStudents(prev => prev.length === 0 ? allSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) : prev);
-            }
-        });
-      }
+    }, (err) => {
+      console.error("Error in shop students listener:", err);
     });
 
     const unsubClasses = onSnapshot(classesQuery, (snapshot) => {
       setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("Error in shop classes listener:", err);
     });
 
     const fetchSettings = async () => {

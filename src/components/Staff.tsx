@@ -139,7 +139,8 @@ export default function StaffManagement({ profile }: StaffProps) {
     setViewingStaffDetail(staff);
     fetchPayrollHistory(staff.id!);
     try {
-        const snap = await getDocs(collection(db, 'classes'));
+        const qConstraints = [where('schoolId', '==', profile?.schoolId || '')];
+        const snap = await getDocs(query(collection(db, 'classes'), ...qConstraints));
         const classes = snap.docs.map(d => d.data() as ClassGroup);
         const staffClasses = classes.filter(c => c.sections.some(s => s.teacherIds.includes(staff.id!)))
             .map(c => `${c.className} ${c.sections.filter(s => s.teacherIds.includes(staff.id!)).map(s => s.name).join(', ')}`);
@@ -176,9 +177,11 @@ export default function StaffManagement({ profile }: StaffProps) {
 
   useEffect(() => {
     if (profile) {
-      fetchStaff();
-      fetchSettings();
-      fetchClasses();
+      Promise.all([
+        fetchStaff(),
+        fetchSettings(),
+        fetchClasses()
+      ]).catch(err => console.error("Error in initial load:", err));
     }
   }, [profile]);
 
@@ -189,22 +192,28 @@ export default function StaffManagement({ profile }: StaffProps) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
       const q = query(collection(db, 'classes'), ...qConstraints);
-      const snap = await getDocs(q);
-      setClassGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup)));
+      const snap = await getDocs(q).catch(err => {
+        handleFirestoreError(err, OperationType.LIST, 'classes');
+        return { docs: [] } as any;
+      });
+      setClassGroups(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as ClassGroup)));
     } catch (e) {
-      console.error("Error fetching classes:", e);
+      console.error("Error in fetchClasses:", e);
     }
   };
 
   const fetchSettings = async () => {
     try {
       const docRef = doc(db, 'settings', 'global');
-      const docSnap = await getDoc(docRef);
+      const docSnap = await getDoc(docRef).catch(err => {
+        handleFirestoreError(err, OperationType.GET, 'settings');
+        throw err;
+      });
       if (docSnap.exists()) {
         setSettings(docSnap.data() as SchoolSettings);
       }
     } catch (error) {
-      console.error("Error fetching settings:", error);
+      console.error("Error in fetchSettings:", error);
     }
   };
 
@@ -281,11 +290,14 @@ export default function StaffManagement({ profile }: StaffProps) {
         qConstraints.push(where('campusId', '==', profile.campusId));
       }
       const q = query(collection(db, 'staff'), ...qConstraints);
-      const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Staff));
+      const querySnapshot = await getDocs(q).catch(err => {
+        handleFirestoreError(err, OperationType.LIST, 'staff');
+        return { docs: [] } as any;
+      });
+      const data = querySnapshot.docs.map((doc: any) => ({ id: doc.id, ...(doc.data() as object) } as Staff));
       setStaffList(data);
     } catch (error) {
-      console.error("Error fetching staff:", error);
+      console.error("Error in fetchStaff:", error);
     } finally {
       setLoading(false);
     }

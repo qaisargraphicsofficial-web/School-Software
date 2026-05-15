@@ -3,7 +3,7 @@ import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, set
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { Student, UserProfile, Attendance, ExamResult } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import { handleFirestoreError, OperationType } from '../firebase';
 import { handleStorageError, StorageOperationType } from '../lib/storage-errors';
 import { 
   Plus, 
@@ -115,8 +115,10 @@ export default function Students({ profile }: StudentsProps) {
 
   useEffect(() => {
     if (profile) {
-      fetchStudents();
-      fetchClasses();
+      Promise.all([
+        fetchStudents(),
+        fetchClasses()
+      ]).catch(err => console.error("Error in initial load:", err));
     }
   }, [profile]);
 
@@ -129,18 +131,20 @@ export default function Students({ profile }: StudentsProps) {
         qConstraints.push(where('campusId', '==', campusId));
       }
       const q = query(collection(db, 'classes'), ...qConstraints);
-      const snap = await getDocs(q);
-      const classesData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const snap = await getDocs(q).catch(err => {
+        handleFirestoreError(err, OperationType.LIST, 'classes');
+        return { docs: [] } as any;
+      });
+      const classesData = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
       setClassGroups(classesData);
     } catch (error) {
-      console.error("Error fetching classes:", error);
+      console.error("Error in fetchClasses:", error);
     }
   };
 
   const fetchStudents = async () => {
     if (!profile?.schoolId && profile?.role !== 'admin') {
       // If super admin has no schoolId, they can see all (optional)
-      // but usually they belong to the "main" system
     }
     setLoading(true);
     try {
@@ -154,13 +158,16 @@ export default function Students({ profile }: StudentsProps) {
         );
       }
       
-      const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as object) } as Student));
+      const querySnapshot = await getDocs(q).catch(err => {
+        handleFirestoreError(err, OperationType.LIST, 'students');
+        return { docs: [] } as any;
+      });
+      const data = querySnapshot.docs.map((doc: any) => ({ id: doc.id, ...(doc.data() as object) } as Student));
       // Client-side sort
       data.sort((a, b) => a.name.localeCompare(b.name));
       setStudents(data);
     } catch (error) {
-      console.error("Error fetching students:", error);
+      console.error("Error in fetchStudents:", error);
     } finally {
       setLoading(false);
     }

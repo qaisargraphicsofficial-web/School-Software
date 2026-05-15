@@ -9,7 +9,7 @@ import { FeeType, FeeRecord, PaymentHistory, Student, UserProfile, SchoolSetting
 import { Wallet, Receipt, Plus, Printer, Download, CheckCircle2, XCircle, Search, Calendar, CreditCard, BarChart3, Settings, AlertCircle, FileText, Trash2, Edit2, ChevronRight, ArrowLeft, Mail, Bell, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import { handleFirestoreError, OperationType } from '../firebase';
 
 const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b'];
 
@@ -165,18 +165,34 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       if (profile.schoolId) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
-      
-      const studentsSnap = await getDocs(query(collection(db, 'students'), ...qConstraints));
-      setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Student)));
+      if (profile.campusId && profile.campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', profile.campusId));
+      }
 
-      const feeTypesSnap = await getDocs(query(collection(db, 'fee_types'), ...qConstraints));
-      setFeeTypes(feeTypesSnap.docs.map(d => ({ id: d.id, ...d.data() } as FeeType)));
+      // Fetch all data in parallel for speed and handle individual errors
+      const [studentsSnap, feeTypesSnap, feeRecordsSnap, paymentsSnap] = await Promise.all([
+        getDocs(query(collection(db, 'students'), ...qConstraints)).catch(err => {
+          handleFirestoreError(err, OperationType.LIST, 'students');
+          return { docs: [] } as any;
+        }),
+        getDocs(query(collection(db, 'fee_types'), ...qConstraints)).catch(err => {
+          handleFirestoreError(err, OperationType.LIST, 'fee_types');
+          return { docs: [] } as any;
+        }),
+        getDocs(query(collection(db, 'fee_records'), ...qConstraints)).catch(err => {
+          handleFirestoreError(err, OperationType.LIST, 'fee_records');
+          return { docs: [] } as any;
+        }),
+        getDocs(query(collection(db, 'payment_history'), ...qConstraints)).catch(err => {
+          handleFirestoreError(err, OperationType.LIST, 'payment_history');
+          return { docs: [] } as any;
+        })
+      ]);
 
-      const feeRecordsSnap = await getDocs(query(collection(db, 'fee_records'), ...qConstraints));
-      setFeeRecords(feeRecordsSnap.docs.map(d => ({ id: d.id, ...d.data() } as FeeRecord)));
-
-      const paymentsSnap = await getDocs(query(collection(db, 'payment_history'), ...qConstraints));
-      setPaymentHistory(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PaymentHistory)));
+      setStudents(studentsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Student)));
+      setFeeTypes(feeTypesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as FeeType)));
+      setFeeRecords(feeRecordsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as FeeRecord)));
+      setPaymentHistory(paymentsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as PaymentHistory)));
 
     } catch (error) {
       console.error("Error fetching fee data:", error);
@@ -239,6 +255,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
         fetchData();
       } catch (error) {
         console.error("Error deleting fee type:", error);
+        handleFirestoreError(error, OperationType.DELETE, 'fee_types');
       }
     }
   };
@@ -475,6 +492,7 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
       fetchData();
     } catch (error) {
       console.error("Error deleting fee record:", error);
+      handleFirestoreError(error, OperationType.DELETE, 'fee_records');
       alert("Failed to delete fee record.");
     }
   };
@@ -902,8 +920,8 @@ export default function FeesManagement({ profile }: FeesManagementProps) {
                   </div>
 
                   {/* Desktop Table */}
-                  <div className="hidden lg:block overflow-x-auto">
-                    <table className="w-full text-left">
+                  <div className="hidden lg:block overflow-x-auto min-w-full">
+                    <table className="w-full text-left min-w-[800px]">
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
                           <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Student</th>

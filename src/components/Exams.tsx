@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, query, where, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { ExamPaper, UserProfile, ExamType, Student, ExamResult, ExamSchedule, Staff, Subject, ClassGroup, SchoolSettings } from '../types';
-import { FileText, Plus, Search, Calendar, Clock, ChevronRight, FilePlus, Sparkles, Loader2, Printer, Settings, X, Trash2, Award, Download, Users, MapPin, GraduationCap, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Search, Calendar, Clock, ChevronRight, FilePlus, Sparkles, Loader2, Printer, Settings, X, Trash2, Award, Download, Users, MapPin, GraduationCap, AlertCircle, Trash } from 'lucide-react';
+import { MathToolbar } from './MathToolbar';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
@@ -121,7 +122,8 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
         const base64String = (reader.result as string).split(',')[1];
         
         // Use Gemini to extract questions from image/PDF
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+        const ai = new GoogleGenAI({ apiKey: apiKey! });
         
         const prompt = `Extract exam questions from this document.
         Return ONLY a JSON array of question objects. Each object MUST have:
@@ -134,7 +136,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
         Return raw JSON only, no markdown.`;
         
         const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-flash-latest',
           contents: [
             prompt,
             {
@@ -1139,12 +1141,22 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
     setGenerating(true);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+      const ai = new GoogleGenAI({ apiKey: apiKey! });
       
       const examTypeName = examTypes.find(t => t.id === aiPrompt.examTypeId)?.name || 'General';
       const totalQuestions = aiPrompt.mcqCount + aiPrompt.shortCount + aiPrompt.longCount;
 
+      const mathInstructions = aiPrompt.subject.toLowerCase().includes('math') ? 
+        `SPECIAL MATH INSTRUCTIONS:
+        - Use LaTeX for ALL mathematical expressions, formulas, and symbols.
+        - Wrap LaTeX in single dollar signs $ for inline and double dollar signs $$ for block math (e.g., $\\frac{a}{b}$ or $$x^2+y^2=r^2$$).
+        - Ensure complex structures like radicals, integrals, limits, and large operators are correctly formatted in LaTeX.
+        - For multiple choice options, if they contain math, also use LaTeX formatting.` : '';
+
       const prompt = `You are an expert educator. Generate a high-quality, comprehensive exam paper for Class ${aiPrompt.class} on the subject of ${aiPrompt.subject}.
+      
+      ${mathInstructions}
       
       SPECIFICATIONS:
       - Exam Type: ${examTypeName}
@@ -1185,7 +1197,7 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
       Return ONLY the raw JSON array. Do not include any markdown formatting or explanations.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-flash-latest',
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -1675,21 +1687,40 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               </div>
 
               <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <h3 className="text-lg font-bold text-slate-900">Questions</h3>
-                    <div className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold">
-                      Total Marks: {newPaper.questions?.reduce((acc: number, q: any) => acc + (q.marks || 0), 0)}
+                <div className="sticky top-0 z-10 bg-white pb-4 border-b border-slate-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-lg font-bold text-slate-900">Questions</h3>
+                      <div className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold">
+                        Total Marks: {newPaper.questions?.reduce((acc: number, q: any) => acc + (q.marks || 0), 0)}
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleAddManualQuestion}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Question
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddManualQuestion}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Question
-                  </button>
+                  <div className="bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                    <div className="px-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                      <span>Math Equation Editor{activeQuestionIndex !== null ? ` (Target: Q${activeQuestionIndex + 1})` : ''}</span>
+                      {activeQuestionIndex === null && <span className="text-amber-500 normal-case italic">Select a question to insert math</span>}
+                    </div>
+                    <MathToolbar 
+                      onInsert={(latex) => {
+                        if (activeQuestionIndex !== null) {
+                          const q = newPaper.questions![activeQuestionIndex];
+                          handleManualQuestionEdit(activeQuestionIndex, 'question', q.question + latex);
+                        } else {
+                          alert("Please click on a question's text area to select it before inserting math.");
+                        }
+                      }}
+                      language={editorLanguage}
+                    />
+                  </div>
                 </div>
                 
                 {newPaper.questions?.map((q: any, index: number) => (
@@ -1710,18 +1741,23 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                           <div className="flex-1 space-y-3">
                             <textarea
                               value={q.question}
+                              onFocus={() => setActiveQuestionIndex(index)}
                               onChange={(e) => handleManualQuestionEdit(index, 'question', e.target.value)}
                               dir="auto"
-                              className="w-full text-slate-900 font-medium bg-white border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[80px]"
-                              placeholder="Question text. Use $ for math, e.g., $\\frac{a}{b}$"
+                              className={cn(
+                                "w-full text-slate-900 font-medium bg-white border rounded-xl p-3 outline-none transition-all resize-none min-h-[80px]",
+                                activeQuestionIndex === index ? "ring-2 ring-indigo-500 border-transparent shadow-md" : "border-slate-200"
+                              )}
+                              placeholder="Question text. Use $ for math, e.g., $\frac{a}{b}$"
                             />
-                            <div className="flex gap-2 text-[10px] text-slate-500">
-                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$\\frac{a}{b}$')} className="hover:text-indigo-600">Fraction</button>
-                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$x^2$')} className="hover:text-indigo-600">Power</button>
-                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$\\sqrt{x}$')} className="hover:text-indigo-600">Root</button>
-                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$\\int$')} className="hover:text-indigo-600">Integral</button>
-                              <button type="button" onClick={() => handleManualQuestionEdit(index, 'question', q.question + '$\\sum$')} className="hover:text-indigo-600">Sigma</button>
-                            </div>
+                            {q.question.includes('$') && (
+                              <div className="p-3 bg-indigo-50/30 rounded-xl border border-indigo-100/50 text-slate-700 min-h-[40px] flex items-center gap-2 overflow-x-auto shadow-inner">
+                                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest shrink-0">Math Preview:</span>
+                                <div className="text-sm font-medium">
+                                  {renderMath(q.question)}
+                                </div>
+                              </div>
+                            )}
                             <div className="flex items-center gap-4">
                               <div className="flex-1">
                                 <label className="text-xs text-slate-500 block mb-1">Question Type</label>
@@ -2331,15 +2367,34 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-slate-900">Questions ({generatedPaperData.questions.length})</h3>
-                  <button
-                    onClick={handleAddQuestionToGenerated}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Question
-                  </button>
+                 <div className="sticky top-0 z-10 bg-white pb-4 border-b border-slate-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-slate-900">Questions ({generatedPaperData.questions.length})</h3>
+                    <button
+                      onClick={handleAddQuestionToGenerated}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Question
+                    </button>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="px-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                      <span>MS Word Style Equation Tab{activeQuestionIndex !== null ? ` (Targeting Q${activeQuestionIndex + 1})` : ''}</span>
+                      {activeQuestionIndex === null && <span className="text-indigo-500 normal-case italic">Click a question to use equation tools</span>}
+                    </div>
+                    <MathToolbar 
+                      onInsert={(latex) => {
+                        if (activeQuestionIndex !== null) {
+                          const q = generatedPaperData.questions[activeQuestionIndex];
+                          handleQuestionEdit(activeQuestionIndex, 'question', q.question + latex);
+                        } else {
+                          alert("Please click on a question's text area to select it before inserting math.");
+                        }
+                      }}
+                      language={aiPrompt.language === 'Urdu' ? 'Urdu' : 'English'}
+                    />
+                  </div>
                 </div>
                 {generatedPaperData.questions.map((q: any, index: number) => (
                   <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative group">
@@ -2358,10 +2413,22 @@ export default function Exams({ profile }: { profile: UserProfile | null }) {
                           <div className="flex-1 space-y-3">
                             <textarea
                               value={q.question}
+                              onFocus={() => setActiveQuestionIndex(index)}
                               onChange={(e) => handleQuestionEdit(index, 'question', e.target.value)}
-                              className="w-full text-slate-900 font-medium bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[80px]"
+                              className={cn(
+                                "w-full text-slate-900 font-medium bg-slate-50 border rounded-xl p-3 outline-none transition-all resize-none min-h-[80px]",
+                                activeQuestionIndex === index ? "ring-2 ring-indigo-500 border-transparent bg-white shadow-md font-bold" : "border-slate-200"
+                              )}
                               placeholder="Question text"
                             />
+                            {q.question.includes('$') && (
+                              <div className="p-3 bg-white/80 rounded-xl border border-slate-100 text-slate-700 min-h-[40px] flex items-center gap-2 overflow-x-auto shadow-inner">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">Live Render:</span>
+                                <div className="text-sm font-medium">
+                                  {renderMath(q.question)}
+                                </div>
+                              </div>
+                            )}
                             <div className="flex items-center gap-4">
                               <div className="flex-1">
                                 <label className="text-xs text-slate-500 block mb-1">Question Type</label>

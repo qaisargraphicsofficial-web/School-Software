@@ -15,18 +15,24 @@ export default function Registration() {
     email: '',
     phone: '',
     address: '',
-    plan: 'basic' as 'basic' | 'premium'
+    plan: 'basic' as 'basic' | 'premium',
+    isTrial: true
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
+      const trialDays = 15;
+      const trialExpiresAt = new Date();
+      trialExpiresAt.setDate(trialExpiresAt.getDate() + trialDays);
+
       const application: SchoolApplication = {
         ...formData,
         status: 'pending',
-        paymentStatus: 'pending',
-        createdAt: new Date().toISOString()
+        paymentStatus: formData.isTrial ? 'pending' : 'pending',
+        createdAt: new Date().toISOString(),
+        trialExpiresAt: formData.isTrial ? trialExpiresAt.toISOString() : undefined
       };
       await addDoc(collection(db, 'school_applications'), application);
       setSubmitted(true);
@@ -200,6 +206,25 @@ export default function Registration() {
                   <div className="text-xs text-slate-500">Unlimited students</div>
                 </button>
               </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-3 cursor-pointer group p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-indigo-200 transition-all">
+                <div className="relative flex items-center justify-center">
+                  <input 
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={formData.isTrial}
+                    onChange={e => setFormData({...formData, isTrial: e.target.checked})}
+                  />
+                  <div className="w-6 h-6 border-2 border-slate-300 rounded-lg peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-all" />
+                  <div className="absolute w-2 h-3.5 border-r-2 border-b-2 border-white rotate-45 mb-1 opacity-0 peer-checked:opacity-100 transition-opacity" />
+                </div>
+                <div>
+                  <span className="text-sm font-bold text-slate-900">Start with 15-Day Free Trial</span>
+                  <p className="text-[10px] text-slate-500 font-medium">Get full access for 15 days. Pay later to continue.</p>
+                </div>
+              </label>
             </div>
 
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">

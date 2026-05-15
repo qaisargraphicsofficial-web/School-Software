@@ -88,11 +88,12 @@ export default function Transport({ profile }: TransportProps) {
   }, [profile]);
 
   const fetchData = async () => {
+    if (!profile?.schoolId) return;
     setLoading(true);
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
-      if (profile?.schoolId) {
-        qConstraints.push(where('schoolId', '==', profile.schoolId));
+      const qConstraints = [where('schoolId', '==', profile.schoolId)];
+      if (profile.campusId && profile.campusId !== 'all') {
+        qConstraints.push(where('campusId', '==', profile.campusId));
       }
 
       const vehicleSnap = await getDocs(query(collection(db, 'transport_vehicles'), ...qConstraints));

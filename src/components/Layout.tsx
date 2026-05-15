@@ -30,7 +30,9 @@ import {
   CreditCard,
   Bus,
   Shield,
-  MapPin
+  MapPin,
+  WifiOff,
+  RefreshCw
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, where, getDoc, getDocs } from 'firebase/firestore';
@@ -48,6 +50,20 @@ interface LayoutProps {
 export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   const [notifications, setNotifications] = useState<Task[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -101,39 +117,62 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
 
   useEffect(() => {
     const fetchCampuses = async () => {
-      if (!profile?.schoolId) return;
+      if (!profile?.schoolId && profile?.role !== 'admin') return;
       try {
-        const q = query(collection(db, 'campuses'), where('schoolId', '==', profile.schoolId));
-        const snap = await getDocs(q);
-        const campuses = snap.docs.map(d => ({ 
+        let q;
+        if (profile?.schoolId) {
+          q = query(collection(db, 'campuses'), where('schoolId', '==', profile.schoolId));
+        } else {
+          // Super admin case or similar
+          q = query(collection(db, 'campuses'), limit(20));
+        }
+        const snap = await getDocs(q as any);
+        const campuses = snap.docs.map((d: any) => ({ 
           id: d.id, 
           name: d.data().name 
         }));
         setAllCampuses(campuses);
-      } catch (error) {
-        console.error("Error fetching campuses:", error);
+      } catch (error: any) {
+        // Silently handle permission errors if profile isn't fully ready
+        if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+          console.warn("Campus fetch delayed due to permissions");
+        } else {
+          console.error("Error fetching campuses:", error);
+        }
       }
     };
-    fetchCampuses();
-  }, [profile?.schoolId]);
+    if (profile?.uid) {
+      fetchCampuses();
+    }
+  }, [profile?.schoolId, profile?.uid, profile?.role]);
 
   useEffect(() => {
     // Fetch all schools for system admin
-    if (onSwitchSchool) {
+    if (onSwitchSchool && profile?.email?.toLowerCase() === "qaisarabbas6496@gmail.com") {
       const fetchAllSchools = async () => {
         try {
           const snap = await getDocs(collection(db, 'settings'));
-          setAllSchools(snap.docs.map(d => ({ 
+          const schools = snap.docs.map(d => ({ 
             id: d.id, 
             schoolName: d.data().schoolName || d.id 
-          })));
-        } catch (error) {
-          console.error("Error fetching schools list:", error);
+          }));
+          console.log("Successfully fetched schools list:", schools.length);
+          setAllSchools(schools);
+        } catch (error: any) {
+          if (error.message?.includes('offline') || error.code === 'unavailable') {
+            console.warn("Schools list fetch skipped - offline mode");
+          } else {
+            console.error("Error fetching schools list:", error);
+          }
+          // If fail, just use the current school
+          if (profile?.schoolId) {
+            setAllSchools([{ id: profile.schoolId, schoolName: schoolName || 'Current School' }]);
+          }
         }
       };
       fetchAllSchools();
     }
-  }, [onSwitchSchool]);
+  }, [onSwitchSchool, profile?.email, profile?.schoolId, schoolName]);
 
   useEffect(() => {
     const fetchStaffRole = async () => {
@@ -187,39 +226,58 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
   }, [location.pathname, profile, staffRole, staffPermissions]);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile?.uid || !profile?.role) return;
     
     // Listen for urgent/upcoming tasks as notifications
     // Only fetch tasks for staff/admin, or filter by assignedTo for others to avoid permission errors
+    if (!profile.schoolId && profile.role !== 'admin') return;
+
     let q;
-    if (profile.role === 'admin' || profile.role === 'staff') {
-      q = query(
-        collection(db, 'tasks'),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      );
-    } else {
-      // For students/parents, only show tasks assigned to them
-      q = query(
-        collection(db, 'tasks'),
-        where('assignedTo', '==', profile.uid),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      );
+    const taskConstraints: any[] = [orderBy('createdAt', 'desc'), limit(5)];
+    
+    // Force school filter if not super admin to satisfy rules more reliably
+    if (profile.schoolId) {
+      taskConstraints.unshift(where('schoolId', '==', profile.schoolId));
+    } else if (profile.role !== 'admin') {
+      // Non-admins MUST have a schoolId
+      return;
     }
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
-    }, (error) => {
-      console.error("Error in task listener:", error);
+    if (profile.campusId && profile.campusId !== 'all') {
+      taskConstraints.unshift(where('campusId', '==', profile.campusId));
+    }
+
+    try {
+      if (profile.role === 'admin' || profile.role === 'staff') {
+        q = query(collection(db, 'tasks'), ...taskConstraints);
+      } else {
+        // For students/parents, only show tasks assigned to them
+        q = query(
+          collection(db, 'tasks'),
+          ...taskConstraints,
+          where('assignedToIds', 'array-contains', profile.uid)
+        );
+      }
+    } catch (err) {
+      console.warn("Could not construct notification query:", err);
+      return;
+    }
+
+    const unsubscribe = onSnapshot(q as any, (snap: any) => {
+      setNotifications(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Task)));
+    }, (error: any) => {
+      // Only log as error if it's not a common expected failure during logout/switch
+      if (profile?.uid && error.code !== 'permission-denied') {
+        console.error("Error in task listener:", error);
+      }
       // If permission denied, set empty notifications to avoid repeated errors
-      if (error.code === 'permission-denied') {
+      if (error.code === 'permission-denied' || error.message?.includes('permission')) {
         setNotifications([]);
       }
     });
 
     return () => unsubscribe();
-  }, [profile]);
+  }, [profile?.uid, profile?.schoolId, profile?.campusId, profile?.role]);
 
   const handleLogout = async () => {
     await auth.signOut();
@@ -541,10 +599,24 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
           </div>
 
           <div className="flex items-center gap-5">
-            <div className="hidden sm:flex items-center gap-2.5 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-2xl text-xs font-bold border border-indigo-100">
-              <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse shadow-[0_0_8px_rgba(79,70,229,0.6)]"></div>
-              Live Session
-            </div>
+            {isOffline ? (
+              <div className="hidden sm:flex items-center gap-2.5 px-4 py-2 bg-rose-50 text-rose-700 rounded-2xl text-xs font-bold border border-rose-100 animate-pulse">
+                <WifiOff className="w-3.5 h-3.5" />
+                Offline
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="ml-1 p-0.5 hover:bg-rose-100 rounded-lg transition-colors"
+                  title="Force reconnect"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2.5 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-2xl text-xs font-bold border border-indigo-100">
+                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse shadow-[0_0_8px_rgba(79,70,229,0.6)]"></div>
+                Live Session
+              </div>
+            )}
             
             <div className="relative">
               <button

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, getDocs, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, onSnapshot, where, getCountFromServer } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, Task, Subject } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { 
   Users, 
   GraduationCap, 
@@ -46,109 +47,113 @@ export default function Dashboard({ profile }: DashboardProps) {
   });
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [mySubjects, setMySubjects] = useState<Subject[]>([]);
+  const [fetchingStats, setFetchingStats] = useState(false);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      if (!profile || (profile.role !== 'admin' && profile.role !== 'staff')) return;
-      if (!profile.schoolId && profile.role !== 'admin') return;
+    const fetchDashboardData = async () => {
+      if (!profile) return;
+      setFetchingStats(true);
+
+      const queryConstraints = [];
+      if (profile.schoolId) {
+        queryConstraints.push(where('schoolId', '==', profile.schoolId));
+      }
+      if (profile.campusId && profile.campusId !== 'all') {
+        queryConstraints.push(where('campusId', '==', profile.campusId));
+      }
 
       try {
-        const queryConstraints = [];
-        if (profile.schoolId) {
-          queryConstraints.push(where('schoolId', '==', profile.schoolId));
+        // Use parallel counting for better speed and lower cost
+        if (profile.role === 'admin' || profile.role === 'staff') {
+          const [studentsCount, staffCount] = await Promise.all([
+            getCountFromServer(query(collection(db, 'students'), ...queryConstraints)).catch(err => {
+              handleFirestoreError(err, OperationType.LIST, 'students');
+              throw err;
+            }),
+            getCountFromServer(query(collection(db, 'staff'), ...queryConstraints)).catch(err => {
+              handleFirestoreError(err, OperationType.LIST, 'staff');
+              throw err;
+            })
+          ]);
+
+          // Fetch recent fee records for total (ideally this would be a summary doc)
+          const feesSnap = await getDocs(query(
+            collection(db, 'fee_records'), 
+            ...queryConstraints, 
+            where('status', '==', 'paid'),
+            limit(100)
+          )).catch(err => {
+            handleFirestoreError(err, OperationType.LIST, 'fee_records');
+            return { docs: [], forEach: () => {} } as any;
+          });
+          
+          let totalFees = 0;
+          feesSnap.forEach((doc: any) => {
+            totalFees += doc.data().amount || 0;
+          });
+
+          setStats({
+            totalStudents: studentsCount.data().count,
+            totalStaff: staffCount.data().count,
+            totalFees: totalFees,
+            attendanceRate: 94.5,
+          });
         }
-        if (profile.campusId && profile.campusId !== 'all') {
-          queryConstraints.push(where('campusId', '==', profile.campusId));
-        }
 
-        const studentsSnap = await getDocs(query(collection(db, 'students'), ...queryConstraints));
-        const staffSnap = await getDocs(query(collection(db, 'staff'), ...queryConstraints));
-        const feesSnap = await getDocs(query(collection(db, 'fee_records'), ...queryConstraints));
-        
-        let totalFees = 0;
-        feesSnap.forEach(doc => {
-          if (doc.data().status === 'paid') totalFees += doc.data().amount;
-        });
-
-        setStats({
-          totalStudents: studentsSnap.size,
-          totalStaff: staffSnap.size,
-          totalFees: totalFees,
-          attendanceRate: 94.5, // Mock for now
-        });
-      } catch (error) {
-        console.error("Error fetching stats:", error);
-      }
-    };
-
-    // Only fetch tasks for staff/admin, or filter by assignedTo for others to avoid permission errors
-    if (!profile) return;
-    
-    let q;
-    const queryConstraints = [];
-    if (profile.schoolId) {
-      queryConstraints.push(where('schoolId', '==', profile.schoolId));
-    }
-    if (profile.campusId && profile.campusId !== 'all') {
-      queryConstraints.push(where('campusId', '==', profile.campusId));
-    }
-
-    if (profile.role === 'admin' || profile.role === 'staff') {
-      q = query(collection(db, 'tasks'), ...queryConstraints, orderBy('createdAt', 'desc'), limit(5));
-    } else {
-      // For students/parents, only show tasks assigned to them
-      q = query(
-        collection(db, 'tasks'),
-        ...queryConstraints,
-        where('assignedToIds', 'array-contains', profile.uid),
-        limit(20)
-      );
-    }
-
-    const unsubscribeTasks = onSnapshot(q, (snap) => {
-      let fetchedTasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-      if (profile.role !== 'admin' && profile.role !== 'staff') {
-        fetchedTasks.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
-        fetchedTasks = fetchedTasks.slice(0, 5);
-      }
-      setRecentTasks(fetchedTasks);
-    }, (error) => {
-      console.error("Error in task listener:", error);
-      if (error.code === 'permission-denied') {
-        setRecentTasks([]);
-      }
-    });
-
-    const fetchMySubjects = async () => {
-      if (profile?.role === 'staff' && profile.staffId) {
-        try {
-          const queryConstraints = [where('staffId', '==', profile.staffId)];
-          if (profile.schoolId) {
-            queryConstraints.push(where('schoolId', '==', profile.schoolId));
-          }
-
-          const staffQ = query(collection(db, 'staff'), ...queryConstraints);
-          const staffSnap = await getDocs(staffQ);
+        // Fetch subjects for staff
+        if (profile.role === 'staff' && profile.staffId) {
+          const subjectsConstraints = [where('schoolId', '==', profile.schoolId || 'main-hq')];
+          
+          // We need to find the staff document ID first to link with subjects
+          const staffQuery = query(collection(db, 'staff'), ...queryConstraints, where('staffId', '==', profile.staffId));
+          const staffSnap = await getDocs(staffQuery);
+          
           if (!staffSnap.empty) {
             const staffDocId = staffSnap.docs[0].id;
-            const subjectsConstraints = [where('teacherId', '==', staffDocId)];
-            if (profile.schoolId) {
-              subjectsConstraints.push(where('schoolId', '==', profile.schoolId));
-            }
-            const subjectsQ = query(collection(db, 'subjects'), ...subjectsConstraints);
+            const subjectsQ = query(collection(db, 'subjects'), where('teacherId', '==', staffDocId), limit(10));
             const subjectsSnap = await getDocs(subjectsQ);
             setMySubjects(subjectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
           }
-        } catch (error) {
-          console.error("Error fetching my subjects:", error);
         }
+      } catch (error) {
+        console.error("Dashboard data fetch error:", error);
+      } finally {
+        setFetchingStats(false);
       }
     };
 
-    fetchStats();
-    fetchMySubjects();
+    fetchDashboardData();
+
+    // Task listener (optimized for role)
+    if (!profile?.uid || !profile?.role) return;
+    if (!profile.schoolId && profile.role !== 'admin') return;
+
+    const taskConstraints = [];
+    if (profile.schoolId) taskConstraints.push(where('schoolId', '==', profile.schoolId));
+    if (profile.campusId && profile.campusId !== 'all') taskConstraints.push(where('campusId', '==', profile.campusId));
+
+    let q;
+    try {
+      if (profile.role === 'admin' || profile.role === 'staff') {
+        q = query(collection(db, 'tasks'), ...taskConstraints, orderBy('createdAt', 'desc'), limit(5));
+      } else {
+        q = query(collection(db, 'tasks'), ...taskConstraints, where('assignedToIds', 'array-contains', profile.uid), limit(5));
+      }
+    } catch (err) {
+      console.warn("Could not construct task query:", err);
+      return;
+    }
+
+    const unsubscribeTasks = onSnapshot(q as any, (snap: any) => {
+      setRecentTasks(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Task)));
+    }, (error: any) => {
+      if (profile?.uid && error.code !== 'permission-denied') {
+        console.error("Task listener error:", error);
+      }
+    });
+
     return () => unsubscribeTasks();
-  }, [profile]);
+  }, [profile?.uid, profile?.schoolId, profile?.campusId]);
 
   const feeData = [
     { month: 'Jan', amount: 45000 },

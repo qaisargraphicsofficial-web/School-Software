@@ -25,6 +25,8 @@ export interface SchoolApplication {
   createdAt: string;
   paymentStatus: 'pending' | 'paid';
   plan: 'basic' | 'premium';
+  isTrial?: boolean;
+  trialExpiresAt?: string;
 }
 
 export interface Campus {
@@ -493,6 +495,9 @@ export interface SchoolSettings {
   voucherSettings?: {
     vouchersPerPage: number;
     fontFamily: string;
+    showStudentCopy?: boolean;
+    showSchoolCopy?: boolean;
+    showBankCopy?: boolean;
     bankAccounts: {
       bankName: string;
       accountTitle: string;

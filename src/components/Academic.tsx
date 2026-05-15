@@ -137,10 +137,12 @@ export default function Academic({ profile }: AcademicProps) {
 
   useEffect(() => {
     if (profile) {
-      fetchStudents();
-      fetchStaff();
-      fetchSubjects();
-      fetchClasses();
+      Promise.all([
+        fetchStudents(),
+        fetchStaff(),
+        fetchSubjects(),
+        fetchClasses()
+      ]).catch(err => console.error("Error in initial load:", err));
     }
   }, [selectedClass, profile]);
 
@@ -155,8 +157,11 @@ export default function Academic({ profile }: AcademicProps) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
       const q = query(collection(db, 'classes'), ...qConstraints);
-      let snap = await getDocs(q);
-      setClassGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassGroup)));
+      const snap = await getDocs(q).catch(err => {
+        handleFirestoreError(err, OperationType.LIST, 'classes');
+        return { docs: [] } as any;
+      });
+      setClassGroups(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as ClassGroup)));
     } catch (error) {
       console.error("Error fetching classes:", error);
     }
@@ -169,8 +174,11 @@ export default function Academic({ profile }: AcademicProps) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
       const q = query(collection(db, 'subjects'), ...qConstraints);
-      let snap = await getDocs(q);
-      setSubjectsList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const snap = await getDocs(q).catch(err => {
+        handleFirestoreError(err, OperationType.LIST, 'subjects');
+        return { docs: [] } as any;
+      });
+      setSubjectsList(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
       console.error("Error fetching subjects:", error);
     }
@@ -218,8 +226,11 @@ export default function Academic({ profile }: AcademicProps) {
         qConstraints.push(where('schoolId', '==', profile.schoolId));
       }
       const q = query(collection(db, 'staff'), ...qConstraints);
-      const snap = await getDocs(q);
-      setStaffList(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
+      const snap = await getDocs(q).catch(err => {
+        handleFirestoreError(err, OperationType.LIST, 'staff');
+        return { docs: [] } as any;
+      });
+      setStaffList(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Staff)));
     } catch (error) {
       console.error("Error fetching staff:", error);
     }
@@ -300,8 +311,11 @@ export default function Academic({ profile }: AcademicProps) {
           q = query(collection(db, 'students'), ...baseConstraints);
         }
 
-        let querySnapshot = await getDocs(q);
-        const data = querySnapshot.docs.map(studentDoc => ({ id: studentDoc.id, ...(studentDoc.data() as any) } as Student));
+        const querySnapshot = await getDocs(q).catch(err => {
+          handleFirestoreError(err, OperationType.LIST, 'students');
+          return { docs: [] } as any;
+        });
+        const data = querySnapshot.docs.map((studentDoc: any) => ({ id: studentDoc.id, ...(studentDoc.data() as any) } as Student));
         setStudents(data);
         
         // Initialize attendance

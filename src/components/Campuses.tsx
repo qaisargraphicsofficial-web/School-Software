@@ -19,8 +19,10 @@ export default function Campuses({ profile }: { profile: UserProfile | null }) {
   });
 
   useEffect(() => {
-    fetchCampuses();
-  }, []);
+    if (profile) {
+      fetchCampuses();
+    }
+  }, [profile]);
 
   const fetchCampuses = async () => {
     try {

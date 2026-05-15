@@ -38,16 +38,16 @@ export default function Inventory({ profile }: InventoryProps) {
   });
 
   useEffect(() => {
-    fetchInventory();
-  }, []);
+    if (profile?.schoolId) {
+      fetchInventory();
+    }
+  }, [profile]);
 
   const fetchInventory = async () => {
+    if (!profile?.schoolId) return;
     setLoading(true);
     try {
-      const qConstraints: any[] = [];
-      if (profile?.schoolId) {
-        qConstraints.push(where('schoolId', '==', profile.schoolId));
-      }
+      const qConstraints: any[] = [where('schoolId', '==', profile.schoolId)];
       qConstraints.push(orderBy('lastUpdated', 'desc'));
       
       const q = query(collection(db, 'inventory'), ...qConstraints);

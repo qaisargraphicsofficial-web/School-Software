@@ -117,6 +117,7 @@ export default function Communication({ profile }: CommunicationProps) {
   };
 
   useEffect(() => {
+    if (!profile?.schoolId) return;
     fetchNotices();
     if (profile?.role === 'admin') {
       fetchBulkMessages();
@@ -134,17 +135,15 @@ export default function Communication({ profile }: CommunicationProps) {
   }, [profile, linkedStudentId]);
 
   useEffect(() => {
-    if (profile?.role === 'admin' || profile?.role === 'staff') {
+    if (profile?.schoolId && (profile?.role === 'admin' || profile?.role === 'staff')) {
       fetchAttendance(selectedAbsentDate);
     }
   }, [selectedAbsentDate]);
 
   const fetchSettings = async () => {
+    if (!profile?.schoolId) return;
     try {
-      const qConstraints = [];
-      if (profile?.schoolId) {
-        qConstraints.push(where('schoolId', '==', profile.schoolId));
-      }
+      const qConstraints = [where('schoolId', '==', profile.schoolId)];
       const snap = await getDocs(query(collection(db, 'settings'), ...qConstraints));
       if (!snap.empty) {
         setSettings(snap.docs[0].data() as SchoolSettings);
@@ -155,12 +154,13 @@ export default function Communication({ profile }: CommunicationProps) {
   };
 
   const fetchClasses = async () => {
+    if (!profile?.schoolId) return;
     const path = 'classes';
     try {
-      const qConstraints = [where('campusId', '==', profile?.campusId || 'main')];
-      if (profile?.schoolId) {
-        qConstraints.push(where('schoolId', '==', profile.schoolId));
-      }
+      const qConstraints = [
+        where('schoolId', '==', profile.schoolId),
+        where('campusId', '==', profile?.campusId || 'main')
+      ];
       const snap = await getDocs(query(collection(db, path), ...qConstraints));
       let fetchedDocs = snap.docs;
 
@@ -169,10 +169,10 @@ export default function Communication({ profile }: CommunicationProps) {
       
       // If no classes exist in the collection, try to derive them from students
       if (fetchedClasses.length === 0) {
-        const sConstraints = [where('campusId', '==', profile?.campusId || 'main')];
-        if (profile?.schoolId) {
-          sConstraints.push(where('schoolId', '==', profile.schoolId));
-        }
+        const sConstraints = [
+            where('schoolId', '==', profile.schoolId),
+            where('campusId', '==', profile?.campusId || 'main')
+        ];
         let studentSnap = await getDocs(query(collection(db, 'students'), ...sConstraints));
 
         const uniqueClasses = Array.from(new Set(studentSnap.docs.map(d => (d.data() as any).class)));
@@ -282,12 +282,25 @@ export default function Communication({ profile }: CommunicationProps) {
   };
 
   const fetchChildData = async (studentId: string) => {
+    if (!profile?.schoolId) return;
     try {
-      const sSnap = await getDocs(query(collection(db, 'students'), where('rollNumber', '==', studentId)));
+      const sConstraints = [
+        where('schoolId', '==', profile.schoolId),
+        where('rollNumber', '==', studentId)
+      ];
+      const sSnap = await getDocs(query(collection(db, 'students'), ...sConstraints));
       if (!sSnap.empty) {
         const student = { id: sSnap.docs[0].id, ...sSnap.docs[0].data() } as Student;
-        const rSnap = await getDocs(query(collection(db, 'results'), where('studentId', '==', student.id)));
-        const aSnap = await getDocs(query(collection(db, 'attendance'), where('targetId', '==', student.id)));
+        const rConstraints = [
+            where('schoolId', '==', profile.schoolId),
+            where('studentId', '==', student.id)
+        ];
+        const aConstraints = [
+            where('schoolId', '==', profile.schoolId),
+            where('targetId', '==', student.id)
+        ];
+        const rSnap = await getDocs(query(collection(db, 'results'), ...rConstraints));
+        const aSnap = await getDocs(query(collection(db, 'attendance'), ...aConstraints));
         
         setChildData({
           student,

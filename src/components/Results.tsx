@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Student, ExamResult, UserProfile, ExamPaper, ExamType, SchoolSettings, ClassGroup } from '../types';
-import { Search, FileText, Calendar, Award, Download, Eye, XCircle, Upload, Check, AlertCircle, Loader2, Printer } from 'lucide-react';
+import { Search, FileText, Calendar, Award, Download, Eye, XCircle, Upload, Check, AlertCircle, Loader2, Printer, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -47,6 +47,17 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
     position: ''
   });
   const [isUploading, setIsUploading] = useState(false);
+
+  // Manual Entry State
+  const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
+  const [entryFilters, setEntryFilters] = useState({
+    examTypeId: '',
+    class: '',
+    section: '',
+    subject: '' // Optional, can be used for summary
+  });
+  const [entryMarks, setEntryMarks] = useState<Record<string, { obtained: string, total: string, grade: string }>>({});
+  const [isSavingEntries, setIsSavingEntries] = useState(false);
 
   useEffect(() => {
     fetchStudents();
@@ -267,6 +278,7 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
           position: Number(row[columnMapping.position]) || 0,
           marks: {}, 
           campusId,
+          schoolId: profile?.schoolId || '',
           updatedAt: new Date().toISOString()
         };
         const newDocRef = doc(collection(db, 'exam_results'));
@@ -285,6 +297,83 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
       setIsUploading(false);
     }
   };
+
+  const calculateGrade = (percentage: number) => {
+    if (percentage >= 90) return 'A+';
+    if (percentage >= 80) return 'A';
+    if (percentage >= 70) return 'B';
+    if (percentage >= 60) return 'C';
+    if (percentage >= 50) return 'D';
+    if (percentage >= 40) return 'E';
+    return 'F';
+  };
+
+  const handleSaveManualMarks = async () => {
+    if (!entryFilters.examTypeId || !entryFilters.class) {
+      alert("Please select Exam Type and Class.");
+      return;
+    }
+
+    setIsSavingEntries(true);
+    try {
+      const batch = writeBatch(db);
+      const campusId = profile?.campusId || 'main';
+      const schoolId = profile?.schoolId || '';
+
+      const entriesToSave = Object.entries(entryMarks).filter(([_, data]) => 
+        (data as any).obtained !== '' && (data as any).total !== ''
+      );
+
+      for (const [studentId, data] of entriesToSave as [string, { obtained: string, total: string, grade: string }][]) {
+        const obtained = parseFloat(data.obtained);
+        const total = parseFloat(data.total);
+        const percentage = total > 0 ? (obtained / total) * 100 : 0;
+        
+        // Find existing result to update or create new
+        const existingResult = results.find(r => 
+          r.studentId === studentId && 
+          r.examTypeId === entryFilters.examTypeId
+        );
+
+        const resultData: Omit<ExamResult, 'id'> = {
+          studentId,
+          examTypeId: entryFilters.examTypeId,
+          class: entryFilters.class,
+          section: entryFilters.section,
+          totalObtained: obtained,
+          totalMax: total,
+          percentage,
+          grade: data.grade || calculateGrade(percentage),
+          marks: existingResult?.marks || {}, // Preserve existing per-subject marks if any
+          campusId,
+          schoolId,
+          updatedAt: new Date().toISOString()
+        };
+
+        if (existingResult?.id) {
+          batch.update(doc(db, 'exam_results', existingResult.id), resultData);
+        } else {
+          batch.set(doc(collection(db, 'exam_results')), resultData);
+        }
+      }
+
+      await batch.commit();
+      alert(`Successfully saved marks for ${entriesToSave.length} students.`);
+      setIsEntryModalOpen(false);
+      setEntryMarks({});
+      fetchResults();
+    } catch (error) {
+      console.error("Error saving marks:", error);
+      alert("Failed to save marks.");
+    } finally {
+      setIsSavingEntries(false);
+    }
+  };
+
+  const studentsInFilteredClass = students.filter(s => 
+    s.class === entryFilters.class && 
+    (!entryFilters.section || s.section === entryFilters.section)
+  );
 
   return (
     <div className="space-y-6">
@@ -315,6 +404,18 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
             >
               <Upload className="w-4 h-4" />
               Upload CSV
+            </button>
+          )}
+          {(profile?.role === 'admin' || profile?.role === 'staff') && (
+            <button
+              onClick={() => {
+                setEntryFilters({ ...entryFilters, examTypeId: resultFilters.examTypeId, class: resultFilters.class, section: resultFilters.section });
+                setIsEntryModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors shadow-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Enter Marks
             </button>
           )}
         </div>
@@ -622,6 +723,200 @@ export default function Results({ profile }: { profile: UserProfile | null }) {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Manual Entry Modal */}
+      <AnimatePresence>
+        {isEntryModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => !isSavingEntries && setIsEntryModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white rounded-3xl shadow-2xl p-8 w-full max-w-5xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-slate-900">Manual Marks Entry</h2>
+                <button onClick={() => setIsEntryModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition-colors">
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Exam Type</label>
+                  <select
+                    value={entryFilters.examTypeId}
+                    onChange={(e) => setEntryFilters({ ...entryFilters, examTypeId: e.target.value })}
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="">Select Exam</option>
+                    {examTypes.map(type => (
+                      <option key={type.id} value={type.id}>{type.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Class</label>
+                  <select
+                    value={entryFilters.class}
+                    onChange={(e) => setEntryFilters({ ...entryFilters, class: e.target.value, section: '' })}
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="">Select Class</option>
+                    {classes.map(c => (
+                      <option key={c.id} value={c.className}>{c.className}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Section</label>
+                  <select
+                    value={entryFilters.section}
+                    onChange={(e) => setEntryFilters({ ...entryFilters, section: e.target.value })}
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="">All Sections</option>
+                    {classes.find(c => c.className === entryFilters.class)?.sections.map(s => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {!entryFilters.examTypeId || !entryFilters.class ? (
+                <div className="text-center py-20 text-slate-400">
+                  <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  <p>Please select an exam type and class to begin entry</p>
+                </div>
+              ) : studentsInFilteredClass.length === 0 ? (
+                <div className="text-center py-20 text-slate-400">
+                  <p>No students found for this class/section</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr>
+                          <th className="p-4 text-xs font-bold text-slate-500 uppercase">Roll #</th>
+                          <th className="p-4 text-xs font-bold text-slate-500 uppercase">Student Name</th>
+                          <th className="p-4 text-xs font-bold text-slate-500 uppercase">Obtained Marks</th>
+                          <th className="p-4 text-xs font-bold text-slate-500 uppercase">Total Marks</th>
+                          <th className="p-4 text-xs font-bold text-slate-500 uppercase">Grade</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {studentsInFilteredClass.map((student) => {
+                          const result = results.find(r => r.studentId === student.id && r.examTypeId === entryFilters.examTypeId);
+                          const entry = entryMarks[student.id!] || { 
+                            obtained: result?.totalObtained?.toString() || '', 
+                            total: result?.totalMax?.toString() || '', 
+                            grade: result?.grade || '' 
+                          };
+
+                          return (
+                            <tr key={student.id} className="hover:bg-slate-50/50">
+                              <td className="p-4 text-sm font-bold text-indigo-600">{student.rollNumber}</td>
+                              <td className="p-4">
+                                <div className="text-sm font-medium text-slate-900">{student.name}</div>
+                                <div className="text-xs text-slate-500">S/O {student.parentName}</div>
+                              </td>
+                              <td className="p-4">
+                                <input
+                                  type="number"
+                                  value={entry.obtained}
+                                  placeholder="0"
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const updated = { ...entry, obtained: val };
+                                    // Auto-calculate grade if total exists
+                                    if (updated.total) {
+                                      updated.grade = calculateGrade((parseFloat(val) / parseFloat(updated.total)) * 100);
+                                    }
+                                    setEntryMarks({ ...entryMarks, [student.id!]: updated });
+                                  }}
+                                  className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                              </td>
+                              <td className="p-4">
+                                <input
+                                  type="number"
+                                  value={entry.total}
+                                  placeholder="100"
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const updated = { ...entry, total: val };
+                                    if (updated.obtained) {
+                                      updated.grade = calculateGrade((parseFloat(updated.obtained) / parseFloat(val)) * 100);
+                                    }
+                                    setEntryMarks({ ...entryMarks, [student.id!]: updated });
+                                  }}
+                                  className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                              </td>
+                              <td className="p-4">
+                                <select
+                                  value={entry.grade}
+                                  onChange={(e) => setEntryMarks({ ...entryMarks, [student.id!]: { ...entry, grade: e.target.value } })}
+                                  className="w-20 px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                  <option value="">-</option>
+                                  <option value="A+">A+</option>
+                                  <option value="A">A</option>
+                                  <option value="B">B</option>
+                                  <option value="C">C</option>
+                                  <option value="D">D</option>
+                                  <option value="E">E</option>
+                                  <option value="F">F</option>
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                    <button
+                      onClick={() => setIsEntryModalOpen(false)}
+                      disabled={isSavingEntries}
+                      className="px-6 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveManualMarks}
+                      disabled={isSavingEntries}
+                      className="px-8 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex items-center gap-2"
+                    >
+                      {isSavingEntries ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Saving Marks...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-5 h-5" />
+                          Save All Marks
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Result Card Preview (Hidden for PDF generation) */}
       <div className="fixed -left-[2000px] top-0 pointer-events-none">
         <div ref={reportCardRef}>

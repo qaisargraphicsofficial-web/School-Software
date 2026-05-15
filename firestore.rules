@@ -2,14 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Global safety net - Default Deny
+    // --- Global Deny & Super Admin Override ---
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isSuperAdmin();
     }
 
-    // --- Helper Functions ---
+    // --- Helpers ---
     function isSignedIn() {
       return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && 
+             (request.auth.token.email.toLowerCase() == "qaisarabbas6496@gmail.com" || 
+              request.auth.uid == "UxVEF2cckyY8OmrTMgZ8ukt0udA3");
     }
 
     function getUserData() {
@@ -17,213 +23,128 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.email != null && request.auth.token.email.toLowerCase() == "qaisarabbas6496@gmail.com") || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-      );
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin');
     }
 
     function isStaff() {
-      return isSignedIn() && (
-        isAdmin() || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff')
-      );
+      return isAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'staff');
     }
 
-    function isMemberOfSameSchool(data) {
-      return isSignedIn() && (
-        isAdmin() || 
-        (data != null && data.schoolId != null && getUserData().schoolId == data.schoolId)
-      );
+    function isApproved() {
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().status == 'approved');
     }
 
-    // --- Core Entities ---
+    function belongsToSchool(schoolId) {
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().schoolId == schoolId);
+    }
+
+    // --- Collections ---
 
     match /test/connection {
       allow read: if true;
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn() && (
-        request.auth.uid == userId || 
-        (request.auth.token.email != null && request.auth.token.email.toLowerCase() == "qaisarabbas6496@gmail.com") ||
-        isAdmin()
-      );
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || isAdmin());
       allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow update, delete: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
     }
 
-    match /authorized_emails/{id} {
-      allow read, list: if isSignedIn();
-      allow write: if isAdmin();
+    match /schools/{schoolId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
     }
 
     match /campuses/{campusId} {
-      allow read: if isSignedIn(); 
-      allow write: if isAdmin();
-    }
-
-    match /school_settings/{settingId} {
-      allow read: if isSignedIn(); 
-      allow write: if isAdmin();
-    }
-
-    match /settings/{settingId} {
-      allow read: if isSignedIn(); 
+      allow read, list: if isSignedIn() && (isSuperAdmin() || (resource != null && belongsToSchool(resource.data.schoolId)));
       allow write: if isAdmin();
     }
 
     match /students/{studentId} {
-      allow read, list: if isMemberOfSameSchool(resource.data); 
-      allow write: if isAdmin() || isStaff();
+      allow read, list: if isSuperAdmin() || (isApproved() && resource != null && belongsToSchool(resource.data.schoolId));
+      allow write: if isStaff() && isApproved();
     }
 
-    match /staff/{staffId} {
-      allow read, list: if isMemberOfSameSchool(resource.data);
-      allow write: if isAdmin();
+    match /fee_records/{recordId} {
+      allow read, list: if isApproved() && (belongsToSchool(resource.data.schoolId) || (isSignedIn() && getUserData().studentId == resource.data.studentId));
+      allow write: if isStaff() && isApproved();
     }
 
-    match /staff_credentials/{id} {
-      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == id);
-      allow write: if isAdmin();
-    }
-
-    match /attendance/{id} {
-      allow read, list: if isStaff() || 
-                    (getUserData().role == 'parent' && getUserData().studentId == resource.data.targetId) || 
-                    (getUserData().role == 'student' && getUserData().studentId == resource.data.targetId);
-      allow write: if isStaff();
-    }
-
-    match /fee_records/{id} {
-      allow read, list: if isStaff() || 
-                    (getUserData().role == 'parent' && getUserData().studentId == resource.data.studentId) || 
-                    (getUserData().role == 'student' && getUserData().studentId == resource.data.studentId);
-      allow write: if isStaff();
-    }
-
-    match /fee_types/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff();
-      allow write: if isStaff();
+    match /fee_types/{typeId} {
+      allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId);
+      allow write: if isStaff() && isApproved();
     }
 
     match /payment_history/{id} {
-      allow read, list: if isStaff() || 
-                    (getUserData().role == 'parent' && getUserData().studentId == resource.data.studentId) || 
-                    (getUserData().role == 'student' && getUserData().studentId == resource.data.studentId);
-      allow write: if isStaff();
-    }
-
-    match /transport_fees/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff();
-      allow write: if isStaff();
-    }
-    
-    match /fees/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff();
-      allow write: if isStaff();
-    }
-
-    match /leave_requests/{id} {
-      allow read, list: if isStaff() || (isSignedIn() && getUserData().staffId == resource.data.staffId);
-      allow write: if isSignedIn();
-    }
-
-    match /leave_balances/{id} {
-      allow read, list: if isStaff() || (isSignedIn() && getUserData().staffId == resource.data.staffId);
-      allow write: if isStaff();
-    }
-
-    match /library_loans/{id} {
-      allow read, list: if isStaff() || 
-                    (getUserData().role == 'parent' && getUserData().studentId == resource.data.studentId) || 
-                    (getUserData().role == 'student' && getUserData().studentId == resource.data.studentId);
-      allow write: if isStaff();
-    }
-
-    match /certificates/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff();
-      allow write: if isStaff();
-    }
-
-    match /timetables/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff() || isSignedIn();
-      allow write: if isStaff();
-    }
-
-    match /exam_schedules/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff() || isSignedIn();
-      allow write: if isStaff();
-    }
-
-    match /exam_papers/{id} {
-      allow read: if isStaff() || (isSignedIn() && isMemberOfSameSchool(resource.data));
-      allow list: if isStaff();
-      allow write: if isStaff();
-    }
-
-    match /exam_types/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data) || isStaff() || isSignedIn();
-      allow write: if isStaff();
-    }
-
-    match /subjects/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data);
-      allow write: if isAdmin() || isStaff();
-    }
-
-    match /classes/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data);
-      allow write: if isAdmin();
-    }
-
-    match /expenses/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data);
-      allow write: if isAdmin() || isStaff();
-    }
-
-    match /payroll/{id} {
-      allow read, list: if isAdmin() || (isStaff() && getUserData().staffId == resource.data.staffId);
-      allow write: if isAdmin();
-    }
-
-    match /inventory/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data);
-      allow write: if isAdmin() || isStaff();
-    }
-
-    match /exam_results/{id} {
-      allow read, list: if isMemberOfSameSchool(resource.data);
-      allow write: if isAdmin() || isStaff();
+      allow read, list: if isApproved() && (belongsToSchool(resource.data.schoolId) || (isSignedIn() && getUserData().studentId == resource.data.studentId));
+      allow write: if isStaff() && isApproved();
     }
 
     match /notices/{id} {
-      allow read, list: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, list: if isApproved();
+      allow write: if isStaff() && isApproved();
     }
 
     match /tasks/{taskId} {
-      allow read, list: if isMemberOfSameSchool(resource.data);
-      allow create: if isStaff();
-      allow update: if isStaff() || (isSignedIn() && (request.auth.uid == resource.data.assignedTo || request.auth.uid in resource.data.assignedToIds));
-      allow delete: if isAdmin();
+      allow read, list: if isSuperAdmin() || (isApproved() && belongsToSchool(resource.data.schoolId));
+      allow create, update: if isStaff() && isApproved();
+      allow delete: if isAdmin() && isApproved();
     }
 
-    match /registrations/{id} {
-      allow create: if true;
-      allow read, list, write: if isAdmin();
-    }
-
+    // Default match for other collections to avoid blanket denial for approved users
+    match /classes/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isAdmin(); }
+    match /subjects/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /attendance/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /expenses/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isAdmin(); }
+    match /inventory/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /exam_schedules/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /exam_types/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /exam_results/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /results/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /timetables/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /staff/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isAdmin(); }
     match /school_applications/{id} {
-      allow create: if true;
-      allow read, list, write: if isAdmin();
+      allow read, list: if isSuperAdmin();
+      allow create: if true; // Public applications
+      allow update, delete: if isSuperAdmin();
     }
 
-    match /schools/{id} {
-      allow read, list: if isSignedIn();
+    match /transport_vehicles/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /transport_routes/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /transport_fees/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    
+    match /leave_requests/{id} { 
+      allow read, list: if isApproved() && (belongsToSchool(resource.data.schoolId) || (isSignedIn() && request.auth.uid == resource.data.staffId));
+      allow write: if isApproved() && (belongsToSchool(resource.data.schoolId));
+    }
+    match /leave_balances/{id} { 
+      allow read, list: if isApproved() && (belongsToSchool(resource.data.schoolId) || (isSignedIn() && request.auth.uid == resource.data.staffId));
       allow write: if isAdmin();
     }
+
+    match /shop_items/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isAdmin(); }
+    match /shop_sales/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+
+    match /events/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /library_loans/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /library_books/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /syllabus/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /certificates/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /exam_papers/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isStaff(); }
+    match /academic_terms/{id} { allow read, list: if isApproved() && belongsToSchool(resource.data.schoolId); allow write: if isAdmin(); }
+
+    match /school_website_settings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /school_websites/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /website_slugs/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /public_admissions/{id} { 
+      allow read, list: if isAdmin(); 
+      allow create: if true; 
+      allow update, delete: if isAdmin(); 
+    }
+    
+    match /authorized_emails/{id} { allow read, list: if isSignedIn(); allow write: if isSuperAdmin() || isAdmin(); }
+    match /settings/{id} { allow read, list: if isSuperAdmin() || (isApproved() && (id == "global" || belongsToSchool(id))); allow write: if isAdmin(); }
+    match /school_settings/{id} { allow read, list: if isSuperAdmin() || (isApproved() && belongsToSchool(id)); allow write: if isAdmin(); }
+
   }
 }
