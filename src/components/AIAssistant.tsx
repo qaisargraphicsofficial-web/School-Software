@@ -14,7 +14,7 @@ import {
   Sparkles,
   User,
   School,
-  BrainCircuit,
+  Bot,
   BookOpen,
   CalendarDays,
   TrendingUp,
@@ -1233,7 +1233,7 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
             <div className="p-4 bg-indigo-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-xl">
-                  <BrainCircuit className="w-5 h-5" />
+                  <School className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold">EduManage AI</h3>
