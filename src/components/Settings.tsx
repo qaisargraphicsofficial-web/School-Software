@@ -234,7 +234,7 @@ export default function Settings({ profile }: SettingsProps) {
         console.error("Error activating trial", e);
       }
 
-      // 3. Find and update user profile or add to authorized emails
+      // 3. Find and update user profile and ensure they are authorized
       const userQ = query(collection(db, 'users'), where('email', '==', app.email));
       const userSnap = await getDocs(userQ);
       
@@ -246,16 +246,17 @@ export default function Settings({ profile }: SettingsProps) {
           schoolId: app.id,
           campusId: app.id // Use app ID as the isolation ID
         });
-      } else {
-        // Create an authorized entry if they don't have a profile yet
-        await setDoc(doc(collection(db, 'authorized_emails')), {
-          email: app.email,
-          role: 'admin',
-          schoolId: app.id,
-          campusId: app.id,
-          createdAt: new Date().toISOString()
-        });
       }
+
+      // Create or ensure authorized entry
+      const authDocId = `${app.email.toLowerCase()}_${app.id}`;
+      await setDoc(doc(db, 'authorized_emails', authDocId), {
+        email: app.email.toLowerCase(),
+        role: 'admin',
+        schoolId: app.id,
+        campusId: app.id,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
 
       alert(`Application for ${app.schoolName} approved!`);
       
@@ -1541,6 +1542,25 @@ export default function Settings({ profile }: SettingsProps) {
                                {deactivatingId === school.id 
                                  ? 'Processing...' 
                                  : (school.isActive !== false ? 'Suspend Access' : 'Restore Access')}
+                             </button>
+                             <button
+                               type="button"
+                               onClick={async () => {
+                                 const email = window.prompt("Enter admin email to authorize:");
+                                 if (!email) return;
+                                 const authDocId = `${email.toLowerCase()}_${school.id}`;
+                                 await setDoc(doc(db, 'authorized_emails', authDocId), {
+                                   email: email.toLowerCase(),
+                                   role: 'admin',
+                                   schoolId: school.id,
+                                   campusId: school.id,
+                                   createdAt: new Date().toISOString()
+                                 }, { merge: true });
+                                 alert(`Authorized ${email} for ${school.name}`);
+                               }}
+                               className="px-6 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 transition-all"
+                             >
+                               Authorize User
                              </button>
                           </div>
                         </div>
