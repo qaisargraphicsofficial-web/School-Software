@@ -1,10 +1,10 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, getDocFromServer } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile, UserRole, UserStatus } from './types';
-import { Clock, LogIn, Loader2 } from 'lucide-react';
+import { Clock, LogIn, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 const Login = lazy(() => import('./components/Login'));
 const Layout = lazy(() => import('./components/Layout'));
@@ -39,6 +39,8 @@ const UserManagement = lazy(() => import('./components/UserManagement'));
 const Registration = lazy(() => import('./components/Registration'));
 const PublicWebsite = lazy(() => import('./components/PublicWebsite'));
 const PublicResultView = lazy(() => import('./components/PublicResultView'));
+const MasterDashboard = lazy(() => import('./components/MasterDashboard'));
+const Support = lazy(() => import('./components/Support'));
 
 const PageLoader = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] p-12">
@@ -51,6 +53,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<boolean>(false);
   const [activeSchoolId, setActiveSchoolId] = useState<string | null>(null);
   const [schoolData, setSchoolData] = useState<any>(null);
   const [checkingSchool, setCheckingSchool] = useState(false);
@@ -59,10 +62,14 @@ export default function App() {
     // Warm up connectivity
     const warmUp = async () => {
       try {
-        await getDoc(doc(db, 'test', 'connection'));
-        console.log("Firestore connection warmed up.");
-      } catch (e) {
-        console.warn("Warm up failed, but proceeding...", e);
+        await getDocFromServer(doc(db, 'test', 'connection'));
+        console.log("Firestore connection warmed up successfully.");
+      } catch (e: any) {
+        if (e.message?.includes('offline') || e.code === 'unavailable') {
+          console.warn("Firestore appears to be offline. Data will be served from cache when available.");
+        } else {
+          console.warn("Warm up failed, but proceeding...", e);
+        }
       }
     };
     warmUp();
@@ -89,6 +96,9 @@ export default function App() {
               if (isConnectivity && retries < maxRetries) {
                 console.warn(`Firestore unreachable (attempt ${retries}/${maxRetries}), retrying in ${retries * 2}s...`);
                 await new Promise(resolve => setTimeout(resolve, retries * 2000));
+              } else if (isConnectivity) {
+                setConnectionError(true);
+                return;
               } else {
                 handleFirestoreError(error, OperationType.GET, 'users/' + firebaseUser.uid);
                 return;
@@ -224,6 +234,34 @@ export default function App() {
   const isTrialExpired = schoolData?.isTrial && schoolData?.trialExpiresAt && new Date(schoolData.trialExpiresAt) < new Date();
   const isSuspended = schoolData?.isActive === false;
 
+  if (connectionError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Connectivity Issue</h2>
+          <p className="text-slate-600 mb-8 font-medium">
+            We're having trouble connecting to the database. This might be due to a poor internet connection or a temporary system issue.
+          </p>
+          <div className="space-y-3">
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry Connection
+            </button>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+              Last Attempt: {new Date().toLocaleTimeString()}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading || checkingSchool) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -331,7 +369,7 @@ export default function App() {
               onSwitchSchool={isSystemAdmin ? handleSwitchSchool : undefined} 
               onSwitchCampus={profile?.role === 'admin' ? handleSwitchCampus : undefined}
             />}>
-              <Route index element={<Dashboard profile={profile} />} />
+              <Route index element={isSystemAdmin && activeSchoolId === 'main-hq' ? <MasterDashboard onSwitchSchool={handleSwitchSchool} /> : <Dashboard profile={profile} />} />
               <Route path="students" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Students profile={profile} /> : <Navigate to="/" replace />} />
               <Route path="classes" element={profile?.role === 'admin' || profile?.role === 'staff' ? <Classes profile={profile} /> : <Navigate to="/" replace />} />
               <Route path="attendance" element={<Academic profile={profile} />} />
@@ -355,6 +393,7 @@ export default function App() {
               <Route path="curriculum" element={<Curriculum profile={profile} />} />
               <Route path="exams" element={<Exams profile={profile} />} />
               <Route path="library" element={<Library profile={profile} />} />
+              <Route path="support" element={<Support profile={profile} />} />
               <Route path="certificates" element={<Certificates profile={profile} />} />
               <Route path="school-website" element={profile?.role === 'admin' ? <SchoolWebsite profile={profile} /> : <Navigate to="/" replace />} />
               <Route path="school-shop" element={profile?.role === 'admin' ? <SchoolShop profile={profile} /> : <Navigate to="/" replace />} />

@@ -5,6 +5,7 @@ import { SchoolApplication } from '../types';
 import { motion } from 'motion/react';
 import { School, User, Mail, Phone, MapPin, Send, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { sendSystemNotification } from '../lib/notifications';
 
 export default function Registration() {
   const [submitted, setSubmitted] = useState(false);
@@ -35,6 +36,16 @@ export default function Registration() {
         trialExpiresAt: formData.isTrial ? trialExpiresAt.toISOString() : undefined
       };
       await addDoc(collection(db, 'school_applications'), application);
+      
+      // Notify Super Admin
+      await sendSystemNotification('registration', {
+        schoolName: formData.schoolName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        plan: formData.plan
+      });
+
       setSubmitted(true);
     } catch (error) {
       console.error("Error submitting application:", error);

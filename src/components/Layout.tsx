@@ -302,39 +302,54 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
 
   const navItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/', category: 'OVERVIEW' },
-    { name: 'Students', icon: Users, path: '/students', roles: ['admin', 'staff'], category: 'ACADEMICS' },
-    { name: 'Classes', icon: BookOpen, path: '/classes', roles: ['admin', 'staff'], category: 'ACADEMICS' },
-    { name: 'Attendance', icon: Calendar, path: '/attendance', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
-    { name: 'Examination Portal', icon: GraduationCap, path: '/examination-portal', roles: ['admin', 'staff'], category: 'EXAMINATIONS' },
-    { name: 'Results', icon: GraduationCap, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'EXAMINATIONS' },
-    { name: 'Subjects', icon: BookOpen, path: '/subjects', roles: ['admin', 'staff'], category: 'ACADEMICS' },
-    { name: 'Fees', icon: Wallet, path: '/fees', roles: ['admin', 'staff'], category: 'FINANCE' },
-    { name: 'Payroll', icon: CreditCard, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE' },
-    { name: 'Expenses', icon: FileText, path: '/expenses', roles: ['admin', 'staff'], category: 'FINANCE' },
+    { name: 'Master Workspace', icon: Shield, path: '/', roles: ['admin'], category: 'SYSTEM CONTROL', systemOnly: true, hqOnly: true },
+    { name: 'Students', icon: Users, path: '/students', roles: ['admin', 'staff'], category: 'ACADEMICS', schoolOnly: true },
+    { name: 'Classes', icon: BookOpen, path: '/classes', roles: ['admin', 'staff'], category: 'ACADEMICS', schoolOnly: true },
+    { name: 'Attendance', icon: Calendar, path: '/attendance', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS', schoolOnly: true },
+    { name: 'Examination Portal', icon: GraduationCap, path: '/examination-portal', roles: ['admin', 'staff'], category: 'EXAMINATIONS', schoolOnly: true },
+    { name: 'Results', icon: GraduationCap, path: '/results', roles: ['admin', 'staff', 'student', 'parent'], category: 'EXAMINATIONS', schoolOnly: true },
+    { name: 'Subjects', icon: BookOpen, path: '/subjects', roles: ['admin', 'staff'], category: 'ACADEMICS', schoolOnly: true },
+    { name: 'Fees', icon: Wallet, path: '/fees', roles: ['admin', 'staff'], category: 'FINANCE', schoolOnly: true },
+    { name: 'Payroll', icon: CreditCard, path: '/payroll', roles: ['admin', 'staff'], category: 'FINANCE', schoolOnly: true },
+    { name: 'Expenses', icon: FileText, path: '/expenses', roles: ['admin', 'staff'], category: 'FINANCE', schoolOnly: true },
     { 
       name: 'Teachers', 
       icon: UserSquare2, 
       path: '/teachers', 
       roles: ['admin', 'staff'], 
-      category: 'STAFF & OPS'
+      category: 'STAFF & OPS',
+      schoolOnly: true
     },
-    { name: 'Communication', icon: MessageSquare, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION' },
-    { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS' },
-    { name: 'User Management', icon: Shield, path: '/users', roles: ['admin'], category: 'AI & SETTINGS', systemOnly: true },
+    { name: 'Communication', icon: MessageSquare, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION', schoolOnly: true },
+    { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS', schoolOnly: true },
+    { name: 'User Management', icon: Shield, path: '/users', roles: ['admin'], category: 'SYSTEM CONTROL', systemOnly: true },
     { name: 'Settings', icon: Settings, path: '/settings', roles: ['admin'], category: 'AI & SETTINGS' },
-    { name: 'Campuses', icon: Building2, path: '/campuses', roles: ['admin'], category: 'STAFF & OPS' },
-    { name: 'Library', icon: Library, path: '/library', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS' },
-    { name: 'Inventory', icon: Package, path: '/inventory', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
-    { name: 'Curriculum', icon: BookText, path: '/curriculum', roles: ['admin', 'staff'], category: 'ACADEMICS' },
-    { name: 'Certificates', icon: Award, path: '/certificates', roles: ['admin', 'staff'], category: 'ACADEMICS' },
-    { name: 'School Shop', icon: Package, path: '/school-shop', roles: ['admin'], category: 'STAFF & OPS' },
-    { name: 'Transport', icon: Bus, path: '/transport', roles: ['admin', 'staff'], category: 'STAFF & OPS' },
-    { name: 'My School Website', icon: School, path: '/school-website', roles: ['admin'], category: 'AI & SETTINGS' },
+    { name: 'Campuses', icon: Building2, path: '/campuses', roles: ['admin'], category: 'STAFF & OPS', schoolOnly: true },
+    { name: 'Library', icon: Library, path: '/library', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS', schoolOnly: true },
+    { name: 'Inventory', icon: Package, path: '/inventory', roles: ['admin', 'staff'], category: 'STAFF & OPS', schoolOnly: true },
+    { name: 'Curriculum', icon: BookText, path: '/curriculum', roles: ['admin', 'staff'], category: 'ACADEMICS', schoolOnly: true },
+    { name: 'Certificates', icon: Award, path: '/certificates', roles: ['admin', 'staff'], category: 'ACADEMICS', schoolOnly: true },
+    { name: 'School Shop', icon: Package, path: '/school-shop', roles: ['admin'], category: 'STAFF & OPS', schoolOnly: true },
+    { name: 'Transport', icon: Bus, path: '/transport', roles: ['admin', 'staff'], category: 'STAFF & OPS', schoolOnly: true },
+    { name: 'My School Website', icon: School, path: '/school-website', roles: ['admin'], category: 'AI & SETTINGS', schoolOnly: true },
+    { name: 'Support & Feedback', icon: MessageSquare, path: '/support', roles: ['admin', 'staff'], category: 'OTHER', schoolOnly: true },
   ];
 
   const filteredNavItems = navItems.filter(item => {
+    const isSystemAdmin = profile?.email?.toLowerCase() === "qaisarabbas6496@gmail.com";
+    const isHQ = profile?.schoolId === 'main-hq';
+
     // Check if it's a system admin only menu
-    if ((item as any).systemOnly && profile?.email?.toLowerCase() !== "qaisarabbas6496@gmail.com") return false;
+    if ((item as any).systemOnly && !isSystemAdmin) return false;
+
+    // If viewing HQ (Master Dashboard), hide school-only tabs
+    if (isSystemAdmin && isHQ && (item as any).schoolOnly) return false;
+
+    // If viewing a specific school as super admin, hide HQ-only tabs (or maybe show them but distinguish)
+    if (isSystemAdmin && !isHQ && (item as any).hqOnly) return false;
+
+    // Standard dashboard item hide for HQ
+    if (isSystemAdmin && isHQ && item.name === 'Dashboard') return false;
 
     if (profile?.role === 'admin') return true;
     
@@ -358,7 +373,7 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
   }, {} as Record<string, typeof filteredNavItems>);
 
   // Define category order
-  const categoryOrder = ['OVERVIEW', 'ACADEMICS', 'EXAMINATIONS', 'FINANCE', 'STAFF & OPS', 'COMMUNICATION', 'AI & SETTINGS', 'OTHER'];
+  const categoryOrder = ['OVERVIEW', 'SYSTEM CONTROL', 'ACADEMICS', 'EXAMINATIONS', 'FINANCE', 'STAFF & OPS', 'COMMUNICATION', 'AI & SETTINGS', 'OTHER'];
 
   return (
     <div className="h-screen print:h-auto bg-slate-50 flex overflow-hidden print:overflow-visible">
@@ -438,6 +453,15 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
           </nav>
 
           <div className="p-6 border-t border-slate-100 shrink-0">
+            {profile?.email?.toLowerCase() === "qaisarabbas6496@gmail.com" && profile.schoolId !== 'main-hq' && (
+              <button
+                onClick={() => onSwitchSchool?.('main-hq')}
+                className="w-full flex items-center gap-3 px-4 py-3.5 bg-indigo-50 text-indigo-700 rounded-2xl mb-4 transition-all duration-200 font-black text-xs uppercase tracking-widest border border-indigo-100"
+              >
+                <Shield className="w-4 h-4" />
+                Return to Master
+              </button>
+            )}
             <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl mb-4 border border-slate-100">
               <div className="w-11 h-11 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md">
                 {profile?.email?.[0].toUpperCase()}
