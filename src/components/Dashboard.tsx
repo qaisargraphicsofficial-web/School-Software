@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, getDocs, orderBy, limit, onSnapshot, where, getCountFromServer } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, onSnapshot, where, getCountFromServer, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, Task, Subject } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
@@ -48,6 +48,24 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [mySubjects, setMySubjects] = useState<Subject[]>([]);
   const [fetchingStats, setFetchingStats] = useState(false);
+  const [schoolName, setSchoolName] = useState<string>('Your School');
+
+  useEffect(() => {
+    const fetchSchoolName = async () => {
+      if (!profile?.schoolId) return;
+      try {
+        const schoolDocRef = doc(db, 'school_settings', profile.schoolId);
+        const schoolSnap = await getDoc(schoolDocRef);
+        if (schoolSnap.exists()) {
+          setSchoolName(schoolSnap.data().schoolName || 'Your School');
+        }
+      } catch (err) {
+        console.error("Error fetching school name:", err);
+      }
+    };
+    
+    fetchSchoolName();
+  }, [profile?.schoolId]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -204,7 +222,7 @@ export default function Dashboard({ profile }: DashboardProps) {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">
             Welcome back, {profile?.email?.split('@')[0]}!
           </h1>
-          <p className="text-slate-500 font-medium">Here's what's happening at your school today.</p>
+          <p className="text-slate-500 font-medium">Here's what's happening at {schoolName} today.</p>
         </div>
         <div className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 shadow-sm">
           <Calendar className="w-4 h-4 text-indigo-600" />

@@ -1217,7 +1217,7 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
           isOpen ? "bg-slate-800 text-white" : "bg-indigo-600 text-white"
         )}
       >
-        {isOpen ? <X className="w-6 h-6" /> : <School className="w-6 h-6" />}
+        {isOpen ? <X className="w-6 h-6" /> : <GraduationCap className="w-6 h-6" />}
       </motion.button>
 
       {/* Chat Window */}
@@ -1233,7 +1233,7 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
             <div className="p-4 bg-indigo-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-xl">
-                  <School className="w-5 h-5" />
+                  <GraduationCap className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold">EduManage AI</h3>
@@ -1278,7 +1278,7 @@ export default function AIAssistant({ profile }: { profile: UserProfile | null }
                     "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
                     msg.role === 'user' ? "bg-indigo-100 text-indigo-600" : "bg-white border border-slate-200 text-slate-600 shadow-sm"
                   )}>
-                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <School className="w-4 h-4" />}
+                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <GraduationCap className="w-4 h-4" />}
                   </div>
                   <div className={cn(
                     "p-3 rounded-2xl text-sm",
