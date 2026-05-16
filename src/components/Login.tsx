@@ -60,31 +60,33 @@ export default function Login() {
         return;
       }
 
-      // 3. For regular users, verify the school domain exists
+      // 3. For regular users, verify the school domain exists (if provided)
       const cleanDomain = domain.toLowerCase().trim();
-      if (!cleanDomain) {
-        throw new Error("Please enter your school web address.");
-      }
-
-      const schoolQuery = query(collection(db, 'schools'), where('domain', '==', cleanDomain));
-      const schoolSnap = await getDocs(schoolQuery);
+      let schoolId = '';
       
-      if (schoolSnap.empty) {
-        throw new Error(`School with address "${cleanDomain}" not found. Please register first.`);
+      if (cleanDomain) {
+        const schoolQuery = query(collection(db, 'schools'), where('domain', '==', cleanDomain));
+        const schoolSnap = await getDocs(schoolQuery);
+        
+        if (schoolSnap.empty) {
+          throw new Error(`School with address "${cleanDomain}" not found. Please register first.`);
+        }
+        schoolId = schoolSnap.docs[0].id;
       }
-      const schoolId = schoolSnap.docs[0].id;
 
       // 4. Verify membership for this specific school
-      const authQuery = query(
-        collection(db, 'authorized_emails'), 
-        where('email', '==', userEmail),
-        where('schoolId', '==', schoolId)
-      );
-      const authSnap = await getDocs(authQuery);
+      let q = collection(db, 'authorized_emails');
+      if (schoolId) {
+        q = query(q, where('email', '==', userEmail), where('schoolId', '==', schoolId));
+      } else {
+        q = query(q, where('email', '==', userEmail));
+      }
+      
+      const authSnap = await getDocs(q);
 
       if (authSnap.empty) {
         await auth.signOut();
-        throw new Error("You are not authorized to login to this school. Please contact the administrator.");
+        throw new Error("You are not authorized to login to this school" + (schoolId ? " or not registered for this specific school" : ". Please contact the administrator."));
       }
     } catch (error: any) {
       console.error("Login failed:", error);
