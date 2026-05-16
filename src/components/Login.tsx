@@ -75,18 +75,17 @@ export default function Login() {
       }
 
       // 4. Verify membership for this specific school
-      let q = collection(db, 'authorized_emails');
+      let authQuery = collection(db, 'authorized_emails');
       if (schoolId) {
-        q = query(q, where('email', '==', userEmail), where('schoolId', '==', schoolId));
+        authQuery = query(authQuery, where('email', '==', userEmail), where('schoolId', '==', schoolId));
       } else {
-        q = query(q, where('email', '==', userEmail));
+        authQuery = query(authQuery, where('email', '==', userEmail));
       }
-      
-      const authSnap = await getDocs(q);
+      const authSnap = await getDocs(authQuery);
 
       if (authSnap.empty) {
         await auth.signOut();
-        throw new Error("You are not authorized to login to this school" + (schoolId ? " or not registered for this specific school" : ". Please contact the administrator."));
+        throw new Error(schoolId ? "You are not authorized to login to this school." : "You are not authorized to login to any registered school.");
       }
     } catch (error: any) {
       console.error("Login failed:", error);
