@@ -9,7 +9,6 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firestore with settings to bypass potential proxy/connection issues
 export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true,
-  experimentalForceLongPolling: true,
   cacheSizeBytes: CACHE_SIZE_UNLIMITED,
 }, firebaseConfig.firestoreDatabaseId || '(default)');
 
