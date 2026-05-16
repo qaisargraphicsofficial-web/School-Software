@@ -577,6 +577,26 @@ export interface LeaveBalance {
   schoolId?: string;
 }
 
+export interface SubscriptionPlan {
+  id?: string;
+  name: 'basic' | 'premium';
+  priceMonthly: number;
+  priceYearly: number;
+  features: string[];
+}
+
+export interface SchoolSubscription {
+  id?: string;
+  schoolId: string;
+  planId: string;
+  status: 'trial' | 'active' | 'expired';
+  type: 'monthly' | 'yearly';
+  startDate: string;
+  expiryDate: string;
+}
+
+export type UserRole = 'admin' | 'staff' | 'parent' | 'student';
+
 export interface SchoolWebsiteConfig {
   id?: string;
   campusId: string;

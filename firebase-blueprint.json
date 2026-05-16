@@ -540,6 +540,8 @@
     "shop_items": { "schema": "ShopItem", "description": "Collection of items available in the shop" },
     "shop_sales": { "schema": "ShopSale", "description": "Collection of shop sales records" },
     "classes": { "schema": "Class", "description": "Collection of class and section definitions" },
-    "dateSheets": { "schema": "DateSheet", "description": "Collection of exam date sheets" }
+    "dateSheets": { "schema": "DateSheet", "description": "Collection of exam date sheets" },
+    "subscription_plans": { "schema": "SubscriptionPlan", "description": "Collection of subscription plans" },
+    "school_subscriptions": { "schema": "SchoolSubscription", "description": "Collection of school subscriptions" }
   }
 }

@@ -4,6 +4,8 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, getDocFromServer } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile, UserRole, UserStatus } from './types';
+import { getSchoolSubscription } from './services/subscriptionService';
+import { SchoolSubscription } from './types';
 import { Clock, LogIn, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 const Login = lazy(() => import('./components/Login'));
@@ -56,6 +58,7 @@ export default function App() {
   const [connectionError, setConnectionError] = useState<boolean>(false);
   const [activeSchoolId, setActiveSchoolId] = useState<string | null>(null);
   const [schoolData, setSchoolData] = useState<any>(null);
+  const [schoolSubscription, setSchoolSubscription] = useState<SchoolSubscription | null>(null);
   const [checkingSchool, setCheckingSchool] = useState(false);
 
   useEffect(() => {
@@ -216,10 +219,14 @@ export default function App() {
       if (!activeSchoolId) return;
       setCheckingSchool(true);
       try {
-        const schoolSnap = await getDoc(doc(db, 'schools', activeSchoolId));
+        const [schoolSnap, sub] = await Promise.all([
+          getDoc(doc(db, 'schools', activeSchoolId)),
+          getSchoolSubscription(activeSchoolId)
+        ]);
         if (schoolSnap.exists()) {
           setSchoolData(schoolSnap.data());
         }
+        setSchoolSubscription(sub);
       } catch (error) {
         console.error("Error checking school status:", error);
       } finally {
@@ -231,8 +238,8 @@ export default function App() {
 
   const isSystemAdmin = user?.email?.toLowerCase() === "qaisarabbas6496@gmail.com";
 
-  const isTrialExpired = schoolData?.isTrial && schoolData?.trialExpiresAt && new Date(schoolData.trialExpiresAt) < new Date();
-  const isSuspended = schoolData?.isActive === false;
+  const isTrialExpired = schoolSubscription?.status === 'trial' && new Date(schoolSubscription.expiryDate) < new Date();
+  const isSuspended = schoolSubscription?.status === 'expired';
 
   if (connectionError) {
     return (

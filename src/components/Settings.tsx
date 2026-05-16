@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { seedData } from '../services/seedService';
+import { activateTrial } from '../services/subscriptionService';
 import { SchoolSettings, UserProfile, SchoolApplication, UserStatus } from '../types';
 import { sendApplicationUpdate } from '../lib/notifications';
 import { 
@@ -222,9 +223,16 @@ export default function Settings({ profile }: SettingsProps) {
         plan: app.plan,
         createdAt: new Date().toISOString(),
         isActive: true, // Default to active
-        isTrial: app.isTrial || false,
-        trialExpiresAt: app.trialExpiresAt || null
+        isTrial: true,
+        trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       });
+
+      // 3. Activate Subscription Trial
+      try {
+        await activateTrial(app.id);
+      } catch (e) {
+        console.error("Error activating trial", e);
+      }
 
       // 3. Find and update user profile
       const userQ = query(collection(db, 'users'), where('email', '==', app.email));

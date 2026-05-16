@@ -142,6 +142,16 @@ service cloud.firestore {
       allow update, delete: if isAdmin(); 
     }
     
+    // --- Subscription System ---
+    match /subscription_plans/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+    match /school_subscriptions/{schoolId} {
+      allow read: if belongsToSchool(schoolId);
+      allow write: if isSuperAdmin();
+    }
+    
     match /authorized_emails/{id} { allow read, list: if isSignedIn(); allow write: if isSuperAdmin() || isAdmin(); }
     match /settings/{id} { allow read, list: if isSuperAdmin() || (isApproved() && (id == "global" || belongsToSchool(id))); allow write: if isAdmin(); }
     match /school_settings/{id} { allow read, list: if isSuperAdmin() || (isApproved() && belongsToSchool(id)); allow write: if isAdmin(); }

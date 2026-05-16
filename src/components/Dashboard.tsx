@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, orderBy, limit, onSnapshot, where, getCountFromServer, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserProfile, Task, Subject } from '../types';
+import { getSchoolSubscription } from '../services/subscriptionService';
+import { UserProfile, Task, Subject, SchoolSubscription } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { 
   Users, 
@@ -49,22 +50,27 @@ export default function Dashboard({ profile }: DashboardProps) {
   const [mySubjects, setMySubjects] = useState<Subject[]>([]);
   const [fetchingStats, setFetchingStats] = useState(false);
   const [schoolName, setSchoolName] = useState<string>('Your School');
+  const [subscription, setSubscription] = useState<SchoolSubscription | null>(null);
 
   useEffect(() => {
-    const fetchSchoolName = async () => {
+    const fetchSchoolData = async () => {
       if (!profile?.schoolId) return;
       try {
-        const schoolDocRef = doc(db, 'school_settings', profile.schoolId);
-        const schoolSnap = await getDoc(schoolDocRef);
-        if (schoolSnap.exists()) {
-          setSchoolName(schoolSnap.data().schoolName || 'Your School');
+        const [nameSnap, sub] = await Promise.all([
+          getDoc(doc(db, 'school_settings', profile.schoolId)),
+          getSchoolSubscription(profile.schoolId)
+        ]);
+        
+        if (nameSnap.exists()) {
+          setSchoolName(nameSnap.data().schoolName || 'Your School');
         }
+        setSubscription(sub);
       } catch (err) {
-        console.error("Error fetching school name:", err);
+        console.error("Error fetching school data:", err);
       }
     };
     
-    fetchSchoolName();
+    fetchSchoolData();
   }, [profile?.schoolId]);
 
   useEffect(() => {
@@ -224,9 +230,21 @@ export default function Dashboard({ profile }: DashboardProps) {
           </h1>
           <p className="text-slate-500 font-medium">Here's what's happening at {schoolName} today.</p>
         </div>
-        <div className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 shadow-sm">
-          <Calendar className="w-4 h-4 text-indigo-600" />
-          {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+        <div className="flex items-center gap-3">
+          {subscription && (
+            <div className={cn(
+              "px-4 py-2 border rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm",
+              subscription.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+              subscription.status === 'trial' ? "bg-amber-50 text-amber-600 border-amber-100" :
+              "bg-rose-50 text-rose-600 border-rose-100"
+            )}>
+              {subscription.planId.toUpperCase()} Plan ({subscription.status})
+            </div>
+          )}
+          <div className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 shadow-sm">
+            <Calendar className="w-4 h-4 text-indigo-600" />
+            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+          </div>
         </div>
       </div>
 
