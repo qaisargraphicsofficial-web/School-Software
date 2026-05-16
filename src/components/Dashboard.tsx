@@ -226,9 +226,9 @@ export default function Dashboard({ profile }: DashboardProps) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">
-            Welcome back, {profile?.email?.split('@')[0]}!
+            Welcome back to {schoolName}, {profile?.email?.split('@')[0]}!
           </h1>
-          <p className="text-slate-500 font-medium">Here's what's happening at {schoolName} today.</p>
+          <p className="text-slate-500 font-medium">Here's a snapshot of your institution's daily operations.</p>
         </div>
         <div className="flex items-center gap-3">
           {subscription && (
