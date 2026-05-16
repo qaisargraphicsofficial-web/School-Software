@@ -234,7 +234,7 @@ export default function Settings({ profile }: SettingsProps) {
         console.error("Error activating trial", e);
       }
 
-      // 3. Find and update user profile
+      // 3. Find and update user profile or add to authorized emails
       const userQ = query(collection(db, 'users'), where('email', '==', app.email));
       const userSnap = await getDocs(userQ);
       
@@ -245,6 +245,15 @@ export default function Settings({ profile }: SettingsProps) {
           isSubscribed: true,
           schoolId: app.id,
           campusId: app.id // Use app ID as the isolation ID
+        });
+      } else {
+        // Create an authorized entry if they don't have a profile yet
+        await setDoc(doc(collection(db, 'authorized_emails')), {
+          email: app.email,
+          role: 'admin',
+          schoolId: app.id,
+          campusId: app.id,
+          createdAt: new Date().toISOString()
         });
       }
 
