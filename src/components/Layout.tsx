@@ -322,7 +322,6 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
     },
     { name: 'Communication', icon: MessageSquare, path: '/communication', roles: ['admin', 'staff', 'student', 'parent'], category: 'COMMUNICATION', schoolOnly: true },
     { name: 'Reports', icon: PieChart, path: '/reports', roles: ['admin', 'staff'], category: 'AI & SETTINGS', schoolOnly: true },
-    { name: 'User Management', icon: Shield, path: '/users', roles: ['admin'], category: 'SYSTEM CONTROL', systemOnly: true },
     { name: 'Settings', icon: Settings, path: '/settings', roles: ['admin'], category: 'AI & SETTINGS' },
     { name: 'Campuses', icon: Building2, path: '/campuses', roles: ['admin'], category: 'STAFF & OPS', schoolOnly: true },
     { name: 'Library', icon: Library, path: '/library', roles: ['admin', 'staff', 'student', 'parent'], category: 'ACADEMICS', schoolOnly: true },
@@ -332,6 +331,7 @@ export default function Layout({ profile, onSwitchSchool, onSwitchCampus }: Layo
     { name: 'School Shop', icon: Package, path: '/school-shop', roles: ['admin'], category: 'STAFF & OPS', schoolOnly: true },
     { name: 'Transport', icon: Bus, path: '/transport', roles: ['admin', 'staff'], category: 'STAFF & OPS', schoolOnly: true },
     { name: 'My School Website', icon: School, path: '/school-website', roles: ['admin'], category: 'AI & SETTINGS', schoolOnly: true },
+    { name: 'User Management', icon: Shield, path: '/users', roles: ['admin'], category: 'OTHER', systemOnly: true },
     { name: 'Support & Feedback', icon: MessageSquare, path: '/support', roles: ['admin', 'staff'], category: 'OTHER', schoolOnly: true },
   ];
 

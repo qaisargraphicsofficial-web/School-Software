@@ -3,6 +3,7 @@ import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } fro
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { seedData } from '../services/seedService';
 import { SchoolSettings, UserProfile, SchoolApplication, UserStatus } from '../types';
+import { sendApplicationUpdate } from '../lib/notifications';
 import { 
   Settings as SettingsIcon, 
   Check,
@@ -240,6 +241,10 @@ export default function Settings({ profile }: SettingsProps) {
       }
 
       alert(`Application for ${app.schoolName} approved!`);
+      
+      // Send automated email
+      await sendApplicationUpdate(app.email, app.schoolName, 'approved');
+      
       fetchApplications();
     } catch (error) {
       console.error("Error approving application:", error);
@@ -249,14 +254,22 @@ export default function Settings({ profile }: SettingsProps) {
     }
   };
 
-  const handleRejectApplication = async (appId: string) => {
-    if (!window.confirm("Are you sure you want to reject this application?")) return;
-    setRejectingId(appId);
+  const handleRejectApplication = async (app: SchoolApplication) => {
+    if (!app.id) return;
+    const reason = window.prompt("Reason for rejection (optional):", "Incomplete information");
+    if (reason === null) return; // Cancelled
+
+    setRejectingId(app.id);
     try {
-      await updateDoc(doc(db, 'school_applications', appId), {
-        status: 'rejected'
+      await updateDoc(doc(db, 'school_applications', app.id), {
+        status: 'rejected',
+        rejectionReason: reason
       });
-      alert("Application rejected.");
+      
+      // Send automated email
+      await sendApplicationUpdate(app.email, app.schoolName, 'rejected', reason);
+      
+      alert("Application rejected and email sent.");
       fetchApplications();
     } catch (error) {
       console.error("Error rejecting application:", error);
@@ -1419,14 +1432,14 @@ export default function Settings({ profile }: SettingsProps) {
                                   >
                                     {approvingId === app.id ? 'Approving...' : 'Approve & Pay'}
                                   </button>
-                                  <button
-                                    type="button"
-                                    disabled={rejectingId === app.id}
-                                    onClick={() => handleRejectApplication(app.id!)}
-                                    className="w-full px-4 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-100 transition-all disabled:opacity-50"
-                                  >
-                                    {rejectingId === app.id ? 'Rejecting...' : 'Reject Application'}
-                                  </button>
+                                    <button
+                                      type="button"
+                                      disabled={rejectingId === app.id}
+                                      onClick={() => handleRejectApplication(app)}
+                                      className="w-full px-4 py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-rose-100 transition-all disabled:opacity-50"
+                                    >
+                                      {rejectingId === app.id ? 'Rejecting...' : 'Reject Application'}
+                                    </button>
                                 </>
                               ) : (
                                 <div className="flex items-center justify-center gap-2 text-emerald-600 font-black text-xs uppercase tracking-widest">
